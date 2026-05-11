@@ -50,7 +50,7 @@ export default function Landing() {
           {[
             { icon: Calendar, title: 'Matter & Deadline Tracking', desc: 'Stay ahead of critical dates and case milestones with automated reminders and calendar integration.', color: 'text-blue-600 bg-blue-50' },
             { icon: Bell, title: 'Client Reminders & Appointments', desc: 'Automate client reminders, manage appointments, and keep every party informed at every stage.', color: 'text-green-600 bg-green-50' },
-            { icon: FileCheck, title: 'Document Readiness & Annual Returns', desc: 'Keep documents organized, track what's missing, and file annual returns on time with guided workflows.', color: 'text-purple-600 bg-purple-50' },
+            { icon: FileCheck, title: 'Document Readiness & Annual Returns', desc: "Keep documents organized, track what's missing, and file annual returns on time with guided workflows.", color: 'text-purple-600 bg-purple-50' },
           ].map(({ icon: Icon, title, desc, color }) => (
             <div key={title} className="card p-6 hover:shadow-md transition-shadow">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${color}`}>
@@ -72,7 +72,7 @@ export default function Landing() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { role: 'Firm Partners', desc: 'Get a bird's-eye view of all matters, financial performance, compliance scores, and annual return progress across the entire practice.', features: ['Practice-wide analytics', 'Financial dashboards', 'Compliance scoring', 'Matter lifecycle tracking'] },
+              { role: 'Firm Partners', desc: "Get a bird's-eye view of all matters, financial performance, compliance scores, and annual return progress across the entire practice.", features: ['Practice-wide analytics', 'Financial dashboards', 'Compliance scoring', 'Matter lifecycle tracking'] },
               { role: 'Attorneys', desc: 'Manage your caseload efficiently with matter overviews, deadline tracking, document management, and client communications in one place.', features: ['Client matter management', 'Deadline tracking', 'Document center', 'Billing overview'] },
               { role: 'Clients', desc: 'Stay informed and empowered with a clear view of your case status, upcoming tasks, required documents, and easy communication with your legal team.', features: ['Case status tracking', 'Task management', 'Document uploads', 'Legal team messaging'] },
             ].map(({ role, desc, features }) => (
