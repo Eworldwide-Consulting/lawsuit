@@ -1,5 +1,5 @@
-// LexProtect Service Worker
-const CACHE_NAME = 'lexprotect-v1';
+// Trivanta Service Worker
+const CACHE_NAME = 'trivanta-v1';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', event => {
@@ -37,7 +37,7 @@ self.addEventListener('fetch', event => {
 });
 
 self.addEventListener('push', event => {
-  const data = event.data?.json() || { title: 'LexProtect', body: 'You have a new notification' };
+  const data = event.data?.json() || { title: 'Trivanta', body: 'You have a new notification' };
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,

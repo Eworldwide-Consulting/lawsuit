@@ -1,4 +1,4 @@
-# LexProtect – Hostinger Deployment Guide
+# Trivanta – Hostinger Deployment Guide
 
 ## Requirements
 - Hostinger VPS (Ubuntu 22.04 recommended) or Cloud Hosting with Node.js
@@ -11,9 +11,9 @@
 
 ```bash
 # Via SSH (recommended):
-scp -r ./lexprotect user@YOUR_VPS_IP:/home/user/
+scp -r ./trivanta user@YOUR_VPS_IP:/home/user/
 ssh user@YOUR_VPS_IP
-cd lexprotect
+cd trivanta
 ```
 
 Or use Hostinger's File Manager to upload the project zip.
@@ -43,7 +43,7 @@ Set these values in `server/.env`:
 NODE_ENV=production
 PORT=5000
 JWT_SECRET=<generate a strong random secret>
-DB_PATH=./lexprotect.db
+DB_PATH=./trivanta.db
 UPLOAD_DIR=./uploads
 MAX_FILE_SIZE_MB=20
 ```
@@ -79,7 +79,7 @@ pm2 startup   # follow the printed command to auto-start on reboot
 Check status:
 ```bash
 pm2 status
-pm2 logs lexprotect
+pm2 logs trivanta
 ```
 
 ---
@@ -91,7 +91,7 @@ Install Nginx:
 sudo apt install nginx -y
 ```
 
-Create config at `/etc/nginx/sites-available/lexprotect`:
+Create config at `/etc/nginx/sites-available/trivanta`:
 ```nginx
 server {
     listen 80;
@@ -116,7 +116,7 @@ server {
 
 Enable and start:
 ```bash
-sudo ln -s /etc/nginx/sites-available/lexprotect /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/trivanta /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -134,7 +134,7 @@ sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 
 ## Mobile App (iOS & Android)
 
-LexProtect is a **Progressive Web App (PWA)**. Users can install it:
+Trivanta is a **Progressive Web App (PWA)**. Users can install it:
 
 **iOS (Safari):**
 1. Open your domain in Safari
@@ -151,7 +151,7 @@ LexProtect is a **Progressive Web App (PWA)**. Users can install it:
 For native iOS/Android apps, use **Capacitor** to wrap the PWA:
 ```bash
 npm install -g @capacitor/cli
-npx cap init LexProtect com.lexprotect.app
+npx cap init Trivanta com.trivanta.app
 npx cap add ios
 npx cap add android
 cd client && npm run build
@@ -168,16 +168,16 @@ After seeding:
 
 | Role | Email | Password |
 |------|-------|----------|
-| Managing Partner | partner@lexprotect.com | Password123! |
-| Attorney | attorney@lexprotect.com | Password123! |
-| Client | client@lexprotect.com | Password123! |
+| Managing Partner | partner@trivanta.com | Password123! |
+| Attorney | attorney@trivanta.com | Password123! |
+| Client | client@trivanta.com | Password123! |
 
 ---
 
 ## File Structure
 
 ```
-lexprotect/
+trivanta/
 ├── client/          # React PWA frontend
 │   ├── dist/        # Built static files (after npm run build)
 │   └── src/
@@ -185,7 +185,7 @@ lexprotect/
 │   ├── src/
 │   └── .env         # Your config (never commit!)
 ├── uploads/         # Uploaded documents
-├── lexprotect.db    # SQLite database
+├── trivanta.db    # SQLite database
 ├── ecosystem.config.js  # PM2 config
 └── deploy.sh        # One-command deploy
 ```
@@ -194,7 +194,7 @@ lexprotect/
 
 **Port already in use:**
 ```bash
-pm2 delete lexprotect
+pm2 delete trivanta
 pm2 start ecosystem.config.js --env production
 ```
 
@@ -205,5 +205,5 @@ cd server && node src/seed.js
 
 **Check logs:**
 ```bash
-pm2 logs lexprotect --lines 100
+pm2 logs trivanta --lines 100
 ```

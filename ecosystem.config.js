@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'lexprotect',
+      name: 'trivanta',
       script: 'server/src/index.js',
       instances: 1,
       exec_mode: 'fork',

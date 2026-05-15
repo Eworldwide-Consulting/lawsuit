@@ -10,7 +10,7 @@ router.get('/', requireAuth, requireRole('attorney', 'partner'), (req, res) => {
 
 router.get('/attorneys', requireAuth, (req, res) => {
   const db = getDb();
-  const attorneys = db.prepare("SELECT id, first_name, last_name, email, avatar_initials FROM users WHERE role IN ('attorney', 'partner') ORDER BY first_name").all();
+  const attorneys = db.prepare("SELECT id, first_name, last_name, email, role, avatar_initials FROM users WHERE role IN ('attorney', 'partner') ORDER BY first_name").all();
   res.json(attorneys);
 });
 

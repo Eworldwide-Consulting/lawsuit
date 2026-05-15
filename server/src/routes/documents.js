@@ -30,7 +30,11 @@ router.get('/', requireAuth, (req, res) => {
   if (matterId) {
     docs = db.prepare('SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC').all(matterId);
   } else if (req.user.role === 'client') {
-    docs = db.prepare('SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
+    docs = db.prepare(`
+      SELECT * FROM documents
+      WHERE matter_id IN (SELECT id FROM matters WHERE client_id = ?)
+      ORDER BY created_at DESC
+    `).all(req.user.id);
   } else {
     docs = db.prepare('SELECT * FROM documents ORDER BY created_at DESC').all();
   }

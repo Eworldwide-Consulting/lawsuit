@@ -46,12 +46,15 @@ router.get('/:id', requireAuth, (req, res) => {
 router.post('/', requireAuth, (req, res) => {
   const { matterType, description, court, county, urgent, importantDate, hasDocuments, workedWithFirmBefore, additionalNotes, matterStatus } = req.body;
   const db = getDb();
-  const caseNum = `${new Date().getFullYear().toString().slice(2)}-${String(db.prepare('SELECT COUNT(*) as c FROM matters').get().c + 1).padStart(4, '0')}`;
+  // Insert without case_number first; derive it from the guaranteed-unique autoincrement id
   const result = db.prepare(`
-    INSERT INTO matters (case_number, client_id, matter_type, stage, description, court, county, urgent, important_date, has_documents, worked_with_firm_before, additional_notes, status)
-    VALUES (?, ?, ?, 'intake', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(caseNum, req.user.id, matterType || null, description || null, court || null, county || null, urgent ? 1 : 0, importantDate || null, hasDocuments ? 1 : 0, workedWithFirmBefore ? 1 : 0, additionalNotes || null, matterStatus || 'active');
-  const matter = db.prepare('SELECT * FROM matters WHERE id = ?').get(result.lastInsertRowid);
+    INSERT INTO matters (client_id, matter_type, stage, description, court, county, urgent, important_date, has_documents, worked_with_firm_before, additional_notes, status)
+    VALUES (?, ?, 'intake', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(req.user.id, matterType || null, description || null, court || null, county || null, urgent ? 1 : 0, importantDate || null, hasDocuments ? 1 : 0, workedWithFirmBefore ? 1 : 0, additionalNotes || null, matterStatus || 'active');
+  const newId = result.lastInsertRowid;
+  const caseNum = `${new Date().getFullYear().toString().slice(2)}-${String(newId).padStart(4, '0')}`;
+  db.prepare('UPDATE matters SET case_number = ? WHERE id = ?').run(caseNum, newId);
+  const matter = db.prepare('SELECT * FROM matters WHERE id = ?').get(newId);
   res.status(201).json(matter);
 });
 

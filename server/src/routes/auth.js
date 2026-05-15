@@ -90,7 +90,7 @@ router.post('/verify-2fa', (req, res) => {
 });
 
 router.post('/setup-2fa', requireAuth, (req, res) => {
-  const secret = speakeasy.generateSecret({ name: `LexProtect (${req.user.email})` });
+  const secret = speakeasy.generateSecret({ name: `Trivanta (${req.user.email})` });
   const db = getDb();
   db.prepare('UPDATE users SET two_fa_secret = ? WHERE id = ?').run(secret.base32, req.user.id);
   res.json({ secret: secret.base32, otpauth_url: secret.otpauth_url });

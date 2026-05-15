@@ -1,5 +1,5 @@
 {
-  "name": "lexprotect-server",
+  "name": "trivanta-server",
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {

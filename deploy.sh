@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 LexProtect Deployment Script"
+echo "🚀 Trivanta Deployment Script"
 echo "================================"
 
 # Check Node.js
@@ -44,7 +44,7 @@ npm run build --prefix client
 mkdir -p logs uploads
 
 # Seed database (first run only)
-if [ ! -f lexprotect.db ]; then
+if [ ! -f trivanta.db ]; then
   echo ""
   echo "🌱 Seeding database with demo data..."
   cd server && node src/seed.js && cd ..
@@ -61,6 +61,6 @@ echo "  pm2 start ecosystem.config.js --env production"
 echo "  pm2 save && pm2 startup"
 echo ""
 echo "Demo accounts:"
-echo "  Partner:  partner@lexprotect.com / Password123!"
-echo "  Attorney: attorney@lexprotect.com / Password123!"
-echo "  Client:   client@lexprotect.com  / Password123!"
+echo "  Partner:  partner@trivanta.com / Password123!"
+echo "  Attorney: attorney@trivanta.com / Password123!"
+echo "  Client:   client@trivanta.com  / Password123!"

@@ -1,8 +1,8 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../lexprotect.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../trivanta.db');
 
 let db;
 

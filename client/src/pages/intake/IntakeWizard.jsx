@@ -34,7 +34,7 @@ export default function IntakeWizard() {
         <div className="w-12 h-12 bg-navy-900 rounded-2xl flex items-center justify-center mx-auto mb-3">
           <span className="text-2xl">⚖️</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Welcome to LexProtect</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Welcome to Trivanta</h1>
         <p className="text-gray-500 text-sm mt-1">Let's get started. We'll guide you to the right support.</p>
       </div>
 

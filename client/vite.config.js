@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'LexProtect Legal Compliance',
-        short_name: 'LexProtect',
+        name: 'Trivanta Legal Compliance',
+        short_name: 'Trivanta',
         description: 'Secure legal compliance, all in one place.',
         theme_color: '#0f2057',
         background_color: '#0f2057',
@@ -39,7 +39,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:3001', changeOrigin: true },
+      '/api': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
   build: {

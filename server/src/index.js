@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -65,5 +65,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 LexProtect server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+  console.log(`🚀 Trivanta server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
 });
