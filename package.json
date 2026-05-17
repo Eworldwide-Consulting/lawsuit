@@ -1,7 +1,7 @@
 {
   "name": "trivanta",
   "version": "1.0.0",
-  "description": "Trivanta Legal Compliance Platform",
+  "description": "TriVanta Legal Compliance Platform",
   "scripts": {
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",

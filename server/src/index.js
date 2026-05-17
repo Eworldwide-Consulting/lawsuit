@@ -65,5 +65,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Trivanta server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+  console.log(`🚀 TriVanta server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
 });

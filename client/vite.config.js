@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Trivanta Legal Compliance',
-        short_name: 'Trivanta',
+        name: 'TriVanta Legal Compliance',
+        short_name: 'TriVanta',
         description: 'Secure legal compliance, all in one place.',
         theme_color: '#0f2057',
         background_color: '#0f2057',

@@ -96,7 +96,7 @@ export default function Login() {
       </button>
 
       <p className="mt-6 text-center text-sm text-gray-500">
-        New to Trivanta?{' '}
+        New to TriVanta?{' '}
         <Link to="/register" className="text-green-600 hover:text-green-700 font-medium">Request access</Link>
       </p>
 

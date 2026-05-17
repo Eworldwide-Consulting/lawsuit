@@ -95,7 +95,7 @@ export default function Landing() {
       {/* CTA */}
       <section className="py-20 px-6 bg-gradient-to-r from-[#0f2057] to-[#1a3476] text-white text-center">
         <h2 className="text-3xl font-bold mb-4">Ready to get started?</h2>
-        <p className="text-blue-200 mb-8 max-w-xl mx-auto">Join law firms already using Trivanta to manage their legal compliance with confidence.</p>
+        <p className="text-blue-200 mb-8 max-w-xl mx-auto">Join law firms already using TriVanta to manage their legal compliance with confidence.</p>
         <button onClick={() => navigate('/register')} className="bg-green-500 hover:bg-green-600 text-white font-semibold px-10 py-4 rounded-xl transition-colors inline-flex items-center gap-2">
           Request Access <ArrowRight size={18} />
         </button>
@@ -106,7 +106,7 @@ export default function Landing() {
           <Shield size={14} />
           <span>Protected with secure encryption</span>
         </div>
-        © {new Date().getFullYear()} Trivanta Legal Compliance. All rights reserved.
+        © {new Date().getFullYear()} TriVanta Legal Compliance. All rights reserved.
       </footer>
     </div>
   );

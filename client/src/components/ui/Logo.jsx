@@ -12,7 +12,7 @@ export default function Logo({ dark = false, size = 'md' }) {
         <path d="M17 22L20.5 25.5L27 19" stroke={dark ? 'white' : '#22c55e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
       <div>
-        <div className={`font-bold leading-tight ${s.title} ${textColor}`}>Trivanta</div>
+        <div className={`font-bold leading-tight ${s.title} ${textColor}`}>TriVanta</div>
         <div className={`font-semibold tracking-widest uppercase ${s.sub} ${subColor}`}>Legal Compliance</div>
       </div>
     </div>

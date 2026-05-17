@@ -1,4 +1,4 @@
-// Trivanta Service Worker
+// TriVanta Service Worker
 const CACHE_NAME = 'trivanta-v1';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 
@@ -37,7 +37,7 @@ self.addEventListener('fetch', event => {
 });
 
 self.addEventListener('push', event => {
-  const data = event.data?.json() || { title: 'Trivanta', body: 'You have a new notification' };
+  const data = event.data?.json() || { title: 'TriVanta', body: 'You have a new notification' };
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,

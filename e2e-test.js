@@ -417,7 +417,7 @@ const futureDateOnly = days => new Date(Date.now() + days * 86400000).toISOStrin
     matterId, title: 'Hearing Prep Review – Torres Guardianship',
     type: 'in_person',
     startTime: futureDate(10, 9), endTime: futureDate(10, 10),
-    location: 'Trivanta Law Offices, 100 Peachtree St, Atlanta GA',
+    location: 'TriVanta Law Offices, 100 Peachtree St, Atlanta GA',
     notes: 'Bring government-issued ID and any correspondence from Dorothy\'s doctors',
   }, atToken);
   log(newAppt.status === 201 ? 'PASS' : 'FAIL', 'Attorney schedules in-person appointment', newAppt.body.location?.slice(0, 30));
