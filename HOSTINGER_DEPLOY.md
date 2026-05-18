@@ -79,6 +79,12 @@ This creates `trivanta-hostinger-YYYYMMDD-HHMM.zip` containing:
    | **Application root** | `public_html/trivanta` *(your upload folder)* |
    | **Application URL** | `yourdomain.com` |
    | **Application startup file** | `server/src/index.js` |
+   | **Application run command** | *(leave blank or `node server/src/index.js`)* |
+
+   > ⚠️ **IMPORTANT — Build command field:**  
+   > If hPanel shows a **"Build command"** field, **leave it blank** or delete any value in it.  
+   > The React frontend is **pre-built** and included in the zip (`client/dist/`).  
+   > Setting it to `npm run build` causes an infinite loop on Hostinger's environment.
 
 4. Click **Save** / **Create Application**
 

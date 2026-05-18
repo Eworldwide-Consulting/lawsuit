@@ -34,6 +34,12 @@
    - **Node.js version:** `20.x` (choose from dropdown)
    - **Application root:** `/public_html/trivanta`
    - **Application startup file:** `server/src/index.js`
+   - **Build command:** *(leave this field completely EMPTY)*
+
+   > ⚠️ **Do NOT put `npm run build` in the Build command field.**  
+   > The app is pre-built and included in the zip. Entering a build command  
+   > causes an infinite loop and a build timeout on Hostinger.
+
 4. Click **Save**
 
 ---
