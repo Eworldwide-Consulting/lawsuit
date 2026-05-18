@@ -14,6 +14,7 @@ const appointmentRoutes = require('./routes/appointments');
 const taskRoutes = require('./routes/tasks');
 const dashboardRoutes = require('./routes/dashboard');
 const userRoutes = require('./routes/users');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,6 +24,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 getDb();
 
 app.use(helmet({ contentSecurityPolicy: false }));
+
+// Stripe webhook must receive raw body — register BEFORE express.json()
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(cors({
   origin: isProduction ? true : (process.env.CLIENT_URL || 'http://localhost:5173'),
   credentials: true,
@@ -46,6 +50,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV }));

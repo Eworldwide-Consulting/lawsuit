@@ -37,21 +37,35 @@
     @apply text-blue-100 hover:bg-white/10 hover:text-white;
   }
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap;
   }
-  .badge-green { @apply badge bg-green-100 text-green-800; }
+  .badge-green  { @apply badge bg-green-100  text-green-800; }
   .badge-yellow { @apply badge bg-yellow-100 text-yellow-800; }
-  .badge-red { @apply badge bg-red-100 text-red-800; }
-  .badge-blue { @apply badge bg-blue-100 text-blue-800; }
-  .badge-gray { @apply badge bg-gray-100 text-gray-600; }
+  .badge-red    { @apply badge bg-red-100    text-red-800; }
+  .badge-blue   { @apply badge bg-blue-100   text-blue-800; }
+  .badge-gray   { @apply badge bg-gray-100   text-gray-600; }
+  .badge-purple { @apply badge bg-purple-100 text-purple-800; }
+  .badge-orange { @apply badge bg-orange-100 text-orange-700; }
   .stat-card {
-    @apply card p-4 flex flex-col gap-1;
+    @apply card p-5 flex flex-col gap-1;
   }
   .progress-step {
     @apply flex flex-col items-center;
   }
   .otp-input {
     @apply w-12 h-14 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors;
+  }
+  /* Upload drop zone */
+  .drop-zone {
+    @apply border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-150
+           border-gray-300 hover:border-green-400 hover:bg-green-50/50;
+  }
+  .drop-zone.active {
+    @apply border-green-400 bg-green-50;
+  }
+  /* File chip */
+  .file-chip {
+    @apply flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2;
   }
 }
 

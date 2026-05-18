@@ -117,6 +117,23 @@ function initSchema() {
       filed_date TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      matter_id INTEGER REFERENCES matters(id),
+      client_id INTEGER REFERENCES users(id),
+      created_by INTEGER REFERENCES users(id),
+      stripe_session_id TEXT,
+      stripe_payment_intent_id TEXT,
+      amount INTEGER NOT NULL,
+      currency TEXT DEFAULT 'usd',
+      description TEXT NOT NULL,
+      service_type TEXT DEFAULT 'general',
+      status TEXT DEFAULT 'pending',
+      due_date TEXT,
+      paid_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 }
 

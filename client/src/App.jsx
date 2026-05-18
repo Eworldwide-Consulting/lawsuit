@@ -29,6 +29,7 @@ import Messages from './pages/Messages';
 import Appointments from './pages/Appointments';
 import Settings from './pages/Settings';
 import CareTasks from './pages/CareTasks';
+import Payments from './pages/Payments';
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -69,6 +70,8 @@ export default function App() {
       <Route path="/appointments" element={<RequireAuth><DashboardLayout><Appointments /></DashboardLayout></RequireAuth>} />
       <Route path="/care-tasks" element={<RequireAuth><DashboardLayout><CareTasks /></DashboardLayout></RequireAuth>} />
       <Route path="/settings" element={<RequireAuth><DashboardLayout><Settings /></DashboardLayout></RequireAuth>} />
+      <Route path="/payments" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />
+      <Route path="/payments/success" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />

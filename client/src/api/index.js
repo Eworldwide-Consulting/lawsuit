@@ -79,4 +79,11 @@ export const usersApi = {
   clients: () => api.get('/users/clients'),
 };
 
+export const paymentsApi = {
+  list: () => api.get('/payments'),
+  createInvoice: d => api.post('/payments/invoice', d),
+  checkout: invoiceId => api.post(`/payments/checkout/${invoiceId}`),
+  confirm: sessionId => api.get(`/payments/confirm/${sessionId}`),
+};
+
 export default api;

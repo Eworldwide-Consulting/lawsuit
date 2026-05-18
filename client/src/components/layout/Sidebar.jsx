@@ -2,45 +2,43 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Logo from '../ui/Logo';
 import {
-  LayoutDashboard, FileText, Users, DollarSign, CreditCard,
+  LayoutDashboard, FileText, Users, CreditCard,
   Calendar, BarChart2, MessageSquare, Settings, LogOut, FileCheck,
-  Home, Briefcase, CheckSquare, Folder,
+  Briefcase, CheckSquare, Folder,
 } from 'lucide-react';
 
 const clientNav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/my-case', icon: Briefcase, label: 'My Case' },
-  { to: '/care-tasks', icon: CheckSquare, label: 'Care Tasks' },
-  { to: '/documents', icon: Folder, label: 'Documents' },
-  { to: '/appointments', icon: Calendar, label: 'Appointments' },
-  { to: '/messages', icon: MessageSquare, label: 'Messages' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/my-case',     icon: Briefcase,       label: 'My Case' },
+  { to: '/care-tasks',  icon: CheckSquare,     label: 'Care Tasks' },
+  { to: '/documents',   icon: Folder,          label: 'Documents' },
+  { to: '/appointments',icon: Calendar,        label: 'Appointments' },
+  { to: '/messages',    icon: MessageSquare,   label: 'Messages' },
+  { to: '/payments',    icon: CreditCard,      label: 'Billing' },
+  { to: '/settings',    icon: Settings,        label: 'Settings' },
 ];
 
 const attorneyNav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/matters', icon: FileText, label: 'Matters' },
-  { to: '/clients', icon: Users, label: 'Clients' },
-  { to: '/documents', icon: Folder, label: 'Documents' },
-  { to: '/deadlines', icon: Calendar, label: 'Deadlines' },
-  { to: '/annual-returns', icon: FileCheck, label: 'Annual Returns' },
-  { to: '/appointments', icon: Calendar, label: 'Appointments' },
-  { to: '/messages', icon: MessageSquare, label: 'Messages' },
-  { to: '/reports', icon: BarChart2, label: 'Reports' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/matters',      icon: FileText,        label: 'Matters' },
+  { to: '/clients',      icon: Users,           label: 'Clients' },
+  { to: '/documents',    icon: Folder,          label: 'Documents' },
+  { to: '/appointments', icon: Calendar,        label: 'Appointments' },
+  { to: '/messages',     icon: MessageSquare,   label: 'Messages' },
+  { to: '/payments',     icon: CreditCard,      label: 'Billing' },
+  { to: '/settings',     icon: Settings,        label: 'Settings' },
 ];
 
 const partnerNav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/matters', icon: FileText, label: 'Matters' },
-  { to: '/clients', icon: Users, label: 'Clients' },
-  { to: '/documents', icon: Folder, label: 'Documents' },
-  { to: '/deadlines', icon: Calendar, label: 'Deadlines' },
-  { to: '/annual-returns', icon: FileCheck, label: 'Annual Returns' },
-  { to: '/appointments', icon: Calendar, label: 'Appointments' },
-  { to: '/messages', icon: MessageSquare, label: 'Messages' },
-  { to: '/reports', icon: BarChart2, label: 'Reports' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/matters',      icon: FileText,        label: 'Matters' },
+  { to: '/clients',      icon: Users,           label: 'Clients' },
+  { to: '/documents',    icon: Folder,          label: 'Documents' },
+  { to: '/appointments', icon: Calendar,        label: 'Appointments' },
+  { to: '/messages',     icon: MessageSquare,   label: 'Messages' },
+  { to: '/payments',     icon: CreditCard,      label: 'Billing' },
+  { to: '/reports',      icon: BarChart2,       label: 'Reports' },
+  { to: '/settings',     icon: Settings,        label: 'Settings' },
 ];
 
 const navByRole = { client: clientNav, attorney: attorneyNav, partner: partnerNav };
