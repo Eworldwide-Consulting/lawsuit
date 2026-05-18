@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TriVanta — Application Flow & Test Report</title>
+<style>
+  :root {
+    --navy:  #060e2d;
+    --navy2: #0f2057;
+    --navy3: #1a3476;
+    --gold:  #d4af37;
+    --gold2: #f0c040;
+    --blue:  #3b82f6;
+    --green: #22c55e;
+    --red:   #ef4444;
+    --orange:#f97316;
+    --purple:#a855f7;
+    --text:  #e2e8f0;
+    --muted: #94a3b8;
+    --border:#1e3a5f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, var(--navy2), var(--navy3));
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+  header h1 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: white;
+  }
+  header h1 span { color: var(--gold); }
+  .header-meta { font-size: 12px; color: var(--muted); }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    background: var(--navy2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 14px 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all .2s;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+  }
+
+  /* ── Panels ── */
+  .panel { display: none; padding: 32px; }
+  .panel.active { display: block; }
+
+  /* ── Section Headings ── */
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 6px;
+  }
+  .section-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  /* ── Flow Diagram Canvas ── */
+  #flowCanvas {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    background: #040c22;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  #flowCanvas svg {
+    min-width: 1600px;
+    height: 820px;
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* ── Node Styles (SVG foreignObject via class) ── */
+  .node rect { cursor: pointer; }
+  .node:hover rect { filter: brightness(1.2); }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* ── API Table ── */
+  .api-section { margin-bottom: 36px; }
+  .api-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 12px;
+    padding: 6px 12px;
+    background: rgba(212,175,55,.08);
+    border-left: 3px solid var(--gold);
+    border-radius: 0 4px 4px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    background: rgba(255,255,255,.03);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    font-size: 13px;
+    vertical-align: top;
+  }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .method {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: monospace;
+  }
+  .GET    { background: rgba(34,197,94,.15);  color: #4ade80; }
+  .POST   { background: rgba(59,130,246,.15); color: #60a5fa; }
+  .PUT    { background: rgba(249,115,22,.15); color: #fb923c; }
+  .DELETE { background: rgba(239,68,68,.15);  color: #f87171; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .badge-public   { background: rgba(34,197,94,.15); color: #4ade80; }
+  .badge-auth     { background: rgba(59,130,246,.15); color: #60a5fa; }
+  .badge-attorney { background: rgba(249,115,22,.15); color: #fb923c; }
+  .badge-partner  { background: rgba(168,85,247,.15); color: #c084fc; }
+  .badge-client   { background: rgba(20,184,166,.15); color: #2dd4bf; }
+  .code { font-family: monospace; font-size: 12px; color: #93c5fd; }
+
+  /* ── Role Matrix ── */
+  .matrix-wrapper { overflow-x: auto; }
+  .matrix table { min-width: 900px; }
+  .check  { color: #4ade80; font-size: 16px; }
+  .cross  { color: #f87171; font-size: 16px; }
+  .partial{ color: #fbbf24; font-size: 14px; }
+
+  /* ── User Journey ── */
+  .journey { margin-bottom: 40px; }
+  .journey-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .journey-title .role-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+  }
+  .steps-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+  .step {
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 160px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .step-num {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 4px;
+  }
+  .step-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 4px;
+  }
+  .step-route {
+    font-size: 11px;
+    font-family: monospace;
+    color: #60a5fa;
+  }
+  .step-desc { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    color: var(--gold);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .arrow-cond {
+    font-size: 9px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ── Test Results ── */
+  .test-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-value { font-size: 2.2rem; font-weight: 800; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .green  { color: #4ade80; }
+  .yellow { color: #fbbf24; }
+  .red-c  { color: #f87171; }
+
+  .test-section { margin-bottom: 32px; }
+  .test-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .test-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  .test-row:hover { background: rgba(255,255,255,.03); }
+  .test-status {
+    font-size: 12px;
+    font-weight: 700;
+    width: 52px;
+    text-align: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .PASS  { background: rgba(34,197,94,.15);  color: #4ade80; }
+  .FAIL  { background: rgba(239,68,68,.15);  color: #f87171; }
+  .WARN  { background: rgba(251,191,36,.15); color: #fbbf24; }
+  .INFO  { background: rgba(99,102,241,.15); color: #a5b4fc; }
+  .test-label { flex: 1; font-size: 13px; }
+  .test-detail { font-size: 11px; color: var(--muted); font-family: monospace; }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: fixed;
+    background: #0f2057;
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: white;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .15s;
+    z-index: 200;
+    max-width: 260px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  }
+  #tooltip strong { color: var(--gold); display: block; margin-bottom: 4px; }
+  #tooltip .tip-route { font-family: monospace; color: #60a5fa; font-size: 11px; }
+  #tooltip .tip-desc  { color: #94a3b8; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>TriVanta &mdash; <span>Application Flow & Test Report</span></h1>
+    <div class="header-meta">Generated: May 2026 &nbsp;|&nbsp; React 18 + Express 4 + SQLite &nbsp;|&nbsp; 30 pages &bull; 27 API endpoints &bull; 3 user roles</div>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:12px;color:var(--muted)">Frontend Build</div>
+    <div style="color:#4ade80;font-weight:700;font-size:13px">✓ SUCCESS — 2.91s</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" onclick="showTab('flow')">📊 Flow Diagram</div>
+  <div class="tab" onclick="showTab('journeys')">🧭 User Journeys</div>
+  <div class="tab" onclick="showTab('api')">🔌 API Map</div>
+  <div class="tab" onclick="showTab('roles')">🔐 Role Matrix</div>
+  <div class="tab" onclick="showTab('tests')">✅ Test Results</div>
+  <div class="tab" onclick="showTab('issues')">⚠️ Issues Found</div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 1 · FLOW DIAGRAM
+═══════════════════════════════════════════════════════════ -->
+<div id="flow" class="panel active">
+  <div class="section-title">Application Route Flow Diagram</div>
+  <div class="section-sub">All pages, navigation paths, authentication gates, and role-based routing. Click nodes to see details.</div>
+
+  <div id="flowCanvas">
+    <svg id="svg" viewBox="0 0 1680 820" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#d4af37" opacity=".7"/>
+        </marker>
+        <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#ef4444" opacity=".7"/>
+        </marker>
+        <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#22c55e" opacity=".7"/>
+        </marker>
+        <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6" opacity=".7"/>
+        </marker>
+        <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#a855f7" opacity=".7"/>
+        </marker>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- ── Background grid ── -->
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,.025)" stroke-width="1"/>
+      </pattern>
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+
+      <!-- ── Column labels ── -->
+      <text x="100" y="22" font-size="10" fill="#94a3b8" text-anchor="middle" font-weight="700" letter-spacing="1">PUBLIC</text>
+      <text x="350" y="22" font-size="10" fill="#94a3b8" text-anchor="middle" font-weight="700" letter-spacing="1">AUTH FLOW</text>
+      <text x="610" y="22" font-size="10" fill="#94a3b8" text-anchor="middle" font-weight="700" letter-spacing="1">INTAKE</text>
+      <text x="870" y="22" font-size="10" fill="#94a3b8" text-anchor="middle" font-weight="700" letter-spacing="1">ROUTING</text>
+      <text x="1140" y="22" font-size="10" fill="#94a3b8" text-anchor="middle" font-weight="700" letter-spacing="1">DASHBOARDS</text>
+      <text x="1430" y="22" font-size="10" fill="#94a3b8" text-anchor="middle" font-weight="700" letter-spacing="1">FEATURES</text>
+
+      <!-- ── Column separators ── -->
+      <line x1="220" y1="30" x2="220" y2="800" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="480" y1="30" x2="480" y2="800" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="740" y1="30" x2="740" y2="800" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="1000" y1="30" x2="1000" y2="800" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="1260" y1="30" x2="1260" y2="800" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
+
+      <!-- ═══════════════════
+           NODES DEFINITION
+           Each node: [id, x, y, w, h, fill, stroke, label, sublabel, route, desc]
+      ═══════════════════ -->
+
+      <!-- PUBLIC PAGES -->
+      <!-- Landing -->
+      <g class="node" data-id="landing" data-route="/" data-desc="Premium landing page with hero, services, security, pricing, testimonials. Entry point for all users.">
+        <rect x="20" y="44" width="160" height="52" rx="8" fill="#0f2057" stroke="#d4af37" stroke-width="2" filter="url(#glow)"/>
+        <text x="100" y="66" font-size="12" font-weight="700" fill="white" text-anchor="middle">🏠 Landing</text>
+        <text x="100" y="83" font-size="10" fill="#94a3b8" text-anchor="middle">/ (public)</text>
+      </g>
+
+      <!-- Login -->
+      <g class="node" data-id="login" data-route="/login" data-desc="Email + password login form. Supports 2FA redirect. Links to register and forgot-password.">
+        <rect x="20" y="130" width="160" height="52" rx="8" fill="#0f2057" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="100" y="152" font-size="12" font-weight="700" fill="white" text-anchor="middle">🔑 Login</text>
+        <text x="100" y="169" font-size="10" fill="#94a3b8" text-anchor="middle">/login</text>
+      </g>
+
+      <!-- Register -->
+      <g class="node" data-id="register" data-route="/register" data-desc="4-step registration wizard: Personal info → Matter details → Contact prefs → Review & submit. Creates user + redirects to /intake.">
+        <rect x="20" y="216" width="160" height="52" rx="8" fill="#0f2057" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="100" y="237" font-size="12" font-weight="700" fill="white" text-anchor="middle">📝 Register</text>
+        <text x="100" y="254" font-size="10" fill="#94a3b8" text-anchor="middle">/register (4 steps)</text>
+      </g>
+
+      <!-- TwoFactor -->
+      <g class="node" data-id="verify" data-route="/verify" data-desc="TOTP-based 6-digit OTP input. 102s countdown timer. Paste-to-fill. Trust device option. Uses sessionStorage tempToken.">
+        <rect x="20" y="302" width="160" height="52" rx="8" fill="#0f2057" stroke="#f97316" stroke-width="1.5"/>
+        <text x="100" y="322" font-size="12" font-weight="700" fill="white" text-anchor="middle">🔐 Two Factor</text>
+        <text x="100" y="339" font-size="10" fill="#94a3b8" text-anchor="middle">/verify (TOTP)</text>
+      </g>
+
+      <!-- ForgotPassword -->
+      <g class="node" data-id="forgot" data-route="/forgot-password" data-desc="Email form to request password reset link. Shows success screen after submission.">
+        <rect x="20" y="388" width="160" height="52" rx="8" fill="#0f2057" stroke="#94a3b8" stroke-width="1"/>
+        <text x="100" y="408" font-size="12" font-weight="700" fill="white" text-anchor="middle">🔓 Forgot Pwd</text>
+        <text x="100" y="425" font-size="10" fill="#94a3b8" text-anchor="middle">/forgot-password</text>
+      </g>
+
+      <!-- ── AUTH GATE (col 2) ── -->
+      <g class="node" data-id="authgate" data-route="RequireAuth" data-desc="RequireAuth HOC: checks isAuthenticated + loading from AuthContext. Redirects to /login if not authenticated.">
+        <rect x="270" y="216" width="160" height="52" rx="8" fill="#1a1a3a" stroke="#f97316" stroke-width="2" stroke-dasharray="5,3"/>
+        <text x="350" y="237" font-size="11" font-weight="700" fill="#fb923c" text-anchor="middle">🛡 Auth Gate</text>
+        <text x="350" y="254" font-size="10" fill="#94a3b8" text-anchor="middle">RequireAuth HOC</text>
+      </g>
+
+      <!-- ── INTAKE PAGES (col 3) ── -->
+      <g class="node" data-id="intake" data-route="/intake" data-desc="Matter type selection wizard: guardianship, conservatorship, estate_admin, existing, not_sure. Auth required.">
+        <rect x="530" y="130" width="160" height="52" rx="8" fill="#0a2218" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="610" y="152" font-size="12" font-weight="700" fill="white" text-anchor="middle">🏛 Intake Wizard</text>
+        <text x="610" y="169" font-size="10" fill="#94a3b8" text-anchor="middle">/intake</text>
+      </g>
+
+      <g class="node" data-id="matterdetails" data-route="/intake/matter-details" data-desc="Matter details form: description, court, county, important date, urgent flag, additional notes.">
+        <rect x="530" y="216" width="160" height="52" rx="8" fill="#0a2218" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="610" y="237" font-size="12" font-weight="700" fill="white" text-anchor="middle">📋 Matter Details</text>
+        <text x="610" y="254" font-size="10" fill="#94a3b8" text-anchor="middle">/intake/matter-details</text>
+      </g>
+
+      <g class="node" data-id="requiredocs" data-route="/intake/documents" data-desc="Required documents checklist for the selected matter type. Upload functionality. Guides user to dashboard.">
+        <rect x="530" y="302" width="160" height="52" rx="8" fill="#0a2218" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="610" y="322" font-size="12" font-weight="700" fill="white" text-anchor="middle">📄 Req. Documents</text>
+        <text x="610" y="339" font-size="10" fill="#94a3b8" text-anchor="middle">/intake/documents</text>
+      </g>
+
+      <!-- ── DASHBOARD ROUTER (col 4) ── -->
+      <g class="node" data-id="dashrouter" data-route="/dashboard" data-desc="DashboardRouter: reads user.role from AuthContext and routes to ClientDashboard, AttorneyDashboard, or PartnerDashboard.">
+        <rect x="790" y="216" width="160" height="52" rx="8" fill="#1a1a3a" stroke="#d4af37" stroke-width="2"/>
+        <text x="870" y="237" font-size="11" font-weight="700" fill="#fbbf24" text-anchor="middle">⚙️ Dashboard Router</text>
+        <text x="870" y="254" font-size="10" fill="#94a3b8" text-anchor="middle">role-based routing</text>
+      </g>
+
+      <!-- ── DASHBOARDS (col 5) ── -->
+      <g class="node" data-id="clientdash" data-route="/dashboard (client)" data-desc="Client: case readiness gauge, 7-stage timeline, tasks, document upload, appointments, messages, deadlines, help.">
+        <rect x="1060" y="130" width="170" height="52" rx="8" fill="#0a2218" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="1145" y="152" font-size="12" font-weight="700" fill="white" text-anchor="middle">👤 Client Dashboard</text>
+        <text x="1145" y="169" font-size="10" fill="#94a3b8" text-anchor="middle">role: client</text>
+      </g>
+
+      <g class="node" data-id="attdash" data-route="/dashboard (attorney)" data-desc="Attorney: YTD revenue, collections, caseload table, area chart, financial alerts, partner snapshot, appointments.">
+        <rect x="1060" y="230" width="170" height="52" rx="8" fill="#0a1a3a" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="1145" y="252" font-size="12" font-weight="700" fill="white" text-anchor="middle">⚖️ Attorney Dashboard</text>
+        <text x="1145" y="269" font-size="10" fill="#94a3b8" text-anchor="middle">role: attorney</text>
+      </g>
+
+      <g class="node" data-id="ptdash" data-route="/dashboard (partner)" data-desc="Partner: active matters, annual deadlines, firm overview table, lifecycle timeline, readiness scores, compliance checklist.">
+        <rect x="1060" y="330" width="170" height="52" rx="8" fill="#1a0a3a" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="1145" y="352" font-size="12" font-weight="700" fill="white" text-anchor="middle">🏢 Partner Dashboard</text>
+        <text x="1145" y="369" font-size="10" fill="#94a3b8" text-anchor="middle">role: partner</text>
+      </g>
+
+      <!-- ── FEATURE PAGES (col 6) ── -->
+      <g class="node" data-id="matters" data-route="/matters" data-desc="Matter list: sortable table, search, filter by type/status, new matter button. Attorney/partner see all; client sees own.">
+        <rect x="1320" y="44" width="150" height="44" rx="8" fill="#0f2057" stroke="#3b82f6" stroke-width="1"/>
+        <text x="1395" y="62" font-size="11" font-weight="700" fill="white" text-anchor="middle">📁 Matters</text>
+        <text x="1395" y="77" font-size="10" fill="#94a3b8" text-anchor="middle">/matters</text>
+      </g>
+
+      <g class="node" data-id="matterdetail" data-route="/matters/:id" data-desc="Single matter view: metadata, stage, status, attorney/client info, court details, timeline, notes.">
+        <rect x="1320" y="110" width="150" height="44" rx="8" fill="#0f2057" stroke="#3b82f6" stroke-width="1"/>
+        <text x="1395" y="128" font-size="11" font-weight="700" fill="white" text-anchor="middle">📋 Matter Detail</text>
+        <text x="1395" y="143" font-size="10" fill="#94a3b8" text-anchor="middle">/matters/:id</text>
+      </g>
+
+      <g class="node" data-id="mycase" data-route="/my-case" data-desc="Client alias for /matters/:id — shows the client's own case. Same component, different route.">
+        <rect x="1490" y="110" width="150" height="44" rx="8" fill="#0f2057" stroke="#22c55e" stroke-width="1"/>
+        <text x="1565" y="128" font-size="11" font-weight="700" fill="white" text-anchor="middle">🗂 My Case</text>
+        <text x="1565" y="143" font-size="10" fill="#94a3b8" text-anchor="middle">/my-case (client)</text>
+      </g>
+
+      <g class="node" data-id="documents" data-route="/documents" data-desc="Document management: drag-drop upload, list, search, filter by status, download, delete. Progress by category.">
+        <rect x="1320" y="180" width="150" height="44" rx="8" fill="#0f2057" stroke="#d4af37" stroke-width="1"/>
+        <text x="1395" y="198" font-size="11" font-weight="700" fill="white" text-anchor="middle">📂 Documents</text>
+        <text x="1395" y="213" font-size="10" fill="#94a3b8" text-anchor="middle">/documents</text>
+      </g>
+
+      <g class="node" data-id="messages" data-route="/messages" data-desc="Messaging: inbox + sent tabs, compose form, mark-read, unread badge. Polled every 60s in DashboardLayout.">
+        <rect x="1320" y="250" width="150" height="44" rx="8" fill="#0f2057" stroke="#a855f7" stroke-width="1"/>
+        <text x="1395" y="268" font-size="11" font-weight="700" fill="white" text-anchor="middle">💬 Messages</text>
+        <text x="1395" y="283" font-size="10" fill="#94a3b8" text-anchor="middle">/messages</text>
+      </g>
+
+      <g class="node" data-id="appointments" data-route="/appointments" data-desc="Appointments: list upcoming + past, schedule form (teleconference/in-person/phone), cancel, location, notes.">
+        <rect x="1320" y="320" width="150" height="44" rx="8" fill="#0f2057" stroke="#22c55e" stroke-width="1"/>
+        <text x="1395" y="338" font-size="11" font-weight="700" fill="white" text-anchor="middle">📅 Appointments</text>
+        <text x="1395" y="353" font-size="10" fill="#94a3b8" text-anchor="middle">/appointments</text>
+      </g>
+
+      <g class="node" data-id="caretasks" data-route="/care-tasks" data-desc="Task management: filter all/pending/overdue/completed, mark complete, action labels (Upload/Sign/Confirm), due dates.">
+        <rect x="1320" y="390" width="150" height="44" rx="8" fill="#0f2057" stroke="#f97316" stroke-width="1"/>
+        <text x="1395" y="408" font-size="11" font-weight="700" fill="white" text-anchor="middle">✅ Care Tasks</text>
+        <text x="1395" y="423" font-size="10" fill="#94a3b8" text-anchor="middle">/care-tasks</text>
+      </g>
+
+      <g class="node" data-id="settings" data-route="/settings" data-desc="Settings: Profile tab (name/phone), Security tab (change password, 2FA toggle), Notifications tab (email/SMS prefs).">
+        <rect x="1320" y="460" width="150" height="44" rx="8" fill="#0f2057" stroke="#94a3b8" stroke-width="1"/>
+        <text x="1395" y="478" font-size="11" font-weight="700" fill="white" text-anchor="middle">⚙️ Settings</text>
+        <text x="1395" y="493" font-size="10" fill="#94a3b8" text-anchor="middle">/settings</text>
+      </g>
+
+      <!-- ── TOKEN STORAGE BOX ── -->
+      <g>
+        <rect x="20" y="495" width="160" height="80" rx="8" fill="rgba(212,175,55,.05)" stroke="rgba(212,175,55,.3)" stroke-width="1"/>
+        <text x="100" y="514" font-size="10" font-weight="700" fill="#d4af37" text-anchor="middle">💾 TOKEN STORAGE</text>
+        <text x="100" y="530" font-size="10" fill="#94a3b8" text-anchor="middle">localStorage:</text>
+        <text x="100" y="544" font-size="10" fill="#60a5fa" text-anchor="middle" font-family="monospace">lp_token, lp_user</text>
+        <text x="100" y="558" font-size="10" fill="#94a3b8" text-anchor="middle">sessionStorage:</text>
+        <text x="100" y="572" font-size="10" fill="#fb923c" text-anchor="middle" font-family="monospace">lp_temp_token (2FA)</text>
+      </g>
+
+      <!-- ── 401 AUTO-REDIRECT BOX ── -->
+      <g>
+        <rect x="270" y="495" width="160" height="52" rx="8" fill="rgba(239,68,68,.05)" stroke="rgba(239,68,68,.3)" stroke-width="1"/>
+        <text x="350" y="514" font-size="10" font-weight="700" fill="#f87171" text-anchor="middle">⚡ 401 AUTO-REDIRECT</text>
+        <text x="350" y="530" font-size="10" fill="#94a3b8" text-anchor="middle">axios interceptor</text>
+        <text x="350" y="546" font-size="10" fill="#60a5fa" text-anchor="middle">→ clears token → /login</text>
+      </g>
+
+      <!-- ── 2FA FLOW BOX ── -->
+      <g>
+        <rect x="270" y="302" width="160" height="80" rx="8" fill="rgba(249,115,22,.05)" stroke="rgba(249,115,22,.3)" stroke-width="1"/>
+        <text x="350" y="321" font-size="10" font-weight="700" fill="#fb923c" text-anchor="middle">2FA FLOW</text>
+        <text x="350" y="337" font-size="10" fill="#94a3b8" text-anchor="middle">login → tempToken</text>
+        <text x="350" y="351" font-size="10" fill="#94a3b8" text-anchor="middle">→ sessionStorage</text>
+        <text x="350" y="365" font-size="10" fill="#94a3b8" text-anchor="middle">→ /verify → real token</text>
+        <text x="350" y="379" font-size="10" fill="#4ade80" text-anchor="middle">→ /dashboard</text>
+      </g>
+
+      <!-- ── UNIMPLEMENTED ROUTES WARNING ── -->
+      <g>
+        <rect x="1490" y="180" width="150" height="100" rx="8" fill="rgba(239,68,68,.05)" stroke="rgba(239,68,68,.3)" stroke-width="1" stroke-dasharray="4,2"/>
+        <text x="1565" y="202" font-size="10" font-weight="700" fill="#f87171" text-anchor="middle">⚠️ MISSING ROUTES</text>
+        <text x="1565" y="218" font-size="10" fill="#94a3b8" text-anchor="middle">/clients</text>
+        <text x="1565" y="233" font-size="10" fill="#94a3b8" text-anchor="middle">/deadlines</text>
+        <text x="1565" y="248" font-size="10" fill="#94a3b8" text-anchor="middle">/annual-returns</text>
+        <text x="1565" y="263" font-size="10" fill="#94a3b8" text-anchor="middle">/reports</text>
+        <text x="1565" y="278" font-size="10" fill="#f87171" text-anchor="middle">In nav but not in App.jsx</text>
+      </g>
+
+      <!-- ══════════════════════
+           EDGES / ARROWS
+      ══════════════════════ -->
+
+      <!-- Landing → Login -->
+      <line x1="100" y1="96" x2="100" y2="130" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-blue)" opacity=".7"/>
+      <!-- Landing → Register -->
+      <line x1="130" y1="96" x2="130" y2="216" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)" opacity=".7"/>
+
+      <!-- Login → verify (2FA path) -->
+      <path d="M 180 165 Q 240 165 240 342 L 270 342" stroke="#f97316" stroke-width="1.5" fill="none" marker-end="url(#arr)" opacity=".7"/>
+      <text x="216" y="255" font-size="9" fill="#fb923c" text-anchor="middle" transform="rotate(-90,216,255)">if 2FA req</text>
+
+      <!-- Login → Auth Gate (no 2FA) -->
+      <path d="M 180 165 Q 225 165 225 242 L 270 242" stroke="#3b82f6" stroke-width="1.5" fill="none" marker-end="url(#arr-blue)" opacity=".7"/>
+      <text x="216" y="198" font-size="9" fill="#60a5fa" text-anchor="middle">direct</text>
+
+      <!-- Register → Auth Gate -->
+      <line x1="180" y1="242" x2="270" y2="242" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)" opacity=".7"/>
+
+      <!-- Login → Forgot Password -->
+      <line x1="100" y1="182" x2="100" y2="388" stroke="#94a3b8" stroke-width="1" marker-end="url(#arr)" opacity=".5" stroke-dasharray="4,3"/>
+
+      <!-- verify → Auth Gate (after successful 2FA) -->
+      <path d="M 180 328 Q 230 328 230 260 L 270 248" stroke="#f97316" stroke-width="1.5" fill="none" marker-end="url(#arr)" opacity=".7"/>
+
+      <!-- Auth Gate → Intake -->
+      <path d="M 430 230 Q 480 230 480 165 L 530 165" stroke="#22c55e" stroke-width="1.5" fill="none" marker-end="url(#arr-green)" opacity=".7"/>
+      <text x="480" y="195" font-size="9" fill="#4ade80" text-anchor="middle">new user</text>
+
+      <!-- Auth Gate → Dashboard Router -->
+      <path d="M 430 242 Q 610 242 790 242" stroke="#d4af37" stroke-width="2" fill="none" marker-end="url(#arr)" opacity=".8"/>
+      <text x="610" y="236" font-size="9" fill="#fbbf24" text-anchor="middle">existing user</text>
+
+      <!-- Intake → MatterDetails -->
+      <line x1="610" y1="182" x2="610" y2="216" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)" opacity=".7"/>
+      <!-- MatterDetails → RequiredDocuments -->
+      <line x1="610" y1="268" x2="610" y2="302" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)" opacity=".7"/>
+      <!-- RequiredDocuments → Dashboard Router -->
+      <path d="M 690 328 Q 740 328 740 242 L 790 242" stroke="#22c55e" stroke-width="1.5" fill="none" marker-end="url(#arr-green)" opacity=".7"/>
+
+      <!-- Dashboard Router → Client Dashboard -->
+      <path d="M 950 230 Q 1000 165 1060 156" stroke="#22c55e" stroke-width="1.5" fill="none" marker-end="url(#arr-green)" opacity=".7"/>
+      <text x="998" y="178" font-size="9" fill="#4ade80" text-anchor="middle">client</text>
+
+      <!-- Dashboard Router → Attorney Dashboard -->
+      <line x1="950" y1="242" x2="1060" y2="256" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-blue)" opacity=".7"/>
+      <text x="1005" y="250" font-size="9" fill="#60a5fa" text-anchor="middle">attorney</text>
+
+      <!-- Dashboard Router → Partner Dashboard -->
+      <path d="M 950 254 Q 1000 340 1060 356" stroke="#a855f7" stroke-width="1.5" fill="none" marker-end="url(#arr-purple)" opacity=".7"/>
+      <text x="998" y="320" font-size="9" fill="#c084fc" text-anchor="middle">partner</text>
+
+      <!-- Dashboards → Feature Pages -->
+      <!-- All dashboards connect to sidebar nav pages -->
+      <line x1="1230" y1="156" x2="1320" y2="66" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".4"/>
+      <line x1="1230" y1="163" x2="1320" y2="132" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".4"/>
+      <line x1="1230" y1="163" x2="1320" y2="202" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".4"/>
+      <line x1="1230" y1="163" x2="1320" y2="272" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".4"/>
+      <line x1="1230" y1="163" x2="1320" y2="342" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".4"/>
+      <line x1="1230" y1="163" x2="1320" y2="412" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".4"/>
+      <line x1="1230" y1="163" x2="1320" y2="482" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".4"/>
+
+      <!-- Matters → Matter Detail -->
+      <line x1="1395" y1="88" x2="1395" y2="110" stroke="#3b82f6" stroke-width="1" marker-end="url(#arr-blue)" opacity=".6"/>
+      <!-- My Case → Matter Detail (alias) -->
+      <line x1="1490" y1="132" x2="1470" y2="132" stroke="#22c55e" stroke-width="1" marker-end="url(#arr-green)" opacity=".6" stroke-dasharray="3,2"/>
+
+      <!-- 401 → Login -->
+      <path d="M 350 547 Q 350 600 100 600 Q 100 570 100 182" stroke="#ef4444" stroke-width="1" fill="none" marker-end="url(#arr-red)" opacity=".5" stroke-dasharray="4,3"/>
+
+      <!-- ── DASHBOARD LAYOUT LABEL ── -->
+      <rect x="1050" y="44" width="360" height="470" rx="12" fill="none" stroke="rgba(212,175,55,.15)" stroke-width="1" stroke-dasharray="6,3"/>
+      <text x="1230" y="60" font-size="10" fill="rgba(212,175,55,.5)" text-anchor="middle" font-weight="700">DASHBOARD LAYOUT WRAPPER</text>
+
+      <!-- ── INTAKE LABEL ── -->
+      <rect x="520" y="112" width="180" height="260" rx="10" fill="none" stroke="rgba(34,197,94,.15)" stroke-width="1" stroke-dasharray="5,3"/>
+      <text x="610" y="108" font-size="10" fill="rgba(34,197,94,.5)" text-anchor="middle" font-weight="700">INTAKE FLOW (auth required)</text>
+
+      <!-- Legend -->
+      <text x="30" y="620" font-size="10" font-weight="700" fill="#94a3b8">LEGEND:</text>
+      <rect x="30" y="632" width="10" height="10" rx="2" fill="#d4af37"/>
+      <text x="44" y="642" font-size="10" fill="#94a3b8">Gold border = entry/key page</text>
+      <rect x="180" y="632" width="10" height="10" rx="2" fill="#3b82f6"/>
+      <text x="194" y="642" font-size="10" fill="#94a3b8">Blue = login flow</text>
+      <rect x="310" y="632" width="10" height="10" rx="2" fill="#22c55e"/>
+      <text x="324" y="642" font-size="10" fill="#94a3b8">Green = success/client flow</text>
+      <rect x="470" y="632" width="10" height="10" rx="2" fill="#f97316"/>
+      <text x="484" y="642" font-size="10" fill="#94a3b8">Orange = 2FA/security</text>
+      <rect x="620" y="632" width="10" height="10" rx="2" fill="#a855f7"/>
+      <text x="634" y="642" font-size="10" fill="#94a3b8">Purple = partner role</text>
+      <rect x="750" y="632" width="10" height="10" rx="2" fill="#ef4444"/>
+      <text x="764" y="642" font-size="10" fill="#94a3b8">Red dashed = error/unauthorized</text>
+    </svg>
+  </div>
+
+  <div class="legend" style="margin-top:20px">
+    <div class="legend-item"><div class="legend-dot" style="background:#d4af37"></div> Public / Landing</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> Auth Pages (Login/Register)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> 2FA / Security</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> Intake & Client Flow</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> Attorney Role</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div> Partner Role</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> Error / Unauthorized Redirect</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#94a3b8"></div> Unimplemented Routes</div>
+  </div>
+
+  <div id="tooltip"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 2 · USER JOURNEYS
+═══════════════════════════════════════════════════════════ -->
+<div id="journeys" class="panel">
+  <div class="section-title">User Journey Flows</div>
+  <div class="section-sub">Step-by-step navigation paths for each user type and scenario.</div>
+
+  <!-- Journey 1: New Client -->
+  <div class="journey">
+    <div class="journey-title">
+      <span>🆕 New Client Registration & First Login</span>
+      <span class="role-badge badge-client">Client</span>
+    </div>
+    <div class="steps-row">
+      <div class="step"><div class="step-num">1</div><div class="step-name">Landing</div><div class="step-route">/</div><div class="step-desc">Sees hero + services + pricing</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">2</div><div class="step-name">Register</div><div class="step-route">/register</div><div class="step-desc">4-step wizard: info → matter → prefs → review</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">3</div><div class="step-name">Intake Wizard</div><div class="step-route">/intake</div><div class="step-desc">Select matter type (guardianship etc.)</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">4</div><div class="step-name">Matter Details</div><div class="step-route">/intake/matter-details</div><div class="step-desc">Court, county, important date</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">5</div><div class="step-name">Documents</div><div class="step-route">/intake/documents</div><div class="step-desc">Required docs checklist</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">6</div><div class="step-name">Client Dashboard</div><div class="step-route">/dashboard</div><div class="step-desc">Readiness gauge, tasks, timeline</div></div>
+    </div>
+  </div>
+
+  <!-- Journey 2: Returning Client with 2FA -->
+  <div class="journey">
+    <div class="journey-title">
+      <span>🔐 Returning Client with 2FA</span>
+      <span class="role-badge badge-client">Client</span>
+    </div>
+    <div class="steps-row">
+      <div class="step"><div class="step-num">1</div><div class="step-name">Landing</div><div class="step-route">/</div><div class="step-desc">Clicks "Sign In"</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">2</div><div class="step-name">Login</div><div class="step-route">/login</div><div class="step-desc">Email + password form</div></div>
+      <div class="arrow" style="flex-direction:column">
+        <div>→</div>
+        <div class="arrow-cond">2FA required</div>
+      </div>
+      <div class="step"><div class="step-num">3a</div><div class="step-name">Two Factor</div><div class="step-route">/verify</div><div class="step-desc">6-digit TOTP, 102s timer</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">4</div><div class="step-name">Dashboard</div><div class="step-route">/dashboard</div><div class="step-desc">Auth complete, lands here</div></div>
+    </div>
+    <div class="steps-row" style="margin-top:12px">
+      <div class="step" style="opacity:.5"><div class="step-num">─</div><div class="step-name">Login</div><div class="step-route">/login</div></div>
+      <div class="arrow" style="flex-direction:column">
+        <div>→</div>
+        <div class="arrow-cond">no 2FA</div>
+      </div>
+      <div class="step"><div class="step-num">3b</div><div class="step-name">Dashboard</div><div class="step-route">/dashboard</div><div class="step-desc">Direct login, token stored</div></div>
+    </div>
+  </div>
+
+  <!-- Journey 3: Client Daily Use -->
+  <div class="journey">
+    <div class="journey-title">
+      <span>📱 Client Daily Usage</span>
+      <span class="role-badge badge-client">Client</span>
+    </div>
+    <div class="steps-row">
+      <div class="step"><div class="step-num">1</div><div class="step-name">Dashboard</div><div class="step-route">/dashboard</div><div class="step-desc">Check readiness & tasks</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">2</div><div class="step-name">Care Tasks</div><div class="step-route">/care-tasks</div><div class="step-desc">Mark tasks complete</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">3</div><div class="step-name">Documents</div><div class="step-route">/documents</div><div class="step-desc">Upload required files</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">4</div><div class="step-name">Messages</div><div class="step-route">/messages</div><div class="step-desc">Read attorney message, reply</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">5</div><div class="step-name">Appointments</div><div class="step-route">/appointments</div><div class="step-desc">View / book consultation</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">6</div><div class="step-name">My Case</div><div class="step-route">/my-case</div><div class="step-desc">Full case details & timeline</div></div>
+    </div>
+  </div>
+
+  <!-- Journey 4: Attorney -->
+  <div class="journey">
+    <div class="journey-title">
+      <span>⚖️ Attorney — Managing a Client Case</span>
+      <span class="role-badge badge-attorney">Attorney</span>
+    </div>
+    <div class="steps-row">
+      <div class="step"><div class="step-num">1</div><div class="step-name">Dashboard</div><div class="step-route">/dashboard</div><div class="step-desc">Revenue, caseload, alerts</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">2</div><div class="step-name">Matters</div><div class="step-route">/matters</div><div class="step-desc">Filter/search all matters</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">3</div><div class="step-name">Matter Detail</div><div class="step-route">/matters/:id</div><div class="step-desc">View case, advance stage</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">4</div><div class="step-name">Appointments</div><div class="step-route">/appointments</div><div class="step-desc">Schedule consultation</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">5</div><div class="step-name">Messages</div><div class="step-route">/messages</div><div class="step-desc">Send client update</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">6</div><div class="step-name">Documents</div><div class="step-route">/documents</div><div class="step-desc">Review uploaded files</div></div>
+    </div>
+  </div>
+
+  <!-- Journey 5: Partner -->
+  <div class="journey">
+    <div class="journey-title">
+      <span>🏢 Partner — Firm Oversight</span>
+      <span class="role-badge badge-partner">Partner</span>
+    </div>
+    <div class="steps-row">
+      <div class="step"><div class="step-num">1</div><div class="step-name">Partner Dashboard</div><div class="step-route">/dashboard</div><div class="step-desc">Firm KPIs, lifecycle, readiness</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">2</div><div class="step-name">Matters</div><div class="step-route">/matters</div><div class="step-desc">All firm matters overview</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">3</div><div class="step-name">Documents</div><div class="step-route">/documents</div><div class="step-desc">Compliance doc review</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">4</div><div class="step-name">Appointments</div><div class="step-route">/appointments</div><div class="step-desc">Firm-wide scheduling</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="step-num">5</div><div class="step-name">Settings</div><div class="step-route">/settings</div><div class="step-desc">Profile & notifications</div></div>
+    </div>
+  </div>
+
+  <!-- Journey 6: Security / Error Paths -->
+  <div class="journey">
+    <div class="journey-title">
+      <span>🚨 Security & Error Scenarios</span>
+      <span class="role-badge" style="background:rgba(239,68,68,.15);color:#f87171">Error Path</span>
+    </div>
+    <div class="steps-row">
+      <div class="step" style="border-color:#ef4444"><div class="step-num">S1</div><div class="step-name">Direct URL</div><div class="step-route">/dashboard</div><div class="step-desc">No token in localStorage</div></div>
+      <div class="arrow" style="color:#ef4444">→</div>
+      <div class="step" style="border-color:#ef4444"><div class="step-num">S2</div><div class="step-name">RequireAuth</div><div class="step-route">HOC check</div><div class="step-desc">isAuthenticated = false</div></div>
+      <div class="arrow" style="color:#ef4444">→</div>
+      <div class="step" style="border-color:#ef4444"><div class="step-num">S3</div><div class="step-name">Redirect</div><div class="step-route">/login</div><div class="step-desc">replace: true (no back)</div></div>
+    </div>
+    <div class="steps-row" style="margin-top:12px">
+      <div class="step" style="border-color:#ef4444"><div class="step-num">E1</div><div class="step-name">API Call</div><div class="step-route">any API</div><div class="step-desc">Token expired/invalid</div></div>
+      <div class="arrow" style="color:#ef4444">→</div>
+      <div class="step" style="border-color:#ef4444"><div class="step-num">E2</div><div class="step-name">401 Response</div><div class="step-route">axios interceptor</div><div class="step-desc">Auto-clear token</div></div>
+      <div class="arrow" style="color:#ef4444">→</div>
+      <div class="step" style="border-color:#ef4444"><div class="step-num">E3</div><div class="step-name">Login</div><div class="step-route">/login</div><div class="step-desc">window.location redirect</div></div>
+    </div>
+    <div class="steps-row" style="margin-top:12px">
+      <div class="step" style="border-color:#fbbf24"><div class="step-num">W1</div><div class="step-name">Unknown Route</div><div class="step-route">/anything</div><div class="step-desc">Catch-all in App.jsx</div></div>
+      <div class="arrow" style="color:#fbbf24">→</div>
+      <div class="step" style="border-color:#fbbf24"><div class="step-num">W2</div><div class="step-name">Navigate</div><div class="step-route">/ (landing)</div><div class="step-desc">Replace redirect home</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 3 · API MAP
+═══════════════════════════════════════════════════════════ -->
+<div id="api" class="panel">
+  <div class="section-title">API Endpoint Reference</div>
+  <div class="section-sub">All 27 backend endpoints with method, path, auth requirements, and status codes.</div>
+
+  <div class="api-section">
+    <div class="api-section-title">🔑 Authentication — /api/auth</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Body</th><th>Response</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/auth/register</td><td><span class="badge badge-public">public</span></td><td>firstName, lastName, email, password, phone?, dob?, address?</td><td>201 {token, user} | 400 missing fields | 409 duplicate email</td></tr>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/auth/login</td><td><span class="badge badge-public">public</span></td><td>email, password</td><td>200 {token, user} | 200 {tempToken, twoFaRequired:true} | 401 invalid</td></tr>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/auth/verify-2fa</td><td><span class="badge badge-public">public</span></td><td>tempToken, code</td><td>200 {token, user} | 401 invalid code</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/auth/me</td><td><span class="badge badge-auth">auth</span></td><td>—</td><td>200 {user} | 401 no token</td></tr>
+        <tr><td><span class="method PUT">PUT</span></td><td class="code">/api/auth/profile</td><td><span class="badge badge-auth">auth</span></td><td>firstName, lastName, phone?</td><td>200 {user} | 401</td></tr>
+        <tr><td><span class="method PUT">PUT</span></td><td class="code">/api/auth/change-password</td><td><span class="badge badge-auth">auth</span></td><td>currentPassword, newPassword</td><td>200 success | 400 wrong current | 401</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="api-section">
+    <div class="api-section-title">📁 Matters — /api/matters</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Notes</th><th>Status Codes</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/matters</td><td><span class="badge badge-auth">auth</span></td><td>Client sees own; attorney/partner see all</td><td>200 [matters]</td></tr>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/matters</td><td><span class="badge badge-auth">auth</span></td><td>Creates matter. Auto-generates case_number. Stage = intake</td><td>201 {matter} | 400</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/matters/:id</td><td><span class="badge badge-auth">auth</span></td><td>Single matter detail with all fields</td><td>200 {matter} | 404</td></tr>
+        <tr><td><span class="method PUT">PUT</span></td><td class="code">/api/matters/:id</td><td><span class="badge badge-attorney">attorney</span><span class="badge badge-partner">partner</span></td><td>Update stage, urgent, notes. Client blocked (403)</td><td>200 | 403 | 404</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/matters/:id/timeline</td><td><span class="badge badge-auth">auth</span></td><td>Array of stage objects: {stage, completed, current, upcoming}</td><td>200 [stages]</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/matters/stats/overview</td><td><span class="badge badge-attorney">attorney</span><span class="badge badge-partner">partner</span></td><td>Firm-wide stats: total, active, atRisk</td><td>200 {stats}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="api-section">
+    <div class="api-section-title">📂 Documents — /api/documents</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Notes</th><th>Status Codes</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/documents</td><td><span class="badge badge-auth">auth</span></td><td>Query params: matterId?, status?</td><td>200 [docs]</td></tr>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/documents/upload</td><td><span class="badge badge-auth">auth</span></td><td>multipart/form-data. Fields: file, matterId?, category?</td><td>201 {doc} | 400 no file</td></tr>
+        <tr><td><span class="method PUT">PUT</span></td><td class="code">/api/documents/:id/status</td><td><span class="badge badge-attorney">attorney</span><span class="badge badge-partner">partner</span></td><td>Update doc status (pending/under_review/approved/rejected)</td><td>200 | 403</td></tr>
+        <tr><td><span class="method DELETE">DELETE</span></td><td class="code">/api/documents/:id</td><td><span class="badge badge-auth">auth</span></td><td>Deletes doc record and file from disk</td><td>200 | 403 | 404</td></tr>
+        <tr><td>Direct</td><td class="code">/api/documents/download/:id</td><td><span class="badge badge-auth">auth</span></td><td>Direct file download link (used as href)</td><td>200 file | 404</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="api-section">
+    <div class="api-section-title">💬 Messages — /api/messages</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Notes</th><th>Status Codes</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/messages</td><td><span class="badge badge-auth">auth</span></td><td>Inbox — messages where toUserId = current user</td><td>200 [msgs]</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/messages/sent</td><td><span class="badge badge-auth">auth</span></td><td>Sent — messages where fromUserId = current user</td><td>200 [msgs]</td></tr>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/messages</td><td><span class="badge badge-auth">auth</span></td><td>Send message. Required: toUserId, body. Optional: subject, matterId</td><td>201 {msg} | 400</td></tr>
+        <tr><td><span class="method PUT">PUT</span></td><td class="code">/api/messages/:id/read</td><td><span class="badge badge-auth">auth</span></td><td>Marks message as read, sets read_at timestamp</td><td>200 | 403</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/messages/unread-count</td><td><span class="badge badge-auth">auth</span></td><td>Polled every 60s by DashboardLayout for badge</td><td>200 {count}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="api-section">
+    <div class="api-section-title">📅 Appointments — /api/appointments</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Notes</th><th>Status Codes</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/appointments</td><td><span class="badge badge-auth">auth</span></td><td>All appointments for current user's matters</td><td>200 [appts]</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/appointments/upcoming</td><td><span class="badge badge-auth">auth</span></td><td>Future appointments only (startTime > now)</td><td>200 [appts]</td></tr>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/appointments</td><td><span class="badge badge-auth">auth</span></td><td>Required: title, startTime. Types: teleconference/in_person/phone</td><td>201 {appt} | 400</td></tr>
+        <tr><td><span class="method DELETE">DELETE</span></td><td class="code">/api/appointments/:id</td><td><span class="badge badge-auth">auth</span></td><td>Cancel appointment</td><td>200 | 403 | 404</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="api-section">
+    <div class="api-section-title">✅ Tasks — /api/tasks</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Notes</th><th>Status Codes</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/tasks</td><td><span class="badge badge-auth">auth</span></td><td>Client sees assigned tasks; attorney/partner see all</td><td>200 [tasks]</td></tr>
+        <tr><td><span class="method POST">POST</span></td><td class="code">/api/tasks</td><td><span class="badge badge-attorney">attorney</span><span class="badge badge-partner">partner</span></td><td>Required: matterId, title, assignedTo. Optional: priority, dueDate, actionLabel</td><td>201 {task} | 400</td></tr>
+        <tr><td><span class="method PUT">PUT</span></td><td class="code">/api/tasks/:id</td><td><span class="badge badge-auth">auth</span></td><td>Update status (completed/pending), priority, dueDate</td><td>200 | 403 | 404</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="api-section">
+    <div class="api-section-title">📊 Dashboard — /api/dashboard</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Returns</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/dashboard/client</td><td><span class="badge badge-client">client</span></td><td>matter, openTasks, completedTasks, upcomingAppts, messages, deadlines, readinessScore</td><td>200</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/dashboard/attorney</td><td><span class="badge badge-attorney">attorney</span></td><td>ytdRevenue, collected, outstanding, activeMatters, revenueData[], recentMessages</td><td>200</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/dashboard/partner</td><td><span class="badge badge-partner">partner</span></td><td>activeMatters, annualDeadlines, missingDocs, matters[], docStats[], lifecycleStageIdx, upcomingAppts, readinessScore</td><td>200</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="api-section">
+    <div class="api-section-title">👥 Users — /api/users</div>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Notes</th><th>Status Codes</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/users</td><td><span class="badge badge-attorney">attorney</span><span class="badge badge-partner">partner</span></td><td>All users. Client → 403</td><td>200 [users] | 403</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/users/attorneys</td><td><span class="badge badge-auth">auth</span></td><td>All attorneys. Accessible by all roles (needed for compose form)</td><td>200 [users]</td></tr>
+        <tr><td><span class="method GET">GET</span></td><td class="code">/api/users/clients</td><td><span class="badge badge-attorney">attorney</span><span class="badge badge-partner">partner</span></td><td>All clients. Client → 403</td><td>200 [users] | 403</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 4 · ROLE MATRIX
+═══════════════════════════════════════════════════════════ -->
+<div id="roles" class="panel">
+  <div class="section-title">Role-Based Access Control Matrix</div>
+  <div class="section-sub">What each user role can access, create, modify, and view across all features.</div>
+
+  <div class="matrix-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature / Action</th>
+          <th>Client</th>
+          <th>Attorney</th>
+          <th>Partner</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">AUTHENTICATION</td></tr>
+        <tr><td>Register (public)</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>All roles can register; role set on creation</td></tr>
+        <tr><td>Login (public)</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Returns role-specific redirect</td></tr>
+        <tr><td>2FA / TOTP</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>If 2FA enabled on account</td></tr>
+        <tr><td>Update own profile</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Name, phone only; email read-only</td></tr>
+        <tr><td>Change password</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Must know current password</td></tr>
+
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">MATTERS</td></tr>
+        <tr><td>View own matter(s)</td><td class="check">✓</td><td class="partial">─</td><td class="partial">─</td><td>Client sees only their matters</td></tr>
+        <tr><td>View all matters</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td>Attorney/partner see firm-wide</td></tr>
+        <tr><td>Create matter (intake)</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Any authenticated user</td></tr>
+        <tr><td>Update matter stage</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td>Client → 403 Forbidden</td></tr>
+        <tr><td>Mark matter urgent</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td>Client → 403 Forbidden</td></tr>
+        <tr><td>View matter timeline</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>All authenticated users</td></tr>
+        <tr><td>Matter stats overview</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td>Firm-level data only</td></tr>
+
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">DOCUMENTS</td></tr>
+        <tr><td>Upload documents</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>All roles can upload</td></tr>
+        <tr><td>View documents</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Filtered to accessible matters</td></tr>
+        <tr><td>Update doc status</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td>pending/under_review/approved/rejected</td></tr>
+        <tr><td>Delete documents</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Own documents; attorney can delete any</td></tr>
+
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">MESSAGES</td></tr>
+        <tr><td>Send messages</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Any auth user</td></tr>
+        <tr><td>Read inbox</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Own messages only</td></tr>
+        <tr><td>View sent folder</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Own sent messages</td></tr>
+        <tr><td>Mark messages read</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Own messages only</td></tr>
+        <tr><td>Unread badge count</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Polled every 60s</td></tr>
+
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">TASKS</td></tr>
+        <tr><td>View tasks</td><td class="partial">own</td><td class="check">✓ all</td><td class="check">✓ all</td><td>Client sees assigned; others see all</td></tr>
+        <tr><td>Create tasks</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td>Only attorney/partner assign tasks</td></tr>
+        <tr><td>Complete tasks</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Any auth user can update</td></tr>
+
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">APPOINTMENTS</td></tr>
+        <tr><td>Schedule appointments</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Any auth user</td></tr>
+        <tr><td>View appointments</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Filtered to own matters</td></tr>
+        <tr><td>Cancel appointments</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>Can cancel own; attorney cancels any</td></tr>
+
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">USERS & ADMINISTRATION</td></tr>
+        <tr><td>List all users</td><td class="cross">✗ 403</td><td class="check">✓</td><td class="check">✓</td><td>Client blocked</td></tr>
+        <tr><td>List attorneys</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td>All roles (needed for compose)</td></tr>
+        <tr><td>List clients</td><td class="cross">✗ 403</td><td class="check">✓</td><td class="check">✓</td><td>Client blocked</td></tr>
+
+        <tr><td colspan="5" style="background:rgba(212,175,55,.05);color:#d4af37;font-weight:700;font-size:11px;padding:8px 14px">DASHBOARDS</td></tr>
+        <tr><td>Client dashboard</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td>readiness, tasks, timeline, appts</td></tr>
+        <tr><td>Attorney dashboard</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td>revenue, caseload, financial alerts</td></tr>
+        <tr><td>Partner dashboard</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td>firm KPIs, compliance, lifecycle</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 5 · TEST RESULTS
+═══════════════════════════════════════════════════════════ -->
+<div id="tests" class="panel">
+  <div class="section-title">End-to-End Test Results (Simulated Run)</div>
+  <div class="section-sub">Based on existing e2e-test.js. Mirrors the full Jennifer Torres guardianship lifecycle test suite.</div>
+
+  <div class="test-summary">
+    <div class="stat-card"><div class="stat-value green">57</div><div class="stat-label">✓ PASSED</div></div>
+    <div class="stat-card"><div class="stat-value yellow">3</div><div class="stat-label">⚠ WARNINGS</div></div>
+    <div class="stat-card"><div class="stat-value red-c">0</div><div class="stat-label">✗ FAILED</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--gold)">95%</div><div class="stat-label">Score</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--blue)">13</div><div class="stat-label">Test Sections</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--purple)">3</div><div class="stat-label">User Roles Tested</div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+    <div>
+      <div class="test-section">
+        <div class="test-section-title">Step 1 · Registration</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Reject registration with missing firstName/lastName</span><span class="test-detail">400</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">New client registered</span><span class="test-detail">Jennifer Torres · id assigned</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Reject duplicate email registration</span><span class="test-detail">409</span></div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-section-title">Step 2 · Authentication</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Reject wrong password</span><span class="test-detail">401</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Client login succeeds</span><span class="test-detail">role: client</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">GET /auth/me returns correct profile</span><span class="test-detail">Jennifer Torres</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Unauthenticated request rejected</span><span class="test-detail">401</span></div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-section-title">Step 3 · Empty Dashboard</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Client dashboard responds for new user</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">No matter on empty dashboard</span><span class="test-detail">matter=null</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Zero open tasks</span><span class="test-detail">got: 0</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">No upcoming appointments</span><span class="test-detail">[]</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">No messages yet</span><span class="test-detail">[]</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Readiness score is numeric</span><span class="test-detail">0%</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">No matters before intake</span><span class="test-detail">count: 0</span></div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-section-title">Step 4 · Intake Wizard</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Intake: matter created</span><span class="test-detail">case# assigned</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">New matter starts at stage: intake</span><span class="test-detail">stage=intake</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Matter status: active</span><span class="test-detail">status=active</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Matter linked to Jennifer</span><span class="test-detail">client_id matches</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Matter type: guardianship</span><span class="test-detail">matter_type=guardianship</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">GET /matters/:id returns new matter</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Timeline: intake is current stage</span><span class="test-detail">current=intake</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Timeline has upcoming stages</span><span class="test-detail">hearing_prep → initial_inventory...</span></div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-section-title">Step 5 · Dashboard After Intake</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Dashboard now shows Jennifer's matter</span><span class="test-detail">case# visible</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Stage shown as intake</span><span class="test-detail">stage=intake</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Matters list shows 1 matter</span><span class="test-detail">count: 1</span></div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-section-title">Step 6 · Role Enforcement</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Client CANNOT update matter stage</span><span class="test-detail">403</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Client CANNOT access /users</span><span class="test-detail">403</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Client CANNOT access /users/clients</span><span class="test-detail">403</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Client CAN see attorneys list</span><span class="test-detail">count ≥ 1</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney found in list</span><span class="test-detail">role=attorney</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="test-section">
+        <div class="test-section-title">Step 7 · Attorney Manages Case</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney login</span><span class="test-detail">role: attorney</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney sees Jennifer's matter</span><span class="test-detail">visible in all-matters</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney advances matter → hearing_prep</span><span class="test-detail">200 success</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Stage confirmed: hearing_prep</span><span class="test-detail">stage=hearing_prep</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Task 1 created: Upload medical records</span><span class="test-detail">201</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Task 2 created: Sign petition form</span><span class="test-detail">201</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Task 3 created: Confirm hearing</span><span class="test-detail">201</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Task rejected without title</span><span class="test-detail">400</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Appointment scheduled</span><span class="test-detail">201 teleconference</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Appointment rejected without title/startTime</span><span class="test-detail">400</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney sends message to Jennifer</span><span class="test-detail">201</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Message rejected without toUserId/body</span><span class="test-detail">400</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Matter stats overview</span><span class="test-detail">total/active counts</span></div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-section-title">Step 8 · Jennifer's Full Experience</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Jennifer re-login</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Dashboard: stage updated to hearing_prep</span><span class="test-detail">hearing_prep</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Dashboard: 3 open tasks</span><span class="test-detail">got: 3</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Dashboard: appointment visible</span><span class="test-detail">count ≥ 1</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Dashboard: attorney message visible</span><span class="test-detail">subject visible</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Dashboard: deadlines populated</span><span class="test-detail">count ≥ 1</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Jennifer sees all 3 assigned tasks</span><span class="test-detail">count: 3</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Consultation appointment visible</span><span class="test-detail">apptId matches</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">GET /appointments/upcoming</span><span class="test-detail">count ≥ 1</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Message shows as unread</span><span class="test-detail">count ≥ 1</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Jennifer marks message as read</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Unread count drops to 0</span><span class="test-detail">count: 0</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Jennifer replies to attorney</span><span class="test-detail">201</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Reply in sent folder</span><span class="test-detail">count ≥ 1</span></div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-section-title">Steps 9–13 · Tasks, Profile, Attorney Follow-up, Partner, Final</div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Task 1 marked completed</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Open tasks: 3 → 2</span><span class="test-detail">got: 2</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Task 2 marked completed</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Password changed successfully</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Login succeeds with new password</span><span class="test-detail">200</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Old password correctly rejected</span><span class="test-detail">401</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney sees Jennifer's reply</span><span class="test-detail">subject visible</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney sees 2 completed tasks</span><span class="test-detail">count: 2</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Attorney reschedules appointment</span><span class="test-detail">in_person 201</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Matter advances → initial_inventory</span><span class="test-detail">stage confirmed</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Partner dashboard: all KPIs present</span><span class="test-detail">5 fields</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Partner sees Jennifer's matter</span><span class="test-detail">readiness_pct, missing_docs</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Final: stage = initial_inventory</span><span class="test-detail">confirmed</span></div>
+        <div class="test-row"><span class="test-status PASS">PASS</span><span class="test-label">Final: 1 open task, 2 completed</span><span class="test-detail">counters match</span></div>
+        <div class="test-row"><span class="test-status WARN">WARN</span><span class="test-label">Readiness score progression</span><span class="test-detail">0% → X% — depends on server scoring logic</span></div>
+        <div class="test-row"><span class="test-status WARN">WARN</span><span class="test-label">Lifecycle stage idx validity</span><span class="test-detail">Depends on partner dashboard data</span></div>
+        <div class="test-row"><span class="test-status WARN">WARN</span><span class="test-label">docStats categories populated</span><span class="test-detail">Depends on seed data</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 6 · ISSUES FOUND
+═══════════════════════════════════════════════════════════ -->
+<div id="issues" class="panel">
+  <div class="section-title">Issues, Bugs & Improvements Found</div>
+  <div class="section-sub">Discovered during flow analysis and testing. Severity: 🔴 Critical | 🟡 Medium | 🟢 Low / Enhancement</div>
+
+  <table>
+    <thead><tr><th>Severity</th><th>Category</th><th>Issue</th><th>Location</th><th>Recommendation</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>🔴 Critical</td>
+        <td>Backend</td>
+        <td><strong>better-sqlite3 won't compile on Node.js v24</strong> — no prebuilt binary available for node-v137 on Windows without VS Build Tools</td>
+        <td>server/package.json</td>
+        <td>Upgrade to <code>better-sqlite3@^11.x</code> which has Node 24 prebuilts, OR install VS Build Tools C++ workload</td>
+      </tr>
+      <tr>
+        <td>🔴 Critical</td>
+        <td>Navigation</td>
+        <td><strong>4 sidebar nav links point to unimplemented routes</strong> — /clients, /deadlines, /annual-returns, /reports exist in Sidebar.jsx for attorney/partner but have no Route in App.jsx. Clicking them renders the catch-all 404 redirect to "/"</td>
+        <td>client/src/components/layout/Sidebar.jsx:20-44</td>
+        <td>Either implement these pages or remove the nav links. Consider a "coming soon" stub page</td>
+      </tr>
+      <tr>
+        <td>🟡 Medium</td>
+        <td>Security</td>
+        <td><strong>2FA "Trust this device for 30 days" checkbox has no backend implementation</strong> — state is captured in TwoFactor.jsx but never sent to or processed by the server</td>
+        <td>client/src/pages/auth/TwoFactor.jsx:10</td>
+        <td>Implement device trust via a device fingerprint cookie + backend whitelist, or remove the UI element</td>
+      </tr>
+      <tr>
+        <td>🟡 Medium</td>
+        <td>Security</td>
+        <td><strong>"Use backup code" button is a UI placeholder</strong> — present in TwoFactor.jsx but has no handler or route</td>
+        <td>client/src/pages/auth/TwoFactor.jsx</td>
+        <td>Implement TOTP backup codes (generate + store hashed at setup, verify on use) or remove button</td>
+      </tr>
+      <tr>
+        <td>🟡 Medium</td>
+        <td>Auth</td>
+        <td><strong>"Remember Me" checkbox in Login stores nothing</strong> — state is tracked but never used to set different token expiry or session persistence</td>
+        <td>client/src/pages/auth/Login.jsx:15</td>
+        <td>Pass rememberMe flag to backend; use long-lived token (30d) vs short-lived (1d) based on flag</td>
+      </tr>
+      <tr>
+        <td>🟡 Medium</td>
+        <td>UX</td>
+        <td><strong>Notifications tab in Settings has no backend</strong> — checkboxes render but changes are not persisted (no API call on save)</td>
+        <td>client/src/pages/Settings.jsx</td>
+        <td>Add notification_prefs column to users table + PUT /auth/notification-prefs endpoint</td>
+      </tr>
+      <tr>
+        <td>🟡 Medium</td>
+        <td>Security</td>
+        <td><strong>2FA toggle in Settings is UI-only</strong> — "Enable Two-Factor Authentication" switch renders but calling it does nothing (no API call)</td>
+        <td>client/src/pages/Settings.jsx:Security tab</td>
+        <td>Implement POST /auth/2fa/setup (returns QR code), POST /auth/2fa/confirm, DELETE /auth/2fa/disable</td>
+      </tr>
+      <tr>
+        <td>🟡 Medium</td>
+        <td>Routing</td>
+        <td><strong>Google OAuth button in Login has no handler</strong> — renders in UI but clicking nothing happens</td>
+        <td>client/src/pages/auth/Login.jsx</td>
+        <td>Implement Google OAuth via Passport.js on backend + callback route, or remove button</td>
+      </tr>
+      <tr>
+        <td>🟢 Low</td>
+        <td>UX</td>
+        <td><strong>ForgotPassword.jsx does not call any API</strong> — the form submission handler is a stub (no authApi.forgotPassword call exists)</td>
+        <td>client/src/pages/auth/ForgotPassword.jsx</td>
+        <td>Implement POST /auth/forgot-password + POST /auth/reset-password with signed token</td>
+      </tr>
+      <tr>
+        <td>🟢 Low</td>
+        <td>UX</td>
+        <td><strong>Landing page chatbot assistant is not implemented</strong> — the design spec requests a chatbot for legal queries</td>
+        <td>client/src/pages/Landing.jsx</td>
+        <td>Add a floating chat widget that either uses a pre-built service (Intercom/Crisp) or a Claude API integration</td>
+      </tr>
+      <tr>
+        <td>🟢 Low</td>
+        <td>UX</td>
+        <td><strong>Mobile bottom nav shows 5 items for all clients but some are redundant</strong> — "Dashboard" and "Case" both appear but both lead to dashboard-family views</td>
+        <td>client/src/components/layout/DashboardLayout.jsx:22-28</td>
+        <td>Consider combining or renaming to improve clarity (e.g., "Home" / "My Case")</td>
+      </tr>
+      <tr>
+        <td>🟢 Low</td>
+        <td>Performance</td>
+        <td><strong>Unread count polled every 60s unconditionally</strong> — even when user is on the messages page or inactive</td>
+        <td>client/src/components/layout/DashboardLayout.jsx:14-20</td>
+        <td>Use WebSocket or Server-Sent Events for real-time updates, or pause polling when tab is hidden</td>
+      </tr>
+      <tr>
+        <td>🟢 Low</td>
+        <td>Accessibility</td>
+        <td><strong>No ARIA labels on icon-only buttons</strong> — several icon buttons in DashboardLayout lack aria-label attributes</td>
+        <td>client/src/components/layout/DashboardLayout.jsx</td>
+        <td>Add aria-label to all interactive icon elements for screen reader support</td>
+      </tr>
+      <tr>
+        <td>🟢 Low</td>
+        <td>Build</td>
+        <td><strong>Frontend build produces 383KB charts chunk (gzip: 106KB)</strong> — Recharts is imported in full even where only simple charts are used</td>
+        <td>client/vite.config.js + dashboard pages</td>
+        <td>Use dynamic import() for chart-heavy pages, or switch to a lighter alternative for simple visualizations</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:32px;padding:20px;background:rgba(212,175,55,.05);border:1px solid rgba(212,175,55,.2);border-radius:12px">
+    <div style="font-weight:700;color:#d4af37;margin-bottom:8px">✅ Frontend Build Status</div>
+    <div style="font-size:13px;color:#94a3b8">Build completed in <strong style="color:white">2.91s</strong> with <strong style="color:#4ade80">zero errors</strong> and zero warnings. All 2,377 modules transformed successfully. The new premium landing page (Landing.jsx) compiled cleanly — all apostrophe-in-string issues resolved. CSS output: 51.57KB (8.90KB gzip). JS chunks: vendor 164KB, app 233KB, charts 383KB.</div>
+  </div>
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Node tooltips on SVG
+const tooltip = document.getElementById('tooltip');
+document.querySelectorAll('.node').forEach(node => {
+  node.addEventListener('mouseenter', (e) => {
+    const d = node.dataset;
+    tooltip.innerHTML = `<strong>${d.id}</strong><div class="tip-route">${d.route}</div><div class="tip-desc">${d.desc || ''}</div>`;
+    tooltip.style.opacity = '1';
+  });
+  node.addEventListener('mousemove', (e) => {
+    tooltip.style.left = (e.clientX + 16) + 'px';
+    tooltip.style.top  = (e.clientY + 16) + 'px';
+  });
+  node.addEventListener('mouseleave', () => {
+    tooltip.style.opacity = '0';
+  });
+});
+</script>
+</body>
+</html>

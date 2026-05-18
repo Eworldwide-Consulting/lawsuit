@@ -36,7 +36,8 @@ router.post('/', requireAuth, (req, res) => {
 
 router.put('/:id/read', requireAuth, (req, res) => {
   const db = getDb();
-  db.prepare("UPDATE messages SET read_at = datetime('now') WHERE id = ? AND to_user_id = ?").run(req.params.id, req.user.id);
+  const result = db.prepare("UPDATE messages SET read_at = datetime('now') WHERE id = ? AND to_user_id = ?").run(req.params.id, req.user.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Message not found' });
   res.json({ success: true });
 });
 

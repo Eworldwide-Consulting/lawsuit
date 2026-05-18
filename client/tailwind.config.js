@@ -22,9 +22,23 @@ export default {
           'green-dark': '#16a34a',
           'green-light': '#86efac',
         },
+        gold: {
+          50:  '#fdf9ec',
+          100: '#faf0c8',
+          200: '#f5df8a',
+          300: '#f0cc4c',
+          400: '#e8b930',
+          500: '#d4af37',
+          600: '#c9a227',
+          700: '#a8821f',
+          800: '#876518',
+          900: '#6b4e12',
+          950: '#3d2b06',
+        },
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        serif: ['Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
       },
       boxShadow: {
         card: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',

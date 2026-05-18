@@ -49,7 +49,8 @@ router.post('/', requireAuth, (req, res) => {
 
 router.delete('/:id', requireAuth, (req, res) => {
   const db = getDb();
-  db.prepare('DELETE FROM appointments WHERE id = ?').run(req.params.id);
+  const result = db.prepare('DELETE FROM appointments WHERE id = ?').run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Appointment not found' });
   res.json({ success: true });
 });
 

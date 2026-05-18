@@ -125,6 +125,7 @@ router.put('/profile', requireAuth, async (req, res) => {
 
 router.put('/change-password', requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'currentPassword and newPassword are required' });
   const valid = await bcrypt.compare(currentPassword, req.user.password_hash);
   if (!valid) return res.status(400).json({ error: 'Current password incorrect' });
   const hash = await bcrypt.hash(newPassword, 12);

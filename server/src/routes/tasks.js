@@ -31,7 +31,8 @@ router.post('/', requireAuth, (req, res) => {
 router.put('/:id', requireAuth, (req, res) => {
   const { status } = req.body;
   const db = getDb();
-  db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, req.params.id);
+  const result = db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Task not found' });
   res.json({ success: true });
 });
 
