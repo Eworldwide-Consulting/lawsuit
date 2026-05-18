@@ -9,6 +9,7 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import TwoFactor from './pages/auth/TwoFactor';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import AuthCallback from './pages/auth/AuthCallback';
 
 // Intake pages
 import IntakeWizard from './pages/intake/IntakeWizard';
@@ -51,6 +52,7 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/verify" element={<TwoFactor />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* Intake (auth required) */}
       <Route path="/intake" element={<RequireAuth><IntakeWizard /></RequireAuth>} />

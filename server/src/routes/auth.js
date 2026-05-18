@@ -134,4 +134,82 @@ router.put('/change-password', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── Google OAuth ──────────────────────────────────────────────────────────────
+const googleCallbackURL = () =>
+  `${process.env.SERVER_URL || process.env.CLIENT_URL}/api/auth/google/callback`;
+
+router.get('/google', (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(501).send(
+      'Google sign-in is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your environment variables.'
+    );
+  }
+  const params = new URLSearchParams({
+    client_id:     process.env.GOOGLE_CLIENT_ID,
+    redirect_uri:  googleCallbackURL(),
+    response_type: 'code',
+    scope:         'openid email profile',
+    access_type:   'offline',
+    prompt:        'select_account',
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+router.get('/google/callback', async (req, res) => {
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const { code, error } = req.query;
+
+  if (error || !code) {
+    return res.redirect(`${clientUrl}/login?error=google_cancelled`);
+  }
+
+  try {
+    // Exchange authorization code for access token
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id:     process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri:  googleCallbackURL(),
+        grant_type:    'authorization_code',
+      }).toString(),
+    });
+    const tokens = await tokenRes.json();
+    if (tokens.error) throw new Error(tokens.error_description || tokens.error);
+
+    // Fetch Google user profile
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    const gUser = await profileRes.json();
+
+    if (!gUser.email) throw new Error('No email returned from Google');
+    if (!gUser.verified_email) {
+      return res.redirect(`${clientUrl}/login?error=google_unverified`);
+    }
+
+    const db = getDb();
+    let user = db.prepare('SELECT * FROM users WHERE email = ?').get(gUser.email);
+
+    if (!user) {
+      const firstName = gUser.given_name  || gUser.name?.split(' ')[0] || 'User';
+      const lastName  = gUser.family_name || gUser.name?.split(' ').slice(1).join(' ') || '';
+      const initials  = `${firstName[0]}${(lastName[0] || firstName[1] || 'U')}`.toUpperCase();
+      const result = db.prepare(`
+        INSERT INTO users (first_name, last_name, email, password_hash, role, avatar_initials)
+        VALUES (?, ?, ?, '', 'client', ?)
+      `).run(firstName, lastName, gUser.email, initials);
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+    }
+
+    const token = signToken(user.id);
+    res.redirect(`${clientUrl}/auth/callback?token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error('Google OAuth error:', err.message);
+    res.redirect(`${clientUrl}/login?error=google_failed`);
+  }
+});
+
 module.exports = router;

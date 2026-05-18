@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
 import Spinner from '../../components/ui/Spinner';
 import { authApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
+
+const GOOGLE_ERRORS = {
+  google_cancelled:  'Google sign-in was cancelled.',
+  google_failed:     'Google sign-in failed. Please try again or use email and password.',
+  google_unverified: 'Your Google account email is not verified.',
+};
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -14,6 +20,15 @@ export default function Login() {
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const e = p.get('error');
+    if (e) {
+      setError(GOOGLE_ERRORS[e] || 'Sign-in failed. Please try again.');
+      window.history.replaceState({}, '', '/login');
+    }
+  }, []);
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -90,7 +105,11 @@ export default function Login() {
         <div className="relative flex justify-center text-sm"><span className="px-3 bg-white text-gray-400">or</span></div>
       </div>
 
-      <button type="button" className="btn-secondary">
+      <button
+        type="button"
+        onClick={() => { window.location.href = '/api/auth/google'; }}
+        className="btn-secondary"
+      >
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.5 2.3 30.1 0 24 0 14.7 0 6.6 5.5 2.8 13.5l7.8 6.1C12.5 13.1 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.9 24.5c0-1.7-.1-3.3-.4-4.9H24v9.3h12.9c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.3-10.1 7.3-17.4z"/><path fill="#FBBC05" d="M10.6 28.6A14.7 14.7 0 019.5 24c0-1.6.3-3.2.9-4.6L2.6 13.3A23.8 23.8 0 000 24c0 3.8.9 7.4 2.6 10.6l8-6z"/><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.4l-7.5-5.8c-2 1.4-4.6 2.2-7.5 2.2-6.2 0-11.5-3.6-13.5-9.4l-8 6.1C6.6 42.5 14.7 48 24 48z"/></svg>
         Continue with Google
       </button>
