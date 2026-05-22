@@ -2,8 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare, Shield } from 'lucide-react';
+import { Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare, Shield, Check, CheckCircle } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
+
+// Fixed icon + colour per action type — same size & min-width for every button
+const ACTION_CFG = {
+  Upload:  { Icon: Upload,       cls: 'bg-[#0f2057] hover:bg-[#1a3476]' },
+  Review:  { Icon: Eye,          cls: 'bg-blue-600  hover:bg-blue-700'  },
+  Sign:    { Icon: PenLine,      cls: 'bg-violet-600 hover:bg-violet-700' },
+  Confirm: { Icon: CheckCircle,  cls: 'bg-green-600  hover:bg-green-700' },
+};
 
 const STAGES     = ['Intake', 'Petition Filed', 'Hearing Prep', 'Guardian Appointed', 'Care Plan', 'Annual Review', 'Court Review'];
 const STAGE_KEYS = ['intake', 'petition_filed', 'hearing_prep', 'guardian_appointed', 'care_plan', 'annual_review', 'court_review'];
@@ -48,12 +56,6 @@ export default function ClientDashboard() {
 
   const readiness      = data?.readinessScore ?? 0;
   const readinessLabel = readiness >= 75 ? 'On track' : readiness >= 50 ? 'Needs attention' : 'At risk';
-
-  const actionIcon = label => {
-    if (label === 'Upload') return <Upload size={14} />;
-    if (label === 'Sign')   return <PenLine size={14} />;
-    return <Eye size={14} />;
-  };
 
   const statusColor = status => {
     if (status === 'overdue') return 'text-red-600';
@@ -136,27 +138,35 @@ export default function ClientDashboard() {
             </div>
 
             <div className="overflow-x-auto">
-              <div className="flex items-center gap-1 min-w-max pb-2">
+              {/* items-start + mt-3.5 connector aligns line to circle centre (h-7 / 2 = 14px = 3.5) */}
+              <ol className="flex items-start min-w-max pb-2">
                 {STAGES.map((stage, i) => {
                   const done = i <= stageIdx;
                   const curr = i === stageIdx;
+                  const last = i === STAGES.length - 1;
                   return (
-                    <div key={stage} className="flex items-center">
+                    <li key={stage} className="flex items-start">
                       <div className="flex flex-col items-center">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                          done ? (curr ? 'bg-navy-900 text-white ring-2 ring-navy-300' : 'bg-green-500 text-white') : 'bg-gray-200 text-gray-400'
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                          curr ? 'bg-[#0f2057] border-[#0f2057] text-white ring-2 ring-[#0f2057]/20 shadow-md' :
+                          done ? 'bg-green-500 border-green-500 text-white shadow-sm' :
+                                 'bg-white border-gray-300 text-gray-400'
                         }`}>
-                          {done && !curr ? '✓' : i + 1}
+                          {done && !curr ? <Check size={12} strokeWidth={3} /> : i + 1}
                         </div>
-                        <div className="text-[9px] text-gray-500 mt-1 text-center w-14 leading-tight">{stage}</div>
+                        <div className={`text-[9px] mt-1 text-center w-14 leading-tight font-medium ${
+                          curr ? 'text-[#0f2057] font-semibold' : done ? 'text-green-600' : 'text-gray-400'
+                        }`}>{stage}</div>
                       </div>
-                      {i < STAGES.length - 1 && (
-                        <div className={`w-8 h-0.5 mx-0.5 mb-4 ${i < stageIdx ? 'bg-green-500' : 'bg-gray-200'}`} />
+                      {!last && (
+                        <div className={`w-8 h-0.5 mt-3.5 mx-0.5 flex-shrink-0 rounded-full transition-colors ${
+                          i < stageIdx ? 'bg-green-500' : 'bg-gray-200'
+                        }`} />
                       )}
-                    </div>
+                    </li>
                   );
                 })}
-              </div>
+              </ol>
             </div>
 
             {matter && (
@@ -196,11 +206,14 @@ export default function ClientDashboard() {
                         ? `Due in ${Math.max(0, Math.ceil((new Date(task.due_date) - new Date()) / 86400000))} days`
                         : 'No due date'}
                   </div>
-                  {task.action_label && (
-                    <button className="flex items-center gap-1 text-xs bg-navy-900 text-white px-3 py-1 rounded-lg hover:bg-navy-800 transition-colors flex-shrink-0">
-                      {actionIcon(task.action_label)} {task.action_label}
-                    </button>
-                  )}
+                  {task.action_label && (() => {
+                    const cfg = ACTION_CFG[task.action_label] || ACTION_CFG.Review;
+                    return (
+                      <button className={`flex items-center justify-center gap-1.5 text-xs font-semibold min-w-[88px] ${cfg.cls} text-white px-3 py-1.5 rounded-lg transition-colors flex-shrink-0`}>
+                        <cfg.Icon size={13} /> {task.action_label}
+                      </button>
+                    );
+                  })()}
                 </div>
               ))}
               {(!data?.tasks || data.tasks.length === 0) && (
