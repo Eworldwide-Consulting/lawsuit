@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
-const { getDb } = require('../database');
+const supabase = require('../supabase');
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -9,9 +9,12 @@ function requireAuth(req, res, next) {
   const token = header.slice(7);
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const db = getDb();
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.userId);
-    if (!user) return res.status(401).json({ error: 'User not found' });
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', payload.userId)
+      .single();
+    if (error || !user) return res.status(401).json({ error: 'User not found' });
     req.user = user;
     next();
   } catch {

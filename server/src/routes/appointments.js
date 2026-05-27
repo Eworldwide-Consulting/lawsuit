@@ -1,57 +1,87 @@
-const router = require('express').Router();
-const { getDb } = require('../database');
+const router   = require('express').Router();
+const supabase = require('../supabase');
 const { requireAuth } = require('../middleware/auth');
 
-router.get('/', requireAuth, (req, res) => {
-  const db = getDb();
-  let appts;
-  if (req.user.role === 'client') {
-    appts = db.prepare(`
-      SELECT a.* FROM appointments a
-      JOIN matters m ON a.matter_id = m.id
-      WHERE m.client_id = ? ORDER BY a.start_time ASC
-    `).all(req.user.id);
-  } else {
-    appts = db.prepare('SELECT * FROM appointments ORDER BY start_time ASC').all();
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role === 'client') {
+      const { data: matters } = await supabase
+        .from('matters').select('id').eq('client_id', req.user.id);
+      const ids = (matters || []).map(m => m.id);
+      if (!ids.length) return res.json([]);
+      const { data, error } = await supabase
+        .from('appointments').select('*').in('matter_id', ids).order('start_time', { ascending: true });
+      if (error) throw error;
+      return res.json(data || []);
+    }
+    const { data, error } = await supabase
+      .from('appointments').select('*').order('start_time', { ascending: true });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(appts);
 });
 
-router.get('/upcoming', requireAuth, (req, res) => {
-  const db = getDb();
-  let appts;
-  if (req.user.role === 'client') {
-    appts = db.prepare(`
-      SELECT a.* FROM appointments a
-      JOIN matters m ON a.matter_id = m.id
-      WHERE m.client_id = ? AND a.start_time >= datetime('now')
-      ORDER BY a.start_time ASC LIMIT 5
-    `).all(req.user.id);
-  } else {
-    appts = db.prepare(`
-      SELECT * FROM appointments WHERE start_time >= datetime('now')
-      ORDER BY start_time ASC LIMIT 10
-    `).all();
+router.get('/upcoming', requireAuth, async (req, res) => {
+  try {
+    const now = new Date().toISOString();
+    if (req.user.role === 'client') {
+      const { data: matters } = await supabase
+        .from('matters').select('id').eq('client_id', req.user.id);
+      const ids = (matters || []).map(m => m.id);
+      if (!ids.length) return res.json([]);
+      const { data, error } = await supabase
+        .from('appointments').select('*')
+        .in('matter_id', ids).gte('start_time', now)
+        .order('start_time', { ascending: true }).limit(5);
+      if (error) throw error;
+      return res.json(data || []);
+    }
+    const { data, error } = await supabase
+      .from('appointments').select('*')
+      .gte('start_time', now).order('start_time', { ascending: true }).limit(10);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(appts);
 });
 
-router.post('/', requireAuth, (req, res) => {
-  const { matterId, title, type, startTime, endTime, location, notes } = req.body;
-  if (!title || !startTime) return res.status(400).json({ error: 'title and startTime required' });
-  const db = getDb();
-  const result = db.prepare(`
-    INSERT INTO appointments (matter_id, title, type, start_time, end_time, location, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(matterId || null, title, type || 'teleconference', startTime, endTime || null, location || null, notes || null);
-  res.status(201).json(db.prepare('SELECT * FROM appointments WHERE id = ?').get(result.lastInsertRowid));
+router.post('/', requireAuth, async (req, res) => {
+  try {
+    const { matterId, title, type, startTime, endTime, location, notes } = req.body;
+    if (!title || !startTime) return res.status(400).json({ error: 'title and startTime required' });
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert({
+        matter_id:  matterId  || null,
+        title,
+        type:       type      || 'teleconference',
+        start_time: startTime,
+        end_time:   endTime   || null,
+        location:   location  || null,
+        notes:      notes     || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.delete('/:id', requireAuth, (req, res) => {
-  const db = getDb();
-  const result = db.prepare('DELETE FROM appointments WHERE id = ?').run(req.params.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Appointment not found' });
-  res.json({ success: true });
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('appointments').delete().eq('id', req.params.id).select();
+    if (error) throw error;
+    if (!data?.length) return res.status(404).json({ error: 'Appointment not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

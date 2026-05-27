@@ -1,50 +1,96 @@
-const router = require('express').Router();
-const { getDb } = require('../database');
+const router   = require('express').Router();
+const supabase = require('../supabase');
 const { requireAuth } = require('../middleware/auth');
 
-router.get('/', requireAuth, (req, res) => {
-  const db = getDb();
-  const messages = db.prepare(`
-    SELECT m.*, u.first_name || ' ' || u.last_name as from_name, u.avatar_initials as from_initials
-    FROM messages m JOIN users u ON m.from_user_id = u.id
-    WHERE m.to_user_id = ? ORDER BY m.created_at DESC
-  `).all(req.user.id);
-  res.json(messages);
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, sender:from_user_id(first_name, last_name, avatar_initials)')
+      .eq('to_user_id', req.user.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const messages = (data || []).map(m => ({
+      ...m,
+      from_name:     `${m.sender?.first_name || ''} ${m.sender?.last_name || ''}`.trim(),
+      from_initials: m.sender?.avatar_initials,
+      sender: undefined,
+    }));
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/sent', requireAuth, (req, res) => {
-  const db = getDb();
-  const messages = db.prepare(`
-    SELECT m.*, u.first_name || ' ' || u.last_name as to_name
-    FROM messages m JOIN users u ON m.to_user_id = u.id
-    WHERE m.from_user_id = ? ORDER BY m.created_at DESC
-  `).all(req.user.id);
-  res.json(messages);
+router.get('/sent', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, recipient:to_user_id(first_name, last_name)')
+      .eq('from_user_id', req.user.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const messages = (data || []).map(m => ({
+      ...m,
+      to_name:   `${m.recipient?.first_name || ''} ${m.recipient?.last_name || ''}`.trim(),
+      recipient: undefined,
+    }));
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/', requireAuth, (req, res) => {
-  const { toUserId, matterId, subject, body } = req.body;
-  if (!toUserId || !body) return res.status(400).json({ error: 'toUserId and body required' });
-  const db = getDb();
-  const result = db.prepare(`
-    INSERT INTO messages (matter_id, from_user_id, to_user_id, subject, body)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(matterId || null, req.user.id, toUserId, subject || null, body);
-  const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(result.lastInsertRowid);
-  res.status(201).json(msg);
+router.get('/unread-count', requireAuth, async (req, res) => {
+  try {
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('to_user_id', req.user.id)
+      .is('read_at', null);
+    if (error) throw error;
+    res.json({ count: count || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.put('/:id/read', requireAuth, (req, res) => {
-  const db = getDb();
-  const result = db.prepare("UPDATE messages SET read_at = datetime('now') WHERE id = ? AND to_user_id = ?").run(req.params.id, req.user.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Message not found' });
-  res.json({ success: true });
+router.post('/', requireAuth, async (req, res) => {
+  try {
+    const { toUserId, matterId, subject, body } = req.body;
+    if (!toUserId || !body) return res.status(400).json({ error: 'toUserId and body required' });
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        matter_id:    matterId || null,
+        from_user_id: req.user.id,
+        to_user_id:   toUserId,
+        subject:      subject || null,
+        body,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/unread-count', requireAuth, (req, res) => {
-  const db = getDb();
-  const { count } = db.prepare('SELECT COUNT(*) as count FROM messages WHERE to_user_id = ? AND read_at IS NULL').get(req.user.id);
-  res.json({ count });
+router.put('/:id/read', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('to_user_id', req.user.id)
+      .select();
+    if (error) throw error;
+    if (!data?.length) return res.status(404).json({ error: 'Message not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

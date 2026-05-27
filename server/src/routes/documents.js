@@ -1,8 +1,8 @@
-const router = require('express').Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { getDb } = require('../database');
+const router   = require('express').Router();
+const multer   = require('multer');
+const path     = require('path');
+const fs       = require('fs');
+const supabase = require('../supabase');
 const { requireAuth } = require('../middleware/auth');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../../../uploads');
@@ -10,7 +10,7 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`),
+  filename:    (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`),
 });
 
 const upload = multer({
@@ -18,66 +18,95 @@ const upload = multer({
   limits: { fileSize: (parseInt(process.env.MAX_FILE_SIZE_MB) || 20) * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, allowed.includes(ext));
+    cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
   },
 });
 
-router.get('/', requireAuth, (req, res) => {
-  const db = getDb();
-  const { matterId } = req.query;
-  let docs;
-  if (matterId) {
-    docs = db.prepare('SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC').all(matterId);
-  } else if (req.user.role === 'client') {
-    docs = db.prepare(`
-      SELECT * FROM documents
-      WHERE matter_id IN (SELECT id FROM matters WHERE client_id = ?)
-      ORDER BY created_at DESC
-    `).all(req.user.id);
-  } else {
-    docs = db.prepare('SELECT * FROM documents ORDER BY created_at DESC').all();
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const { matterId } = req.query;
+    let query = supabase.from('documents').select('*').order('created_at', { ascending: false });
+
+    if (matterId) {
+      query = query.eq('matter_id', matterId);
+    } else if (req.user.role === 'client') {
+      const { data: matters } = await supabase
+        .from('matters').select('id').eq('client_id', req.user.id);
+      const ids = (matters || []).map(m => m.id);
+      if (!ids.length) return res.json([]);
+      query = query.in('matter_id', ids);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(docs);
 });
 
-router.post('/upload', requireAuth, upload.array('files', 10), (req, res) => {
-  const { matterId, category, docType } = req.body;
-  const db = getDb();
-  const inserted = req.files.map(f => {
-    const result = db.prepare(`
-      INSERT INTO documents (matter_id, user_id, name, category, doc_type, file_path, file_size, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'uploaded')
-    `).run(matterId || null, req.user.id, f.originalname, category || null, docType || null, f.filename, f.size);
-    return db.prepare('SELECT * FROM documents WHERE id = ?').get(result.lastInsertRowid);
-  });
-  res.status(201).json(inserted);
-});
-
-router.put('/:id/status', requireAuth, (req, res) => {
-  const { status } = req.body;
-  const db = getDb();
-  db.prepare('UPDATE documents SET status = ? WHERE id = ?').run(status, req.params.id);
-  res.json({ success: true });
-});
-
-router.delete('/:id', requireAuth, (req, res) => {
-  const db = getDb();
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
-  if (!doc) return res.status(404).json({ error: 'Not found' });
-  if (doc.file_path) {
-    const fp = path.join(UPLOAD_DIR, doc.file_path);
-    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+router.post('/upload', requireAuth, upload.array('files', 10), async (req, res) => {
+  try {
+    const { matterId, category, docType } = req.body;
+    const inserted = await Promise.all(req.files.map(async f => {
+      const { data } = await supabase
+        .from('documents')
+        .insert({
+          matter_id: matterId || null,
+          user_id:   req.user.id,
+          name:      f.originalname,
+          category:  category || null,
+          doc_type:  docType  || null,
+          file_path: f.filename,
+          file_size: f.size,
+          status:    'uploaded',
+        })
+        .select()
+        .single();
+      return data;
+    }));
+    res.status(201).json(inserted);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  db.prepare('DELETE FROM documents WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
 });
 
-router.get('/download/:id', requireAuth, (req, res) => {
-  const db = getDb();
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
-  if (!doc || !doc.file_path) return res.status(404).json({ error: 'File not found' });
-  res.download(path.join(UPLOAD_DIR, doc.file_path), doc.name);
+router.put('/:id/status', requireAuth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('documents').update({ status: req.body.status }).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const { data: doc } = await supabase
+      .from('documents').select('*').eq('id', req.params.id).maybeSingle();
+    if (!doc) return res.status(404).json({ error: 'Not found' });
+    if (doc.file_path) {
+      const fp = path.join(UPLOAD_DIR, doc.file_path);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    }
+    await supabase.from('documents').delete().eq('id', req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/download/:id', requireAuth, async (req, res) => {
+  try {
+    const { data: doc } = await supabase
+      .from('documents').select('*').eq('id', req.params.id).maybeSingle();
+    if (!doc || !doc.file_path) return res.status(404).json({ error: 'File not found' });
+    res.download(path.join(UPLOAD_DIR, doc.file_path), doc.name);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
