@@ -14,6 +14,7 @@ const taskRoutes        = require('./routes/tasks');
 const dashboardRoutes   = require('./routes/dashboard');
 const userRoutes        = require('./routes/users');
 const paymentRoutes     = require('./routes/payments');
+const adminRoutes       = require('./routes/admin');
 
 const app          = express();
 const PORT         = process.env.PORT || 5000;
@@ -47,6 +48,7 @@ app.use('/api/tasks',        taskRoutes);
 app.use('/api/dashboard',    dashboardRoutes);
 app.use('/api/users',        userRoutes);
 app.use('/api/payments',     paymentRoutes);
+app.use('/api/admin',        adminRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV }));
 

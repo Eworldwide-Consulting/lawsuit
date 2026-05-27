@@ -32,15 +32,16 @@ async function seed() {
   console.log('Seeding users...');
   const hash = await bcrypt.hash('Password123!', 12);
   const usersData = [
-    { first_name: 'Alex',     last_name: 'Morgan',   email: 'partner@trivanta.com',  password_hash: hash, phone: '(555) 100-0001', role: 'partner',  avatar_initials: 'AM', email_verified: true },
-    { first_name: 'Sarah',    last_name: 'Johnson',  email: 'attorney@trivanta.com', password_hash: hash, phone: '(555) 100-0002', role: 'attorney', avatar_initials: 'SJ', email_verified: true },
-    { first_name: 'Mary',     last_name: 'Allen',    email: 'client@trivanta.com',   password_hash: hash, phone: '(555) 200-0001', role: 'client',   avatar_initials: 'MA', email_verified: true },
-    { first_name: 'Margaret', last_name: 'Allen',    email: 'margaret@example.com',  password_hash: hash, phone: '(555) 200-0002', role: 'client',   avatar_initials: 'MA', email_verified: true },
-    { first_name: 'Thomas',   last_name: 'Brooks',   email: 'thomas@example.com',    password_hash: hash, phone: '(555) 200-0003', role: 'client',   avatar_initials: 'TB', email_verified: true },
-    { first_name: 'Patricia', last_name: 'Davis',    email: 'patricia@example.com',  password_hash: hash, phone: '(555) 200-0004', role: 'client',   avatar_initials: 'PD', email_verified: true },
-    { first_name: 'Robert',   last_name: 'Wilson',   email: 'robert@example.com',    password_hash: hash, phone: '(555) 200-0005', role: 'client',   avatar_initials: 'RW', email_verified: true },
-    { first_name: 'Linda',    last_name: 'Martinez', email: 'linda@example.com',     password_hash: hash, phone: '(555) 200-0006', role: 'client',   avatar_initials: 'LM', email_verified: true },
-    { first_name: 'James',    last_name: 'Anderson', email: 'james@example.com',     password_hash: hash, phone: '(555) 200-0007', role: 'client',   avatar_initials: 'JA', email_verified: true },
+    { first_name: 'Alex',     last_name: 'Morgan',   email: 'partner@trivanta.com',  password_hash: hash, phone: '(555) 100-0001', role: 'partner',   avatar_initials: 'AM', email_verified: true, approval_status: 'approved' },
+    { first_name: 'Sarah',    last_name: 'Johnson',  email: 'attorney@trivanta.com', password_hash: hash, phone: '(555) 100-0002', role: 'attorney',  avatar_initials: 'SJ', email_verified: true, approval_status: 'approved' },
+    { first_name: 'IT',       last_name: 'Support',  email: 'itsupport@trivanta.com',password_hash: hash, phone: '(555) 100-0099', role: 'itsupport', avatar_initials: 'IT', email_verified: true },
+    { first_name: 'Mary',     last_name: 'Allen',    email: 'client@trivanta.com',   password_hash: hash, phone: '(555) 200-0001', role: 'client',    avatar_initials: 'MA', email_verified: true },
+    { first_name: 'Margaret', last_name: 'Allen',    email: 'margaret@example.com',  password_hash: hash, phone: '(555) 200-0002', role: 'client',    avatar_initials: 'MA', email_verified: true },
+    { first_name: 'Thomas',   last_name: 'Brooks',   email: 'thomas@example.com',    password_hash: hash, phone: '(555) 200-0003', role: 'client',    avatar_initials: 'TB', email_verified: true },
+    { first_name: 'Patricia', last_name: 'Davis',    email: 'patricia@example.com',  password_hash: hash, phone: '(555) 200-0004', role: 'client',    avatar_initials: 'PD', email_verified: true },
+    { first_name: 'Robert',   last_name: 'Wilson',   email: 'robert@example.com',    password_hash: hash, phone: '(555) 200-0005', role: 'client',    avatar_initials: 'RW', email_verified: true },
+    { first_name: 'Linda',    last_name: 'Martinez', email: 'linda@example.com',     password_hash: hash, phone: '(555) 200-0006', role: 'client',    avatar_initials: 'LM', email_verified: true },
+    { first_name: 'James',    last_name: 'Anderson', email: 'james@example.com',     password_hash: hash, phone: '(555) 200-0007', role: 'client',    avatar_initials: 'JA', email_verified: true },
   ];
 
   for (const u of usersData) {
@@ -53,9 +54,10 @@ async function seed() {
     return data;
   };
 
-  const [partnerU, attorneyU, clientU, margaretU, thomasU, patriciaU, robertU, lindaU] = await Promise.all([
+  const [partnerU, attorneyU, itsupportU, clientU, margaretU, thomasU, patriciaU, robertU, lindaU] = await Promise.all([
     getUser('partner@trivanta.com'),
     getUser('attorney@trivanta.com'),
+    getUser('itsupport@trivanta.com'),
     getUser('client@trivanta.com'),
     getUser('margaret@example.com'),
     getUser('thomas@example.com'),
@@ -63,6 +65,27 @@ async function seed() {
     getUser('robert@example.com'),
     getUser('linda@example.com'),
   ]);
+
+  // Seed user_profiles for partner and attorney
+  console.log('Seeding user profiles...');
+  const profiles = [
+    {
+      user_id: partnerU.id, bar_number: 'GA-12345', state_bar: 'Georgia',
+      years_experience: 18, specializations: 'Guardianship,Conservatorship,Elder Law',
+      firm_role: 'Managing Partner', practice_groups: 'Probate,Elder Law',
+      approved_at: new Date().toISOString(), approved_by: itsupportU.id,
+    },
+    {
+      user_id: attorneyU.id, bar_number: 'GA-67890', state_bar: 'Georgia',
+      years_experience: 8, specializations: 'Conservatorship,Estate Planning',
+      firm_role: null, practice_groups: 'Probate',
+      approved_at: new Date().toISOString(), approved_by: itsupportU.id,
+    },
+  ];
+  for (const p of profiles) {
+    const { error } = await supabase.from('user_profiles').upsert(p, { onConflict: 'user_id', ignoreDuplicates: true });
+    if (error) console.warn(`  Warning upserting profile for user ${p.user_id}:`, error.message);
+  }
 
   console.log('Seeding matters...');
   const mattersData = [
@@ -176,9 +199,10 @@ async function seed() {
   if (docErr) console.error('  Document seed error:', docErr.message);
 
   console.log('\n✅ Database seeded successfully!');
-  console.log('\n  Partner:  partner@trivanta.com  / Password123!');
-  console.log('  Attorney: attorney@trivanta.com / Password123!');
-  console.log('  Client:   client@trivanta.com   / Password123!');
+  console.log('\n  IT Support: itsupport@trivanta.com / Password123!');
+  console.log('  Partner:    partner@trivanta.com   / Password123!');
+  console.log('  Attorney:   attorney@trivanta.com  / Password123!');
+  console.log('  Client:     client@trivanta.com    / Password123!');
   console.log('\n  Other clients (same password):');
   console.log('  margaret@example.com · thomas@example.com · patricia@example.com');
   console.log('  robert@example.com   · linda@example.com  · james@example.com');

@@ -28,25 +28,27 @@ router.get('/check-email', async (req, res) => {
 // ── Register ──────────────────────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
-    const { firstName, lastName, email, password, phone, dob, street, city, state, zip, role } = req.body;
+    const {
+      firstName, lastName, email, password, phone, dob, street, city, state, zip, role,
+      // Professional fields (attorney / partner)
+      barNumber, stateBar, yearsExperience, specializations, firmRole, practiceGroups,
+      // Client-specific
+      matterType, existingMatter,
+    } = req.body;
 
     // Validate required fields
     if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({ error: 'Required fields missing' });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Invalid email address' });
     }
-
-    // Validate password length
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    // Check duplicate email
     const { data: existing } = await supabase
       .from('users')
       .select('id')
@@ -54,11 +56,11 @@ router.post('/register', async (req, res) => {
       .maybeSingle();
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
-    const hash       = await bcrypt.hash(password, 12);
-    const initials   = `${firstName[0]}${lastName[0]}`.toUpperCase();
-    const userRole   = ['attorney', 'partner'].includes(role) ? role : 'client';
+    const hash     = await bcrypt.hash(password, 12);
+    const initials = `${firstName[0]}${lastName[0]}`.toUpperCase();
+    const userRole = ['attorney', 'partner', 'itsupport'].includes(role) ? role : 'client';
 
-    // Generate email verification token
+    const isProfessional = ['attorney', 'partner'].includes(userRole);
     const verificationToken   = crypto.randomBytes(32).toString('hex');
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
@@ -66,32 +68,59 @@ router.post('/register', async (req, res) => {
       .from('users')
       .insert({
         first_name: firstName,
-        last_name: lastName,
-        email: email.toLowerCase(),
+        last_name:  lastName,
+        email:      email.toLowerCase(),
         password_hash: hash,
-        phone: phone || null,
-        dob: dob || null,
+        phone:  phone  || null,
+        dob:    dob    || null,
         street: street || null,
-        city: city || null,
-        state: state || null,
-        zip: zip || null,
-        role: userRole,
+        city:   city   || null,
+        state:  state  || null,
+        zip:    zip    || null,
+        role:   userRole,
         avatar_initials: initials,
         email_verified: false,
         verification_token: verificationToken,
         verification_token_expires: verificationExpires,
+        approval_status: isProfessional ? 'pending' : null,
       })
       .select('id, first_name, last_name, email, role, avatar_initials')
       .single();
 
     if (error) throw error;
 
-    // Send verification email (non-blocking — don't fail registration if SMTP is down)
+    // Store professional profile details for attorneys / partners
+    if (isProfessional) {
+      await supabase.from('user_profiles').insert({
+        user_id:          user.id,
+        bar_number:       barNumber       || null,
+        state_bar:        stateBar        || null,
+        years_experience: yearsExperience ? parseInt(yearsExperience) : null,
+        specializations:  specializations || null,
+        firm_role:        firmRole        || null,
+        practice_groups:  practiceGroups  || null,
+      });
+    }
+
+    // Log registration activity
+    await supabase.from('activity_log').insert({
+      user_id: user.id,
+      action:  'registered',
+      resource_type: 'user',
+      resource_id:   user.id,
+      details: `New ${userRole} account registered`,
+    }).catch(() => {});
+
     sendVerificationEmail(user.email, verificationToken).catch(err =>
       console.error('[email] Failed to send verification email:', err.message)
     );
 
-    res.status(201).json({ requiresVerification: true, email: user.email });
+    res.status(201).json({
+      requiresVerification: true,
+      requiresApproval: isProfessional,
+      email: user.email,
+      role:  userRole,
+    });
   } catch (err) {
     console.error('Register error:', err.message);
     res.status(500).json({ error: err.message });
@@ -178,6 +207,20 @@ router.post('/login', async (req, res) => {
         error: 'Please verify your email before logging in.',
         requiresVerification: true,
         email: user.email,
+      });
+    }
+
+    // Block attorneys/partners who haven't been approved yet
+    if (user.approval_status === 'pending') {
+      return res.status(403).json({
+        error: 'Your account is pending review by our team. You will be notified once approved.',
+        requiresApproval: true,
+      });
+    }
+    if (user.approval_status === 'rejected') {
+      return res.status(403).json({
+        error: 'Your account application was not approved. Please contact support for assistance.',
+        requiresApproval: true,
       });
     }
 

@@ -41,7 +41,13 @@ const partnerNav = [
   { to: '/settings',     icon: Settings,        label: 'Settings' },
 ];
 
-const navByRole = { client: clientNav, attorney: attorneyNav, partner: partnerNav };
+const itsupportNav = [
+  { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/users', icon: Users,           label: 'Users' },
+  { to: '/settings',    icon: Settings,        label: 'Settings' },
+];
+
+const navByRole = { client: clientNav, attorney: attorneyNav, partner: partnerNav, itsupport: itsupportNav };
 
 export default function Sidebar({ unreadMessages = 0, onClose }) {
   const { user, logout } = useAuth();
@@ -84,6 +90,12 @@ export default function Sidebar({ unreadMessages = 0, onClose }) {
           <div className="mb-3 p-3 bg-white/10 rounded-lg text-xs text-blue-100">
             <div className="font-semibold text-white mb-1">Your practice. Our platform.</div>
             <div className="text-blue-200">Powering better outcomes for your clients.</div>
+          </div>
+        )}
+        {user?.role === 'itsupport' && (
+          <div className="mb-3 p-3 bg-white/10 rounded-lg text-xs text-blue-100">
+            <div className="font-semibold text-white mb-1">System Administration</div>
+            <div className="text-blue-200">Monitor users, approvals, and platform health.</div>
           </div>
         )}
         <button onClick={handleLogout}

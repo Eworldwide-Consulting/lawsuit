@@ -27,6 +27,9 @@ export const authApi = {
   me: () => api.get('/auth/me'),
   updateProfile: d => api.put('/auth/profile', d),
   changePassword: d => api.put('/auth/change-password', d),
+  checkEmail: email => api.get('/auth/check-email', { params: { email } }),
+  verifyEmail: token => api.get('/auth/verify-email', { params: { token } }),
+  resendVerification: email => api.post('/auth/resend-verification', { email }),
 };
 
 export const mattersApi = {
@@ -84,6 +87,20 @@ export const paymentsApi = {
   createInvoice: d => api.post('/payments/invoice', d),
   checkout: invoiceId => api.post(`/payments/checkout/${invoiceId}`),
   confirm: sessionId => api.get(`/payments/confirm/${sessionId}`),
+};
+
+export const adminApi = {
+  stats: () => api.get('/admin/stats'),
+  users: () => api.get('/admin/users'),
+  pending: () => api.get('/admin/pending'),
+  approve: id => api.post(`/admin/users/${id}/approve`),
+  reject: (id, notes) => api.post(`/admin/users/${id}/reject`, { notes }),
+  changeRole: (id, role) => api.put(`/admin/users/${id}/role`, { role }),
+  forceVerify: id => api.post(`/admin/users/${id}/verify-email`),
+  resendInvite: id => api.post(`/admin/users/${id}/resend-invite`),
+  activity: () => api.get('/admin/activity'),
+  health: () => api.get('/admin/health'),
+  dbStats: () => api.get('/admin/db-stats'),
 };
 
 export default api;

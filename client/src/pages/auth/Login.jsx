@@ -18,6 +18,8 @@ export default function Login() {
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [needsVerification, setNeedsVerification] = useState('');
+  const [resentVerification, setResentVerification] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -46,7 +48,9 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
+      const d = err.response?.data || {};
+      setError(d.error || 'Login failed. Please try again.');
+      if (d.requiresVerification && d.email) setNeedsVerification(d.email);
     } finally {
       setLoading(false);
     }
@@ -60,7 +64,27 @@ export default function Login() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
+          {needsVerification && (
+            <div className="mt-2">
+              {resentVerification ? (
+                <span className="text-green-600 font-medium">Verification email sent!</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await authApi.resendVerification(needsVerification).catch(() => {});
+                    setResentVerification(true);
+                  }}
+                  className="underline font-medium hover:text-red-900"
+                >
+                  Resend verification email
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">

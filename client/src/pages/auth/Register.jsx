@@ -1,390 +1,598 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Mail, Phone, Calendar, MapPin, ChevronRight, Shield, CheckCircle, Eye, EyeOff } from 'lucide-react';
-import AuthLayout from '../../components/layout/AuthLayout';
-import StepIndicator from '../../components/ui/StepIndicator';
-import Spinner from '../../components/ui/Spinner';
+import {
+  Eye, EyeOff, CheckCircle, Loader2, ArrowLeft, ArrowRight,
+  User, Scale, Briefcase, Shield, Mail, Check,
+} from 'lucide-react';
 import { authApi } from '../../api';
+import Logo from '../../components/ui/Logo';
 
-const STEPS = ['Your Information', 'Matter Details', 'Contact Preferences', 'Review & Submit'];
-const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function FieldError({ msg }) {
-  if (!msg) return null;
-  return <p className="mt-1 text-xs text-red-500">{msg}</p>;
+function pwStrength(pw) {
+  if (!pw) return 0;
+  let s = 0;
+  if (pw.length >= 8)  s++;
+  if (pw.length >= 12) s++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
+  if (/\d/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  return s;
 }
 
 function PasswordStrength({ password }) {
+  const s = pwStrength(password);
+  const level = s <= 1 ? 'Weak' : s <= 3 ? 'Fair' : 'Strong';
+  const color = s <= 1 ? 'bg-red-500' : s <= 3 ? 'bg-yellow-500' : 'bg-green-500';
+  const textColor = s <= 1 ? 'text-red-600' : s <= 3 ? 'text-yellow-600' : 'text-green-600';
+  const width = `${Math.min(100, (s / 5) * 100)}%`;
   if (!password) return null;
-  const len    = password.length >= 8;
-  const upper  = /[A-Z]/.test(password);
-  const number = /\d/.test(password);
-  const score  = [len, upper, number].filter(Boolean).length;
-  const colors = ['bg-red-400', 'bg-yellow-400', 'bg-green-400'];
-  const labels = ['Weak', 'Fair', 'Strong'];
   return (
-    <div className="mt-1.5">
-      <div className="flex gap-1 mb-1">
-        {[0, 1, 2].map(i => (
-          <div key={i} className={`h-1 flex-1 rounded-full ${i < score ? colors[score - 1] : 'bg-gray-200'}`} />
-        ))}
+    <div className="mt-1.5 space-y-1">
+      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width }} />
       </div>
-      <p className="text-xs text-gray-400">
-        {score > 0 && <span className={score === 3 ? 'text-green-600' : score === 2 ? 'text-yellow-600' : 'text-red-500'}>{labels[score - 1]}</span>}
-        {' · '}8+ chars{len ? ' ✓' : ''}, uppercase{upper ? ' ✓' : ''}, number{number ? ' ✓' : ''}
-      </p>
+      <p className={`text-xs font-medium ${textColor}`}>Password strength: {level}</p>
     </div>
   );
 }
 
+function FieldError({ msg }) {
+  if (!msg) return null;
+  return <p className="text-xs text-red-600 mt-1">{msg}</p>;
+}
+
+function Field({ label, error, children }) {
+  return (
+    <div>
+      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      {children}
+      <FieldError msg={error} />
+    </div>
+  );
+}
+
+function Input({ className = '', ...props }) {
+  return (
+    <input
+      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 ${className}`}
+      {...props}
+    />
+  );
+}
+
+function Select({ className = '', children, ...props }) {
+  return (
+    <select
+      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+      {...props}
+    >
+      {children}
+    </select>
+  );
+}
+
+// ── Step progress bar ─────────────────────────────────────────────────────────
+
+const STEP_LABELS = {
+  client:   ['Personal Info', 'Contact Details', 'Matter Type'],
+  attorney: ['Personal Info', 'Credentials'],
+  partner:  ['Personal Info', 'Firm Details'],
+};
+
+function StepBar({ role, currentStep }) {
+  const steps = STEP_LABELS[role] || [];
+  return (
+    <div className="flex items-center justify-center gap-0 mb-8">
+      {steps.map((label, i) => {
+        const done = i < currentStep;
+        const active = i === currentStep;
+        return (
+          <div key={i} className="flex items-center">
+            <div className="flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                ${done ? 'bg-green-500 text-white' : active ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                {done ? <Check size={14} /> : i + 1}
+              </div>
+              <span className={`text-xs mt-1 hidden sm:block ${active ? 'text-blue-600 font-semibold' : done ? 'text-green-600' : 'text-gray-400'}`}>
+                {label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`w-12 sm:w-16 h-0.5 mx-1 mb-4 ${done ? 'bg-green-500' : 'bg-gray-200'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Role selection ────────────────────────────────────────────────────────────
+
+const ROLES = [
+  {
+    id: 'client',
+    icon: User,
+    label: 'Client',
+    desc: 'I need legal representation for a guardianship or conservatorship matter.',
+    ring: 'ring-blue-500', bg: 'bg-blue-50', iconColor: 'text-blue-600', checkBg: 'bg-blue-600',
+  },
+  {
+    id: 'attorney',
+    icon: Scale,
+    label: 'Attorney',
+    desc: 'I am a licensed attorney seeking to manage client cases on this platform.',
+    ring: 'ring-indigo-500', bg: 'bg-indigo-50', iconColor: 'text-indigo-600', checkBg: 'bg-indigo-600',
+  },
+  {
+    id: 'partner',
+    icon: Briefcase,
+    label: 'Partner',
+    desc: 'I am a firm partner overseeing attorneys, clients, and practice operations.',
+    ring: 'ring-purple-500', bg: 'bg-purple-50', iconColor: 'text-purple-600', checkBg: 'bg-purple-600',
+  },
+];
+
+function RoleCard({ role, selected, onSelect }) {
+  const Icon = role.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(role.id)}
+      className={`relative w-full text-left p-5 rounded-2xl border-2 transition-all
+        ${selected ? `border-transparent ring-2 ${role.ring} ${role.bg}` : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+    >
+      {selected && (
+        <div className={`absolute top-3 right-3 w-6 h-6 rounded-full ${role.checkBg} flex items-center justify-center`}>
+          <Check size={13} className="text-white" />
+        </div>
+      )}
+      <div className={`w-10 h-10 rounded-xl ${selected ? role.bg : 'bg-gray-100'} flex items-center justify-center mb-3`}>
+        <Icon size={20} className={selected ? role.iconColor : 'text-gray-500'} />
+      </div>
+      <div className="font-semibold text-gray-900 mb-1">{role.label}</div>
+      <div className="text-xs text-gray-500 leading-relaxed">{role.desc}</div>
+    </button>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+const INITIAL = {
+  firstName: '', lastName: '', email: '', password: '',
+  phone: '', dob: '', street: '', city: '', state: '', zip: '',
+  matterType: '', existingMatter: '',
+  barNumber: '', stateBar: '', yearsExperience: '', specializations: '',
+  firmRole: '', practiceGroups: '',
+};
+
 export default function Register() {
-  const [step, setStep]           = useState(0);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
-  const [fieldErrors, setFErrors] = useState({});
-  const [showPass, setShowPass]   = useState(false);
+  const [role, setRole] = useState('');
+  const [step, setStep] = useState(-1); // -1 = role selection
+  const [form, setForm] = useState(INITIAL);
+  const [errors, setErrors] = useState({});
+  const [showPw, setShowPw] = useState(false);
   const [emailChecking, setEmailChecking] = useState(false);
-  const [verified, setVerified]   = useState(null); // { email } after registration
+  const [submitState, setSubmitState] = useState('idle');
+  const [submitResult, setSubmitResult] = useState(null);
+  const [serverError, setServerError] = useState('');
 
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', password: '', phone: '', dob: '',
-    street: '', city: '', state: '', zip: '',
-    matterType: '', caseNumber: '', contactEmail: true, contactPhone: false, preferredMethod: 'email',
-  });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const e = k => errors[k];
+  const totalSteps = STEP_LABELS[role]?.length ?? 0;
 
-  const set     = k => e => { setForm(f => ({ ...f, [k]: e.target.value })); setFErrors(fe => ({ ...fe, [k]: '' })); };
-  const setCheck = k => e => setForm(f => ({ ...f, [k]: e.target.checked }));
+  // ── Validation ──────────────────────────────────────────────────────────────
 
-  // Validate step 0 fields inline
-  const validateStep0 = () => {
+  const validate = (s) => {
     const errs = {};
-    if (!form.firstName.trim()) errs.firstName = 'First name is required';
-    if (!form.lastName.trim())  errs.lastName  = 'Last name is required';
-    if (!form.email.trim())          errs.email    = 'Email is required';
-    else if (!EMAIL_REGEX.test(form.email)) errs.email = 'Enter a valid email address';
-    if (!form.password)              errs.password = 'Password is required';
-    else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters';
-    setFErrors(errs);
+    if (s === 0) {
+      if (!form.firstName.trim()) errs.firstName = 'First name is required';
+      if (!form.lastName.trim())  errs.lastName  = 'Last name is required';
+      if (!form.email.trim())     errs.email     = 'Email is required';
+      else if (!emailRe.test(form.email)) errs.email = 'Enter a valid email address';
+      if (!form.password)         errs.password  = 'Password is required';
+      else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters';
+    }
+    if (s === 1 && (role === 'attorney' || role === 'partner')) {
+      if (!form.barNumber.trim()) errs.barNumber = 'Bar number is required';
+      if (!form.stateBar.trim())  errs.stateBar  = 'State bar is required';
+      if (!form.yearsExperience)  errs.yearsExperience = 'Years of experience is required';
+      if (role === 'attorney' && !form.specializations.trim()) errs.specializations = 'At least one specialization is required';
+      if (role === 'partner'  && !form.firmRole.trim()) errs.firmRole = 'Firm role is required';
+    }
+    if (s === 2 && role === 'client') {
+      if (!form.matterType) errs.matterType = 'Please select a matter type';
+    }
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  // Check email availability on blur
-  const checkEmail = useCallback(async () => {
-    if (!form.email || !EMAIL_REGEX.test(form.email)) return;
+  // ── Email availability check ────────────────────────────────────────────────
+
+  const checkEmail = async () => {
+    if (!emailRe.test(form.email)) return;
     setEmailChecking(true);
     try {
-      const res = await authApi.checkEmail(form.email);
-      if (res.data.exists) {
-        setFErrors(fe => ({ ...fe, email: 'This email is already registered. Try signing in instead.' }));
-      }
-    } catch {
-      // ignore network errors on blur
-    } finally {
-      setEmailChecking(false);
-    }
-  }, [form.email]);
-
-  const handleNext = () => {
-    if (step === 0 && !validateStep0()) return;
-    setStep(s => s + 1);
+      const { data } = await authApi.checkEmail(form.email);
+      if (data.exists) setErrors(ex => ({ ...ex, email: 'This email is already registered' }));
+    } catch { /* ignore */ }
+    finally { setEmailChecking(false); }
   };
 
-  async function handleSubmit() {
-    setLoading(true);
-    setError('');
+  // ── Navigation ──────────────────────────────────────────────────────────────
+
+  const handleNext = () => {
+    if (!validate(step)) return;
+    if (step < totalSteps - 1) { setStep(s => s + 1); setErrors({}); }
+    else handleSubmit();
+  };
+
+  const handleBack = () => {
+    if (step === 0) { setStep(-1); setErrors({}); }
+    else { setStep(s => s - 1); setErrors({}); }
+  };
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+
+  const handleSubmit = async () => {
+    setSubmitState('submitting');
+    setServerError('');
     try {
-      const res = await authApi.register(form);
-      if (res.data.requiresVerification) {
-        setVerified({ email: res.data.email });
-      }
+      const { data } = await authApi.register({ ...form, role });
+      setSubmitResult(data);
+      setSubmitState('success');
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
+      setServerError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setSubmitState('error');
     }
-  }
+  };
 
-  async function handleResend() {
-    if (!verified?.email) return;
-    try {
-      await authApi.resendVerification(verified.email);
-      setError('');
-    } catch {
-      // silent
-    }
-  }
+  // ── Success screen ──────────────────────────────────────────────────────────
 
-  const fieldClass = (hasIcon = true) => `form-input ${hasIcon ? 'pl-10' : ''}`;
-
-  // ── Email verified — show confirmation screen ────────────────────────────────
-  if (verified) {
+  if (submitState === 'success') {
+    const isProfessional = role === 'attorney' || role === 'partner';
     return (
-      <AuthLayout variant="register">
-        <div className="text-center py-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <CheckCircle size={32} className="text-green-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            {isProfessional
+              ? <Shield className="w-10 h-10 text-indigo-600" />
+              : <Mail className="w-10 h-10 text-blue-600" />}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h1>
-          <p className="text-gray-500 text-sm mb-4">
-            We've sent a verification link to<br />
-            <span className="font-semibold text-gray-800">{verified.email}</span>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {isProfessional ? 'Application Submitted' : 'Check Your Email'}
+          </h1>
+          <p className="text-gray-600 mb-1">
+            {isProfessional
+              ? `Your ${role} account application has been received.`
+              : "We've sent a verification link to:"}
           </p>
-          <p className="text-gray-400 text-xs mb-6">
-            Click the link in the email to activate your account.<br />
-            The link expires in 24 hours.
-          </p>
-          <button onClick={handleResend} className="btn-secondary w-full mb-3 text-sm">
-            Resend verification email
+          <p className="font-semibold text-blue-600 mb-5">{submitResult?.email}</p>
+
+          {isProfessional ? (
+            <div className="bg-indigo-50 rounded-xl p-4 text-left text-sm text-indigo-800 space-y-1.5">
+              <p className="font-semibold mb-2">What happens next?</p>
+              <p>1. Verify your email via the link we sent you.</p>
+              <p>2. Our team reviews your credentials and bar information.</p>
+              <p>3. You will be notified once approved (1–2 business days).</p>
+            </div>
+          ) : (
+            <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800 text-left">
+              Click the link in your email to activate your account. The link expires in 24 hours.
+            </div>
+          )}
+
+          <button
+            className="mt-4 text-sm text-gray-500 hover:text-gray-700 underline"
+            onClick={async () => {
+              await authApi.resendVerification(submitResult?.email).catch(() => {});
+              alert('Verification email resent!');
+            }}
+          >
+            Didn't receive it? Resend
           </button>
-          <Link to="/login" className="text-green-600 hover:text-green-700 text-sm font-medium">
-            Back to sign in
-          </Link>
+          <div className="mt-2">
+            <Link to="/login" className="text-sm text-blue-600 hover:underline">Back to Sign In</Link>
+          </div>
         </div>
-      </AuthLayout>
+      </div>
     );
   }
 
-  // ── Registration form ────────────────────────────────────────────────────────
+  // ── Page shell ──────────────────────────────────────────────────────────────
+
   return (
-    <AuthLayout variant="register">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome! Let's set up your account.</h1>
-        <p className="text-gray-500 text-sm mt-1">Complete the form below to get started.</p>
-      </div>
-
-      <StepIndicator steps={STEPS} current={step} />
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-          {error}
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-lg">
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-4"><Logo size="md" /></div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {step === -1 ? 'Create your account' : STEP_LABELS[role]?.[step] ?? 'Register'}
+          </h1>
+          {step === -1 && (
+            <p className="text-gray-500 mt-1 text-sm">Select your account type to get started</p>
+          )}
         </div>
-      )}
 
-      {/* Step 0 – Your Information */}
-      {step === 0 && (
-        <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => { window.location.href = '/api/auth/google'; }}
-            className="btn-secondary w-full"
-          >
-            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.5 2.3 30.1 0 24 0 14.7 0 6.6 5.5 2.8 13.5l7.8 6.1C12.5 13.1 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.9 24.5c0-1.7-.1-3.3-.4-4.9H24v9.3h12.9c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.3-10.1 7.3-17.4z"/><path fill="#FBBC05" d="M10.6 28.6A14.7 14.7 0 019.5 24c0-1.6.3-3.2.9-4.6L2.6 13.3A23.8 23.8 0 000 24c0 3.8.9 7.4 2.6 10.6l8-6z"/><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.4l-7.5-5.8c-2 1.4-4.6 2.2-7.5 2.2-6.2 0-11.5-3.6-13.5-9.4l-8 6.1C6.6 42.5 14.7 48 24 48z"/></svg>
-            Sign up with Google
-          </button>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-            <div className="relative flex justify-center text-xs"><span className="px-3 bg-white text-gray-400">or sign up with email</span></div>
-          </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-7">
 
-          <h2 className="font-semibold text-gray-800">Your Information</h2>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="form-label">First name <span className="text-red-400">*</span></label>
-              <div className="relative">
-                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={form.firstName} onChange={set('firstName')} placeholder="First name"
-                  className={`${fieldClass()} ${fieldErrors.firstName ? 'border-red-300 focus:ring-red-200' : ''}`} />
+          {/* ── Role selection screen ── */}
+          {step === -1 && (
+            <div className="space-y-4">
+              <div className="grid gap-3">
+                {ROLES.map(r => (
+                  <RoleCard key={r.id} role={r} selected={role === r.id} onSelect={setRole} />
+                ))}
               </div>
-              <FieldError msg={fieldErrors.firstName} />
-            </div>
-            <div>
-              <label className="form-label">Last name <span className="text-red-400">*</span></label>
-              <div className="relative">
-                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={form.lastName} onChange={set('lastName')} placeholder="Last name"
-                  className={`${fieldClass()} ${fieldErrors.lastName ? 'border-red-300 focus:ring-red-200' : ''}`} />
-              </div>
-              <FieldError msg={fieldErrors.lastName} />
-            </div>
-          </div>
-
-          <div>
-            <label className="form-label">Email address <span className="text-red-400">*</span></label>
-            <div className="relative">
-              <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="email" value={form.email} onChange={set('email')} onBlur={checkEmail}
-                placeholder="you@example.com"
-                className={`${fieldClass()} ${fieldErrors.email ? 'border-red-300 focus:ring-red-200' : ''}`} />
-              {emailChecking && <Spinner size={4} className="absolute right-3 top-1/2 -translate-y-1/2" />}
-            </div>
-            <FieldError msg={fieldErrors.email} />
-          </div>
-
-          <div>
-            <label className="form-label">Password <span className="text-red-400">*</span></label>
-            <div className="relative">
-              <Shield size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type={showPass ? 'text' : 'password'} value={form.password} onChange={set('password')}
-                placeholder="Min. 8 characters"
-                className={`${fieldClass()} pr-10 ${fieldErrors.password ? 'border-red-300 focus:ring-red-200' : ''}`} />
-              <button type="button" onClick={() => setShowPass(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+              <button
+                type="button"
+                disabled={!role}
+                onClick={() => { setStep(0); setErrors({}); }}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                Continue <ArrowRight size={18} />
               </button>
+              <p className="text-center text-sm text-gray-500">
+                Already have an account?{' '}
+                <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
+              </p>
             </div>
-            <FieldError msg={fieldErrors.password} />
-            <PasswordStrength password={form.password} />
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* ── Steps ── */}
+          {step >= 0 && (
             <div>
-              <label className="form-label">Phone number</label>
-              <div className="relative">
-                <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="tel" value={form.phone} onChange={set('phone')} placeholder="(555) 123-4567" className={fieldClass()} />
-              </div>
-            </div>
-            <div>
-              <label className="form-label">Date of birth</label>
-              <div className="relative">
-                <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="date" value={form.dob} onChange={set('dob')} className={fieldClass()} />
-              </div>
-            </div>
-          </div>
+              <StepBar role={role} currentStep={step} />
 
-          <div>
-            <label className="form-label">Street address</label>
-            <div className="relative">
-              <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input value={form.street} onChange={set('street')} placeholder="123 Main Street" className={fieldClass()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="form-label">City</label>
-              <input value={form.city} onChange={set('city')} placeholder="City" className="form-input" />
-            </div>
-            <div>
-              <label className="form-label">State</label>
-              <select value={form.state} onChange={set('state')} className="form-input">
-                <option value="">State</option>
-                {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">ZIP code</label>
-              <input value={form.zip} onChange={set('zip')} placeholder="ZIP" className="form-input" />
-            </div>
-          </div>
-
-          <button onClick={handleNext} className="btn-primary mt-2">
-            Continue <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* Step 1 – Matter Details */}
-      {step === 1 && (
-        <div className="space-y-4">
-          <h2 className="font-semibold text-gray-800">Matter Details</h2>
-          <p className="text-sm text-gray-500">Tell us about your legal matter so we can connect you properly.</p>
-          <div>
-            <label className="form-label">Matter type</label>
-            <select value={form.matterType} onChange={set('matterType')} className="form-input">
-              <option value="">Select matter type</option>
-              <option value="guardianship">Guardianship</option>
-              <option value="conservatorship">Conservatorship</option>
-              <option value="estate_administration">Estate Administration</option>
-              <option value="probate">Probate</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Existing case number <span className="text-gray-400 font-normal">(if you have one)</span></label>
-            <input value={form.caseNumber} onChange={set('caseNumber')} placeholder="e.g. 24PR-12345" className="form-input" />
-          </div>
-          <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700 flex gap-2">
-            <span>ℹ️</span>
-            <span>Don't worry if you don't have all the details yet — you can continue and fill in more later.</span>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => setStep(0)} className="btn-secondary flex-shrink-0 w-auto px-6">Back</button>
-            <button onClick={() => setStep(2)} className="btn-primary">Continue <ChevronRight size={16} /></button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 2 – Contact Preferences */}
-      {step === 2 && (
-        <div className="space-y-4">
-          <h2 className="font-semibold text-gray-800">Contact Preferences</h2>
-          <p className="text-sm text-gray-500">How would you like your legal team to reach you?</p>
-          <div>
-            <label className="form-label">Contact methods</label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" checked={form.contactEmail} onChange={setCheck('contactEmail')} className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium text-gray-700">Email — {form.email || 'your email'}</span>
-              </label>
-              <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" checked={form.contactPhone} onChange={setCheck('contactPhone')} className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium text-gray-700">Phone (SMS) — {form.phone || 'your phone'}</span>
-              </label>
-            </div>
-          </div>
-          <div>
-            <label className="form-label">Preferred contact method</label>
-            <select value={form.preferredMethod} onChange={set('preferredMethod')} className="form-input">
-              <option value="email">Email</option>
-              <option value="phone">Phone</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => setStep(1)} className="btn-secondary flex-shrink-0 w-auto px-6">Back</button>
-            <button onClick={() => setStep(3)} className="btn-primary">Continue <ChevronRight size={16} /></button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3 – Review & Submit */}
-      {step === 3 && (
-        <div className="space-y-4">
-          <h2 className="font-semibold text-gray-800">Review & Submit</h2>
-          <p className="text-sm text-gray-500">Please review your information before submitting.</p>
-
-          {[
-            { label: 'Your Information', icon: '👤', fields: `${form.firstName} ${form.lastName}\n${form.email} · ${form.phone || 'No phone'}` },
-            { label: 'Matter Details',   icon: '📁', fields: `${form.matterType ? form.matterType.replace(/_/g,' ') : 'Not specified'}${form.caseNumber ? ` · Case #${form.caseNumber}` : ''}` },
-            { label: 'Contact Preferences', icon: '💬', fields: `Email: ${form.email}\n${form.contactPhone ? `Phone: ${form.phone}` : ''} · Preferred: ${form.preferredMethod}` },
-          ].map(({ label, icon, fields }, i) => (
-            <div key={i} className="border border-gray-200 rounded-xl p-4 flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <span className="text-xl">{icon}</span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-800">{label}</div>
-                  <div className="text-xs text-gray-500 mt-0.5 whitespace-pre-line">{fields}</div>
+              {/* Step 0 — Personal Info (all roles) */}
+              {step === 0 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="First Name" error={e('firstName')}>
+                      <Input value={form.firstName} onChange={ev => set('firstName', ev.target.value)} placeholder="Jane" />
+                    </Field>
+                    <Field label="Last Name" error={e('lastName')}>
+                      <Input value={form.lastName} onChange={ev => set('lastName', ev.target.value)} placeholder="Smith" />
+                    </Field>
+                  </div>
+                  <Field label="Email Address" error={e('email')}>
+                    <div className="relative">
+                      <Input
+                        type="email"
+                        value={form.email}
+                        onChange={ev => { set('email', ev.target.value); setErrors(ex => ({ ...ex, email: '' })); }}
+                        onBlur={checkEmail}
+                        placeholder="jane@example.com"
+                        className={e('email') ? 'border-red-400' : ''}
+                      />
+                      {emailChecking && (
+                        <Loader2 size={15} className="absolute right-3 top-3 animate-spin text-gray-400" />
+                      )}
+                    </div>
+                  </Field>
+                  <Field label="Password" error={e('password')}>
+                    <div className="relative">
+                      <Input
+                        type={showPw ? 'text' : 'password'}
+                        value={form.password}
+                        onChange={ev => set('password', ev.target.value)}
+                        placeholder="Minimum 8 characters"
+                        className={`pr-10 ${e('password') ? 'border-red-400' : ''}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPw(v => !v)}
+                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                    <PasswordStrength password={form.password} />
+                  </Field>
                 </div>
+              )}
+
+              {/* Step 1 — Client: Contact Details */}
+              {step === 1 && role === 'client' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Phone (optional)">
+                      <Input value={form.phone} onChange={ev => set('phone', ev.target.value)} placeholder="(555) 000-0000" />
+                    </Field>
+                    <Field label="Date of Birth (optional)">
+                      <Input type="date" value={form.dob} onChange={ev => set('dob', ev.target.value)} />
+                    </Field>
+                  </div>
+                  <Field label="Street Address (optional)">
+                    <Input value={form.street} onChange={ev => set('street', ev.target.value)} placeholder="123 Main St" />
+                  </Field>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-1">
+                      <Field label="City">
+                        <Input value={form.city} onChange={ev => set('city', ev.target.value)} placeholder="Atlanta" />
+                      </Field>
+                    </div>
+                    <Field label="State">
+                      <Input value={form.state} onChange={ev => set('state', ev.target.value)} placeholder="GA" maxLength={2} />
+                    </Field>
+                    <Field label="ZIP">
+                      <Input value={form.zip} onChange={ev => set('zip', ev.target.value)} placeholder="30301" maxLength={5} />
+                    </Field>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2 — Client: Matter Type */}
+              {step === 2 && role === 'client' && (
+                <div className="space-y-5">
+                  <Field label="What type of legal matter do you need help with?" error={e('matterType')}>
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      {[
+                        { id: 'guardianship', label: 'Guardianship', desc: 'Care for a person who cannot care for themselves' },
+                        { id: 'conservatorship', label: 'Conservatorship', desc: 'Manage finances for someone who cannot do so' },
+                      ].map(t => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => set('matterType', t.id)}
+                          className={`p-4 rounded-xl border-2 text-left transition-all
+                            ${form.matterType === t.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                        >
+                          <div className="font-semibold text-sm text-gray-900">{t.label}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{t.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <FieldError msg={e('matterType')} />
+                  </Field>
+                  <Field label="Have you worked with our firm before?">
+                    <div className="flex gap-3 mt-1">
+                      {['Yes', 'No'].map(opt => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => set('existingMatter', opt.toLowerCase())}
+                          className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all
+                            ${form.existingMatter === opt.toLowerCase()
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                </div>
+              )}
+
+              {/* Step 1 — Attorney: Credentials */}
+              {step === 1 && role === 'attorney' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Bar Number" error={e('barNumber')}>
+                      <Input value={form.barNumber} onChange={ev => set('barNumber', ev.target.value)} placeholder="GA-12345" />
+                    </Field>
+                    <Field label="State Bar" error={e('stateBar')}>
+                      <Input value={form.stateBar} onChange={ev => set('stateBar', ev.target.value)} placeholder="Georgia" />
+                    </Field>
+                  </div>
+                  <Field label="Years of Experience" error={e('yearsExperience')}>
+                    <Select value={form.yearsExperience} onChange={ev => set('yearsExperience', ev.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="1">0–2 years</option>
+                      <option value="4">3–5 years</option>
+                      <option value="8">6–10 years</option>
+                      <option value="13">11–15 years</option>
+                      <option value="18">16–20 years</option>
+                      <option value="25">20+ years</option>
+                    </Select>
+                  </Field>
+                  <Field label="Primary Specializations" error={e('specializations')}>
+                    <Input
+                      value={form.specializations}
+                      onChange={ev => set('specializations', ev.target.value)}
+                      placeholder="e.g. Guardianship, Elder Law, Estate Planning"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Separate multiple specializations with commas</p>
+                  </Field>
+                  <Field label="Phone (optional)">
+                    <Input value={form.phone} onChange={ev => set('phone', ev.target.value)} placeholder="(555) 000-0000" />
+                  </Field>
+                </div>
+              )}
+
+              {/* Step 1 — Partner: Firm Details */}
+              {step === 1 && role === 'partner' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Bar Number" error={e('barNumber')}>
+                      <Input value={form.barNumber} onChange={ev => set('barNumber', ev.target.value)} placeholder="GA-12345" />
+                    </Field>
+                    <Field label="State Bar" error={e('stateBar')}>
+                      <Input value={form.stateBar} onChange={ev => set('stateBar', ev.target.value)} placeholder="Georgia" />
+                    </Field>
+                  </div>
+                  <Field label="Firm Role" error={e('firmRole')}>
+                    <Select value={form.firmRole} onChange={ev => set('firmRole', ev.target.value)}>
+                      <option value="">Select your role…</option>
+                      <option value="Managing Partner">Managing Partner</option>
+                      <option value="Senior Partner">Senior Partner</option>
+                      <option value="Associate Partner">Associate Partner</option>
+                      <option value="Equity Partner">Equity Partner</option>
+                    </Select>
+                  </Field>
+                  <Field label="Years of Experience" error={e('yearsExperience')}>
+                    <Select value={form.yearsExperience} onChange={ev => set('yearsExperience', ev.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="1">0–2 years</option>
+                      <option value="4">3–5 years</option>
+                      <option value="8">6–10 years</option>
+                      <option value="13">11–15 years</option>
+                      <option value="18">16–20 years</option>
+                      <option value="25">20+ years</option>
+                    </Select>
+                  </Field>
+                  <Field label="Practice Groups">
+                    <Input
+                      value={form.practiceGroups}
+                      onChange={ev => set('practiceGroups', ev.target.value)}
+                      placeholder="e.g. Probate, Elder Law, Trust Administration"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Separate multiple groups with commas</p>
+                  </Field>
+                  <Field label="Phone (optional)">
+                    <Input value={form.phone} onChange={ev => set('phone', ev.target.value)} placeholder="(555) 000-0000" />
+                  </Field>
+                </div>
+              )}
+
+              {/* Server error */}
+              {submitState === 'error' && serverError && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                  {serverError}
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="flex gap-3 mt-7">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <ArrowLeft size={16} /> Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={submitState === 'submitting'}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
+                >
+                  {submitState === 'submitting' ? (
+                    <><Loader2 size={16} className="animate-spin" /> Submitting…</>
+                  ) : step < totalSteps - 1 ? (
+                    <>Continue <ArrowRight size={16} /></>
+                  ) : (
+                    <><CheckCircle size={16} /> {role === 'client' ? 'Create Account' : 'Submit Application'}</>
+                  )}
+                </button>
               </div>
-              <button onClick={() => setStep(i)} className="text-green-600 text-xs font-medium hover:text-green-700">Edit</button>
             </div>
-          ))}
-
-          <div className="p-3 bg-blue-50 rounded-lg flex items-start gap-2 text-xs text-blue-700">
-            <Shield size={14} className="flex-shrink-0 mt-0.5" />
-            <span>After submitting, we'll send a verification link to <strong>{form.email}</strong>. Click it to activate your account.</span>
-          </div>
-
-          <div className="flex gap-3">
-            <button onClick={() => setStep(2)} className="btn-secondary flex-shrink-0 w-auto px-6">Back</button>
-            <button onClick={handleSubmit} disabled={loading} className="btn-primary">
-              {loading ? <Spinner size={5} color="text-white" /> : <><Shield size={16} /> Submit & Create Account</>}
-            </button>
-          </div>
+          )}
         </div>
-      )}
 
-      <p className="mt-6 text-center text-sm text-gray-500">
-        Already have an account?{' '}
-        <Link to="/login" className="text-green-600 hover:text-green-700 font-medium">Sign in</Link>
-      </p>
-      <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-400">
-        <Shield size={12} /><span>Protected with secure encryption</span>
+        {step === -1 && (
+          <p className="text-center text-xs text-gray-400 mt-4">
+            By creating an account you agree to our{' '}
+            <Link to="/terms" className="underline hover:text-gray-600">Terms of Service</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="underline hover:text-gray-600">Privacy Policy</Link>
+          </p>
+        )}
       </div>
-    </AuthLayout>
+    </div>
   );
 }

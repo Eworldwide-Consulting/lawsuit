@@ -10,6 +10,7 @@ import Register from './pages/auth/Register';
 import TwoFactor from './pages/auth/TwoFactor';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import AuthCallback from './pages/auth/AuthCallback';
+import VerifyEmail from './pages/auth/VerifyEmail';
 
 // Intake pages
 import IntakeWizard from './pages/intake/IntakeWizard';
@@ -20,6 +21,7 @@ import RequiredDocuments from './pages/intake/RequiredDocuments';
 import ClientDashboard from './pages/dashboard/ClientDashboard';
 import AttorneyDashboard from './pages/dashboard/AttorneyDashboard';
 import PartnerDashboard from './pages/dashboard/PartnerDashboard';
+import ITSupportDashboard from './pages/dashboard/ITSupportDashboard';
 
 // App pages
 import Matters from './pages/Matters';
@@ -39,8 +41,9 @@ function RequireAuth({ children }) {
 
 function DashboardRouter() {
   const { user } = useAuth();
-  if (user?.role === 'partner') return <PartnerDashboard />;
-  if (user?.role === 'attorney') return <AttorneyDashboard />;
+  if (user?.role === 'itsupport') return <ITSupportDashboard />;
+  if (user?.role === 'partner')   return <PartnerDashboard />;
+  if (user?.role === 'attorney')  return <AttorneyDashboard />;
   return <ClientDashboard />;
 }
 
@@ -54,6 +57,7 @@ export default function App() {
       <Route path="/verify" element={<TwoFactor />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* Intake (auth required) */}
       <Route path="/intake" element={<RequireAuth><IntakeWizard /></RequireAuth>} />

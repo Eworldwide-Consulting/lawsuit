@@ -4,25 +4,53 @@
 
 -- ─── Users ────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-  id                        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  first_name                TEXT NOT NULL,
-  last_name                 TEXT NOT NULL,
-  email                     TEXT UNIQUE NOT NULL,
-  password_hash             TEXT NOT NULL DEFAULT '',
-  phone                     TEXT,
-  dob                       TEXT,
-  street                    TEXT,
-  city                      TEXT,
-  state                     TEXT,
-  zip                       TEXT,
-  role                      TEXT DEFAULT 'client',
-  two_fa_secret             TEXT,
-  two_fa_enabled            BOOLEAN DEFAULT FALSE,
-  avatar_initials           TEXT,
-  email_verified            BOOLEAN DEFAULT FALSE,
-  verification_token        TEXT,
+  id                         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  first_name                 TEXT NOT NULL,
+  last_name                  TEXT NOT NULL,
+  email                      TEXT UNIQUE NOT NULL,
+  password_hash              TEXT NOT NULL DEFAULT '',
+  phone                      TEXT,
+  dob                        TEXT,
+  street                     TEXT,
+  city                       TEXT,
+  state                      TEXT,
+  zip                        TEXT,
+  role                       TEXT DEFAULT 'client',   -- client | attorney | partner | itsupport
+  two_fa_secret              TEXT,
+  two_fa_enabled             BOOLEAN DEFAULT FALSE,
+  avatar_initials            TEXT,
+  email_verified             BOOLEAN DEFAULT FALSE,
+  verification_token         TEXT,
   verification_token_expires TIMESTAMPTZ,
-  created_at                TIMESTAMPTZ DEFAULT NOW()
+  approval_status            TEXT DEFAULT NULL,        -- NULL (clients/itsupport) | pending | approved | rejected
+  created_at                 TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── User Profiles (professional details for attorney / partner) ──────────────
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id          BIGINT UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  bar_number       TEXT,
+  state_bar        TEXT,
+  years_experience INTEGER,
+  specializations  TEXT,   -- comma-separated list
+  firm_role        TEXT,   -- Managing Partner | Senior Partner | Associate Partner
+  practice_groups  TEXT,   -- comma-separated list
+  approval_notes   TEXT,
+  approved_at      TIMESTAMPTZ,
+  approved_by      BIGINT REFERENCES users(id),
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── Activity Log ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS activity_log (
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id       BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  action        TEXT NOT NULL,   -- registered | login | matter_created | doc_uploaded | approved | rejected
+  resource_type TEXT,
+  resource_id   BIGINT,
+  details       TEXT,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ─── Matters ──────────────────────────────────────────────────────────────────
@@ -46,7 +74,6 @@ CREATE TABLE IF NOT EXISTS matters (
   updated_at                TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Auto-update updated_at on matters
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
