@@ -26,13 +26,18 @@ if [ ! -f .env ]; then
   JWT=$(node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
   sed -i "s|REPLACE_WITH_64_CHAR_RANDOM_HEX_STRING|$JWT|" .env
   ok ".env created with auto-generated JWT secret"
-  warn "IMPORTANT: Open .env and set CLIENT_URL=https://yourdomain.com"
-  warn "           Also update DB_PATH and UPLOAD_DIR to absolute paths."
+  warn "IMPORTANT: Open .env and fill in the required values:"
   echo ""
-  echo "  Example values:"
-  echo "  DB_PATH=/home/$(whoami)/public_html/trivanta/trivanta.db"
-  echo "  UPLOAD_DIR=/home/$(whoami)/public_html/trivanta/uploads"
+  echo "  Required:"
+  echo "  SUPABASE_URL=https://your-project.supabase.co"
+  echo "  SUPABASE_SERVICE_ROLE_KEY=your-service-role-key"
   echo "  CLIENT_URL=https://yourdomain.com"
+  echo "  SERVER_URL=https://yourdomain.com"
+  echo "  SMTP_HOST / SMTP_USER / SMTP_PASS"
+  echo ""
+  echo "  Optional (OAuth):"
+  echo "  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET"
+  echo "  MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET"
   echo ""
   read -p "  Press Enter after editing .env to continue..." _
 else
@@ -60,15 +65,14 @@ fi
 mkdir -p logs uploads
 ok "Directories: logs/ uploads/"
 
-# 6. Seed database (only if DB does not exist)
-DB_FILE=$(node -e "require('dotenv').config(); console.log(process.env.DB_PATH || './trivanta.db')" 2>/dev/null || echo "./trivanta.db")
-if [ ! -f "$DB_FILE" ]; then
-  echo ""
-  echo "🌱 Seeding database with demo data..."
+# 6. Seed Supabase database with demo accounts (idempotent — safe to run again)
+echo ""
+read -p "  Seed demo accounts into Supabase? (partner / attorney / client) [y/N]: " DO_SEED
+if [[ "$DO_SEED" =~ ^[Yy]$ ]]; then
   node server/src/seed.js
-  ok "Database seeded: $DB_FILE"
+  ok "Supabase seeded with demo accounts"
 else
-  ok "Database already exists: $DB_FILE (skipping seed)"
+  ok "Skipped seed (existing data preserved)"
 fi
 
 # 7. Done

@@ -1,23 +1,30 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Spinner from '../../components/ui/Spinner';
 
+const PROVIDER_LABELS = {
+  google:    'Google',
+  microsoft: 'Microsoft',
+};
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [provider, setProvider] = useState('');
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token  = params.get('token');
-    const error  = params.get('error');
+    const params   = new URLSearchParams(window.location.search);
+    const token    = params.get('token');
+    const error    = params.get('error');
+    const prov     = params.get('provider') || 'google';
+    setProvider(prov);
 
     if (error || !token) {
       navigate('/login?error=' + (error || 'unknown'), { replace: true });
       return;
     }
 
-    // Remove token from URL bar immediately
     window.history.replaceState({}, '', '/auth/callback');
 
     fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
@@ -29,13 +36,15 @@ export default function AuthCallback() {
         login(token, user);
         navigate('/dashboard', { replace: true });
       })
-      .catch(() => navigate('/login?error=google_failed', { replace: true }));
+      .catch(() => navigate(`/login?error=${prov}_failed`, { replace: true }));
   }, []);
+
+  const label = PROVIDER_LABELS[provider] || 'your account';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       <Spinner size={10} />
-      <p className="mt-4 text-gray-500 text-sm">Signing you in with Google…</p>
+      <p className="mt-4 text-gray-500 text-sm">Signing you in with {label}…</p>
     </div>
   );
 }

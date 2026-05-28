@@ -336,6 +336,10 @@ router.put('/change-password', requireAuth, async (req, res) => {
 const googleCallbackURL = () =>
   `${process.env.SERVER_URL || process.env.CLIENT_URL}/api/auth/google/callback`;
 
+// ── Microsoft OAuth ───────────────────────────────────────────────────────────
+const microsoftCallbackURL = () =>
+  `${process.env.SERVER_URL || process.env.CLIENT_URL}/api/auth/microsoft/callback`;
+
 router.get('/google', (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
     return res.status(501).send(
@@ -399,7 +403,7 @@ router.get('/google/callback', async (req, res) => {
           email: gUser.email.toLowerCase(),
           password_hash: '', role: 'client',
           avatar_initials: initials,
-          email_verified: true, // Google accounts are pre-verified
+          email_verified: true,
         })
         .select('*')
         .single();
@@ -407,10 +411,90 @@ router.get('/google/callback', async (req, res) => {
     }
 
     const token = signToken(user.id);
-    res.redirect(`${clientUrl}/auth/callback?token=${encodeURIComponent(token)}`);
+    res.redirect(`${clientUrl}/auth/callback?token=${encodeURIComponent(token)}&provider=google`);
   } catch (err) {
     console.error('Google OAuth error:', err.message);
     res.redirect(`${clientUrl}/login?error=google_failed`);
+  }
+});
+
+// ── Microsoft OAuth routes ────────────────────────────────────────────────────
+router.get('/microsoft', (req, res) => {
+  if (!process.env.MICROSOFT_CLIENT_ID) {
+    return res.status(501).send(
+      'Microsoft sign-in is not configured. Add MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET to your environment variables.'
+    );
+  }
+  const params = new URLSearchParams({
+    client_id:     process.env.MICROSOFT_CLIENT_ID,
+    redirect_uri:  microsoftCallbackURL(),
+    response_type: 'code',
+    response_mode: 'query',
+    scope:         'openid email profile User.Read',
+    prompt:        'select_account',
+  });
+  res.redirect(`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`);
+});
+
+router.get('/microsoft/callback', async (req, res) => {
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const { code, error } = req.query;
+  if (error || !code) return res.redirect(`${clientUrl}/login?error=microsoft_cancelled`);
+
+  try {
+    const tokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id:     process.env.MICROSOFT_CLIENT_ID,
+        client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+        redirect_uri:  microsoftCallbackURL(),
+        grant_type:    'authorization_code',
+      }).toString(),
+    });
+    const tokens = await tokenRes.json();
+    if (tokens.error) throw new Error(tokens.error_description || tokens.error);
+
+    const profileRes = await fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    const msUser = await profileRes.json();
+
+    // Microsoft returns mail for personal accounts, userPrincipalName for work/school
+    const email = (msUser.mail || msUser.userPrincipalName || '').toLowerCase();
+    if (!email) throw new Error('No email returned from Microsoft');
+
+    let { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (!user) {
+      const firstName = msUser.givenName   || msUser.displayName?.split(' ')[0] || 'User';
+      const lastName  = msUser.surname     || msUser.displayName?.split(' ').slice(1).join(' ') || '';
+      const initials  = `${firstName[0]}${(lastName[0] || firstName[1] || 'U')}`.toUpperCase();
+
+      const { data: created } = await supabase
+        .from('users')
+        .insert({
+          first_name: firstName, last_name: lastName,
+          email,
+          password_hash: '', role: 'client',
+          avatar_initials: initials,
+          email_verified: true,
+        })
+        .select('*')
+        .single();
+      user = created;
+    }
+
+    const token = signToken(user.id);
+    res.redirect(`${clientUrl}/auth/callback?token=${encodeURIComponent(token)}&provider=microsoft`);
+  } catch (err) {
+    console.error('Microsoft OAuth error:', err.message);
+    res.redirect(`${clientUrl}/login?error=microsoft_failed`);
   }
 });
 

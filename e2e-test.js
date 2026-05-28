@@ -498,6 +498,38 @@ const futureDateOnly = days => new Date(Date.now() + days * 86400000).toISOStrin
   log('INFO', 'Final readiness score for Jennifer', finalDash.readinessScore + '%');
 
   // ════════════════════════════════════════════════════════════════
+  section('STEP 14 · OAUTH ENDPOINT AVAILABILITY');
+  // ════════════════════════════════════════════════════════════════
+
+  // Google OAuth — endpoint must redirect (302) or return 501 if not configured
+  const googleOAuth = await get('/api/auth/google');
+  log(
+    googleOAuth.status === 302 || googleOAuth.status === 501 || googleOAuth.status === 200
+      ? 'PASS' : 'FAIL',
+    'GET /api/auth/google responds',
+    'status: ' + googleOAuth.status + (googleOAuth.status === 302 ? ' (redirect — configured)' : googleOAuth.status === 501 ? ' (not configured — expected)' : '')
+  );
+
+  // Microsoft OAuth — endpoint must redirect (302) or return 501 if not configured
+  const msOAuth = await get('/api/auth/microsoft');
+  log(
+    msOAuth.status === 302 || msOAuth.status === 501 || msOAuth.status === 200
+      ? 'PASS' : 'FAIL',
+    'GET /api/auth/microsoft responds',
+    'status: ' + msOAuth.status + (msOAuth.status === 302 ? ' (redirect — configured)' : msOAuth.status === 501 ? ' (not configured — expected)' : '')
+  );
+
+  // Google callback — without code param must redirect to /login?error=google_cancelled
+  const googleCbNoCode = await get('/api/auth/google/callback');
+  log(googleCbNoCode.status === 302 ? 'PASS' : 'FAIL',
+    'GET /api/auth/google/callback (no code) redirects', 'status: ' + googleCbNoCode.status);
+
+  // Microsoft callback — without code param must redirect to /login?error=microsoft_cancelled
+  const msCbNoCode = await get('/api/auth/microsoft/callback');
+  log(msCbNoCode.status === 302 ? 'PASS' : 'FAIL',
+    'GET /api/auth/microsoft/callback (no code) redirects', 'status: ' + msCbNoCode.status);
+
+  // ════════════════════════════════════════════════════════════════
   console.log('\n' + '═'.repeat(65));
   console.log('  TEST SUMMARY');
   console.log('═'.repeat(65));
