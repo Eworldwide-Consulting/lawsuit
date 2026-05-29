@@ -9,7 +9,10 @@ import Logo from '../../components/ui/Logo';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailRe = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+
+const MAX_DOB = new Date(Date.now() - 13 * 365.25 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const MIN_DOB = '1900-01-01';
 
 function pwStrength(pw) {
   if (!pw) return 0;
@@ -191,10 +194,23 @@ export default function Register() {
     if (s === 0) {
       if (!form.firstName.trim()) errs.firstName = 'First name is required';
       if (!form.lastName.trim())  errs.lastName  = 'Last name is required';
-      if (!form.email.trim())     errs.email     = 'Email is required';
-      else if (!emailRe.test(form.email)) errs.email = 'Enter a valid email address';
+      if (!form.email.trim())          errs.email = 'Email is required';
+      else if (!emailRe.test(form.email.trim())) errs.email = 'Enter a valid email address (e.g. name@domain.com)';
       if (!form.password)         errs.password  = 'Password is required';
       else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters';
+    }
+    if (s === 1 && role === 'client') {
+      if (form.dob) {
+        const dob  = new Date(form.dob);
+        const year = dob.getFullYear();
+        if (isNaN(dob.getTime()) || year < 1900 || year > new Date().getFullYear()) {
+          errs.dob = 'Please enter a valid date of birth';
+        } else {
+          const ageYrs = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+          if (ageYrs < 13)  errs.dob = 'You must be at least 13 years old to register';
+          if (ageYrs > 120) errs.dob = 'Please enter a valid date of birth';
+        }
+      }
     }
     if (s === 1 && (role === 'attorney' || role === 'partner')) {
       if (!form.barNumber.trim()) errs.barNumber = 'Bar number is required';
@@ -361,11 +377,20 @@ export default function Register() {
                   <Field label="Email Address" error={e('email')}>
                     <div className="relative">
                       <Input
-                        type="email"
+                        type="text"
                         value={form.email}
-                        onChange={ev => { set('email', ev.target.value); setErrors(ex => ({ ...ex, email: '' })); }}
+                        onChange={ev => {
+                          const val = ev.target.value;
+                          set('email', val);
+                          if (val && !emailRe.test(val.trim())) {
+                            setErrors(ex => ({ ...ex, email: 'Enter a valid email address (e.g. name@domain.com)' }));
+                          } else {
+                            setErrors(ex => ({ ...ex, email: '' }));
+                          }
+                        }}
                         onBlur={checkEmail}
                         placeholder="jane@example.com"
+                        autoComplete="email"
                         className={e('email') ? 'border-red-400' : ''}
                       />
                       {emailChecking && (
@@ -402,8 +427,18 @@ export default function Register() {
                     <Field label="Phone (optional)">
                       <Input value={form.phone} onChange={ev => set('phone', ev.target.value)} placeholder="(555) 000-0000" />
                     </Field>
-                    <Field label="Date of Birth (optional)">
-                      <Input type="date" value={form.dob} onChange={ev => set('dob', ev.target.value)} />
+                    <Field label="Date of Birth (optional)" error={e('dob')}>
+                      <Input
+                        type="date"
+                        value={form.dob}
+                        min={MIN_DOB}
+                        max={MAX_DOB}
+                        onChange={ev => {
+                          set('dob', ev.target.value);
+                          setErrors(ex => ({ ...ex, dob: '' }));
+                        }}
+                        className={e('dob') ? 'border-red-400' : ''}
+                      />
                     </Field>
                   </div>
                   <Field label="Street Address (optional)">
