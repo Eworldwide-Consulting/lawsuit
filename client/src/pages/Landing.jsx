@@ -249,7 +249,7 @@ export default function Landing() {
               {[
                 { step: '01', icon: Upload,       title: 'Upload',  desc: 'Securely upload your legal documents with end-to-end encryption.', iconCls: 'text-blue-600 bg-blue-50' },
                 { step: '02', icon: Search,       title: 'Review',  desc: 'Our attorneys and AI review your documents for completeness.',     iconCls: 'text-gold-600 bg-gold-50'  },
-                { step: '03', icon: Users,        title: 'Connect with Legal Firm', desc: 'Book a consultation with a qualified attorney in your area.',      iconCls: 'text-green-600 bg-green-50' },
+                { step: '03', icon: Users,        title: 'Connect with Attorney', desc: 'Book a consultation with a qualified attorney in your area.',      iconCls: 'text-green-600 bg-green-50' },
                 { step: '04', icon: CheckCircle,  title: 'Resolve', desc: 'Track progress and close your matter with full documentation.',    iconCls: 'text-purple-600 bg-purple-50' },
               ].map(({ step, icon: Icon, title, desc, iconCls }) => (
                 <div key={step} className="text-center card-lift">
@@ -561,39 +561,58 @@ export default function Landing() {
               <p className="text-blue-200 text-lg max-w-xl mx-auto">Start with a free consultation and scale as your needs grow.</p>
             </div>
 
+            {/* Seasonal sale banner */}
+            <div className="flex items-center justify-center gap-3 mb-8 bg-gradient-to-r from-gold-500/20 to-gold-500/10 border border-gold-500/40 rounded-2xl px-6 py-3">
+              <span className="text-xl">🎉</span>
+              <p className="text-gold-300 text-sm font-semibold">
+                Seasonal Sale — Use code{' '}
+                <span className="bg-gold-500 text-navy-950 font-bold px-2 py-0.5 rounded mx-1 tracking-wider">SAVE20</span>
+                at checkout to get <span className="text-white font-bold">$20 off</span> the Starter plan
+              </p>
+            </div>
+
             <div className="grid md:grid-cols-3 gap-6 items-start">
               {[
                 {
                   name: 'Starter',
-                  price: 'Free',
-                  period: 'consultation',
+                  price: '$120',
+                  originalPrice: '$140',
+                  period: '/month',
+                  badge: '🏷️ Save $20',
                   desc: 'Perfect for individuals with simple legal needs.',
-                  features: ['1 free consultation', '500 MB document storage', 'Basic document review', 'Email support', 'Secure messaging'],
-                  cta: 'Start Free',
+                  features: ['3 consultations/month', '2 GB document storage', 'Basic document review', 'Email support', 'Secure messaging', 'Case tracking dashboard'],
+                  cta: 'Get Started',
                   hot: false,
+                  sale: true,
                 },
                 {
                   name: 'Professional',
-                  price: '$49',
+                  price: '$249',
+                  originalPrice: null,
                   period: '/month',
+                  badge: null,
                   desc: 'For individuals and small businesses with ongoing legal matters.',
                   features: ['Unlimited consultations', '10 GB encrypted storage', 'AI + attorney review', '24 hr response SLA', 'Priority support', 'Case tracking dashboard', 'Multi-factor auth'],
                   cta: 'Get Started',
                   hot: true,
+                  sale: false,
                 },
                 {
                   name: 'Enterprise',
                   price: 'Custom',
+                  originalPrice: null,
                   period: 'pricing',
+                  badge: null,
                   desc: 'For law firms and large organisations with complex needs.',
                   features: ['Unlimited everything', 'Custom integrations', 'Dedicated attorney team', 'White-label options', 'SLA guarantees', 'Compliance reporting', 'API access'],
                   cta: 'Contact Sales',
                   hot: false,
+                  sale: false,
                 },
-              ].map(({ name, price, period, desc, features, cta, hot }) => (
+              ].map(({ name, price, originalPrice, period, badge, desc, features, cta, hot, sale }) => (
                 <div
                   key={name}
-                  className={`rounded-2xl p-8 border card-lift ${
+                  className={`rounded-2xl p-8 border card-lift relative ${
                     hot
                       ? 'bg-gradient-to-b from-navy-500 to-navy-900 border-gold-500 shadow-2xl shadow-gold-500/10 md:-mt-4'
                       : 'bg-navy-900 border-white/10'
@@ -604,12 +623,27 @@ export default function Landing() {
                       <span className="bg-gold-500 text-navy-950 text-xs font-bold px-3 py-1 rounded-full">Most Popular</span>
                     </div>
                   )}
+                  {sale && (
+                    <div className="absolute -top-3 right-5">
+                      <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                        🔥 Seasonal Sale
+                      </span>
+                    </div>
+                  )}
                   <div className="mb-6">
                     <div className="text-blue-300 text-sm font-semibold mb-1">{name}</div>
-                    <div className="flex items-baseline gap-1">
+                    <div className="flex items-baseline gap-2">
+                      {originalPrice && (
+                        <span className="text-xl text-blue-400 line-through opacity-60">{originalPrice}</span>
+                      )}
                       <span className={`text-4xl font-bold ${hot ? 'text-gold-400' : 'text-white'}`}>{price}</span>
                       <span className="text-blue-300 text-sm">{period}</span>
                     </div>
+                    {badge && (
+                      <div className="mt-2 inline-flex items-center gap-1 bg-green-500/20 border border-green-500/40 text-green-300 text-xs font-semibold px-3 py-1 rounded-full">
+                        {badge} · Use code <span className="text-white font-bold ml-1">SAVE20</span>
+                      </div>
+                    )}
                     <p className="text-blue-300 text-sm mt-2">{desc}</p>
                   </div>
 
