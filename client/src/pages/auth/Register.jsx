@@ -9,9 +9,10 @@ import Logo from '../../components/ui/Logo';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const emailRe = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const ALLOWED_DOMAINS = /^[a-zA-Z0-9._%+\-]+@(gmail|hotmail|outlook|live)\.[a-zA-Z]{2,}$/i;
+const emailRe = ALLOWED_DOMAINS;
 
-const MAX_DOB = new Date(Date.now() - 13 * 365.25 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const MAX_DOB = new Date().toISOString().slice(0, 10); // today — DOB cannot be in the future
 const MIN_DOB = '1900-01-01';
 
 function pwStrength(pw) {
@@ -195,16 +196,18 @@ export default function Register() {
       if (!form.firstName.trim()) errs.firstName = 'First name is required';
       if (!form.lastName.trim())  errs.lastName  = 'Last name is required';
       if (!form.email.trim())          errs.email = 'Email is required';
-      else if (!emailRe.test(form.email.trim())) errs.email = 'Enter a valid email address (e.g. name@domain.com)';
+      else if (!emailRe.test(form.email.trim())) errs.email = 'Please use a Gmail, Hotmail, Outlook, or Live email address';
       if (!form.password)         errs.password  = 'Password is required';
       else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters';
     }
     if (s === 1 && role === 'client') {
       if (form.dob) {
-        const dob  = new Date(form.dob);
-        const year = dob.getFullYear();
-        if (isNaN(dob.getTime()) || year < 1900 || year > new Date().getFullYear()) {
+        const dob   = new Date(form.dob);
+        const today = new Date(); today.setHours(0,0,0,0);
+        if (isNaN(dob.getTime()) || dob.getFullYear() < 1900) {
           errs.dob = 'Please enter a valid date of birth';
+        } else if (dob > today) {
+          errs.dob = 'Date of birth cannot be in the future';
         } else {
           const ageYrs = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
           if (ageYrs < 13)  errs.dob = 'You must be at least 13 years old to register';
@@ -383,7 +386,7 @@ export default function Register() {
                           const val = ev.target.value;
                           set('email', val);
                           if (val && !emailRe.test(val.trim())) {
-                            setErrors(ex => ({ ...ex, email: 'Enter a valid email address (e.g. name@domain.com)' }));
+                            setErrors(ex => ({ ...ex, email: 'Please use a Gmail, Hotmail, Outlook, or Live email address' }));
                           } else {
                             setErrors(ex => ({ ...ex, email: '' }));
                           }

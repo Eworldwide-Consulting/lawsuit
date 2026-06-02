@@ -561,29 +561,20 @@ export default function Landing() {
               <p className="text-blue-200 text-lg max-w-xl mx-auto">Start with a free consultation and scale as your needs grow.</p>
             </div>
 
-            {/* Seasonal sale banner */}
-            <div className="flex items-center justify-center gap-3 mb-8 bg-gradient-to-r from-gold-500/20 to-gold-500/10 border border-gold-500/40 rounded-2xl px-6 py-3">
-              <span className="text-xl">🎉</span>
-              <p className="text-gold-300 text-sm font-semibold">
-                Seasonal Sale — Use code{' '}
-                <span className="bg-gold-500 text-navy-950 font-bold px-2 py-0.5 rounded mx-1 tracking-wider">SAVE20</span>
-                at checkout to get <span className="text-white font-bold">$20 off</span> the Starter plan
-              </p>
-            </div>
 
             <div className="grid md:grid-cols-3 gap-6 items-start">
               {[
                 {
                   name: 'Starter',
-                  price: '$120',
-                  originalPrice: '$140',
+                  price: '$149',
+                  originalPrice: null,
                   period: '/month',
-                  badge: '🏷️ Save $20',
+                  badge: null,
                   desc: 'Perfect for individuals with simple legal needs.',
                   features: ['3 consultations/month', '2 GB document storage', 'Basic document review', 'Email support', 'Secure messaging', 'Case tracking dashboard'],
                   cta: 'Get Started',
                   hot: false,
-                  sale: true,
+                  sale: false,
                 },
                 {
                   name: 'Professional',
