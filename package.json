@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "TriVanta Legal Compliance Platform",
   "scripts": {
-    "postinstall": "npm install --prefix server --omit=dev && npm rebuild better-sqlite3 --prefix server",
+    "postinstall": "cd server && npm install --omit=dev",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "npm run dev --prefix server",

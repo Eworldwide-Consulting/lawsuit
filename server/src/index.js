@@ -22,19 +22,13 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDev        = !isProduction;
 
 app.use(helmet({ contentSecurityPolicy: false }));
-
-// Stripe webhook must receive raw body — register BEFORE express.json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
-
-app.use(cors({
-  origin: isProduction ? true : (process.env.CLIENT_URL || 'http://localhost:5173'),
-  credentials: true,
-}));
+app.use(cors({ origin: isProduction ? true : (process.env.CLIENT_URL || 'http://localhost:5173'), credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-const limiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: isDev ? 2000 : 200, standardHeaders: true });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: isDev ? 200  : 20,  standardHeaders: true });
+const limiter     = rateLimit({ windowMs: 15*60*1000, max: isDev ? 2000 : 200, standardHeaders: true });
+const authLimiter = rateLimit({ windowMs: 15*60*1000, max: isDev ? 200  : 20,  standardHeaders: true });
 app.use('/api/', limiter);
 app.use('/api/auth/login',    authLimiter);
 app.use('/api/auth/register', authLimiter);
@@ -67,5 +61,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 TriVanta server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+  console.log(`🚀 TriVanta running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
 });
