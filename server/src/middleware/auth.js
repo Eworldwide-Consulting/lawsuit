@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
-const supabase = require('../supabase');
+const { getDb } = require('../database');
 
-async function requireAuth(req, res, next) {
+function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -9,12 +9,9 @@ async function requireAuth(req, res, next) {
   const token = header.slice(7);
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', payload.userId)
-      .single();
-    if (error || !user) return res.status(401).json({ error: 'User not found' });
+    if (payload.twoFaPending) return res.status(401).json({ error: 'Two-factor authentication required' });
+    const user = getDb().prepare('SELECT * FROM users WHERE id = ?').get(payload.userId);
+    if (!user) return res.status(401).json({ error: 'User not found' });
     req.user = user;
     next();
   } catch {
@@ -24,7 +21,7 @@ async function requireAuth(req, res, next) {
 
 function requireRole(...roles) {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user?.role)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     next();

@@ -1,46 +1,23 @@
-const router   = require('express').Router();
-const supabase = require('../supabase');
+const router = require('express').Router();
+const { getDb } = require('../database');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-router.get('/', requireAuth, requireRole('attorney', 'partner'), async (req, res) => {
+router.get('/', requireAuth, requireRole('attorney','partner'), (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, first_name, last_name, email, role, phone, avatar_initials, created_at')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json(data || []);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json(getDb().prepare('SELECT id,first_name,last_name,email,role,phone,avatar_initials,created_at FROM users ORDER BY created_at DESC').all());
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/attorneys', requireAuth, async (req, res) => {
+router.get('/attorneys', requireAuth, (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, first_name, last_name, email, role, avatar_initials')
-      .in('role', ['attorney', 'partner'])
-      .order('first_name', { ascending: true });
-    if (error) throw error;
-    res.json(data || []);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json(getDb().prepare("SELECT id,first_name,last_name,email,role,avatar_initials FROM users WHERE role IN ('attorney','partner') ORDER BY first_name ASC").all());
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/clients', requireAuth, requireRole('attorney', 'partner'), async (req, res) => {
+router.get('/clients', requireAuth, requireRole('attorney','partner'), (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, first_name, last_name, email, phone, avatar_initials, created_at')
-      .eq('role', 'client')
-      .order('last_name', { ascending: true });
-    if (error) throw error;
-    res.json(data || []);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json(getDb().prepare("SELECT id,first_name,last_name,email,phone,avatar_initials,created_at FROM users WHERE role='client' ORDER BY last_name ASC").all());
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;
