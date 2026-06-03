@@ -9,7 +9,7 @@ import Logo from '../../components/ui/Logo';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const ALLOWED_DOMAINS = /^[a-zA-Z0-9._%+\-]+@(gmail|hotmail|outlook|live)\.[a-zA-Z]{2,}$/i;
+const ALLOWED_DOMAINS = /^[a-zA-Z0-9._%+\-]+@(gmail|hotmail|outlook|live|yahoo)\.[a-zA-Z]{2,}$/i;
 const emailRe = ALLOWED_DOMAINS;
 
 const MAX_DOB = new Date().toISOString().slice(0, 10); // today — DOB cannot be in the future
