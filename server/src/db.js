@@ -1,44 +1,60 @@
-const mysql = require('mysql2/promise');
+const { getDb } = require('./database');
 
-let pool;
-
-function getPool() {
-  if (pool) return pool;
-  pool = mysql.createPool({
-    host:     process.env.DB_HOST     || 'localhost',
-    port:     parseInt(process.env.DB_PORT) || 3306,
-    database: process.env.DB_NAME,
-    user:     process.env.DB_USER,
-    password: process.env.DB_PASS,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
-  return pool;
+function toPostgresSql(sql, params = []) {
+  let index = 0;
+  const text = sql.replace(/\?/g, () => `$${++index}`);
+  return { text, values: params };
 }
 
-// Returns first row or null
 async function one(sql, params = []) {
-  const [rows] = await getPool().execute(sql, params);
-  return rows[0] || null;
+  const db = getDb();
+  if (db.type === 'sqlite') {
+    const stmt = db.sqlite.prepare(sql);
+    const row = stmt.get(params);
+    return row || null;
+  }
+  const { text, values } = toPostgresSql(sql, params);
+  const result = await db.pool.query({ text, values });
+  return result.rows[0] || null;
 }
 
-// Returns all rows
 async function all(sql, params = []) {
-  const [rows] = await getPool().execute(sql, params);
-  return rows;
+  const db = getDb();
+  if (db.type === 'sqlite') {
+    const stmt = db.sqlite.prepare(sql);
+    return stmt.all(params);
+  }
+  const { text, values } = toPostgresSql(sql, params);
+  const result = await db.pool.query({ text, values });
+  return result.rows;
 }
 
-// Returns insertId or affectedRows
 async function run(sql, params = []) {
-  const [result] = await getPool().execute(sql, params);
-  return result;
+  const db = getDb();
+  if (db.type === 'sqlite') {
+    const stmt = db.sqlite.prepare(sql);
+    const result = stmt.run(params);
+    return {
+      ...result,
+      insertId: result.lastInsertRowid,
+      affectedRows: result.changes,
+    };
+  }
+
+  const { text, values } = toPostgresSql(sql, params);
+  const shouldReturnId = /^\s*INSERT\s+/i.test(text) && !/\bRETURNING\b/i.test(text);
+  const query = shouldReturnId ? `${text} RETURNING id` : text;
+  const result = await db.pool.query({ text: query, values });
+  return {
+    insertId: result.rows?.[0]?.id ?? null,
+    affectedRows: result.rowCount,
+    rows: result.rows,
+  };
 }
 
-// Count shortcut
 async function count(sql, params = []) {
   const row = await one(sql, params);
   return row ? Object.values(row)[0] : 0;
 }
 
-module.exports = { getPool, one, all, run, count };
+module.exports = { one, all, run, count };

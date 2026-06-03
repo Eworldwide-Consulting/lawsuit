@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react';
-import { tasksApi } from '../api';
+import { tasksApi, mattersApi } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { CheckSquare, Clock, AlertTriangle, Check } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
 export default function CareTasks() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [matters, setMatters] = useState([]);
+  const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [priority, setPriority] = useState('normal');
+  const [matterId, setMatterId] = useState('');
 
   const load = () => tasksApi.list().then(r => setTasks(r.data)).finally(() => setLoading(false));
-  useEffect(() => { load(); }, []);
+  const loadMatters = () => mattersApi.list().then(r => setMatters(r.data)).catch(() => setMatters([]));
+
+  useEffect(() => { load(); loadMatters(); }, []);
 
   async function complete(id) {
     await tasksApi.update(id, { status: 'completed' });
@@ -29,14 +40,101 @@ export default function CareTasks() {
     return { text: `Due in ${d} day${d !== 1 ? 's' : ''}`, color: d <= 3 ? 'text-amber-600' : 'text-gray-500' };
   };
 
+  const normalizeTitle = title => title === 'Review doctor appointment notes'
+    ? 'Review attorney appointment notes'
+    : title;
+
   const counts = { all: tasks.length, pending: tasks.filter(t => t.status === 'pending').length, overdue: tasks.filter(t => t.status === 'overdue').length, completed: tasks.filter(t => t.status === 'completed').length };
+
+  const selectedMatter = matters.find(m => String(m.id) === String(matterId));
+  const assignedTo = user?.role === 'attorney' ? selectedMatter?.client_id : user?.id;
+
+  const createTask = async () => {
+    if (!title.trim()) return;
+    setCreating(true);
+    try {
+      const created = await tasksApi.create({
+        matterId: matterId || null,
+        assignedTo: assignedTo || undefined,
+        title: title.trim(),
+        description: description.trim() || null,
+        dueDate: dueDate || null,
+        priority,
+        actionLabel: 'Review',
+      });
+      setTasks(prev => [created.data, ...prev]);
+      setTitle('');
+      setDescription('');
+      setDueDate('');
+      setPriority('normal');
+      setMatterId('');
+      setCreating(false);
+    } catch (err) {
+      setCreating(false);
+      console.error(err);
+    }
+  };
 
   return (
     <div className="p-4 lg:p-6 max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Care Tasks</h1>
-        <p className="text-gray-500 text-sm">Track and complete your required actions</p>
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Care Tasks</h1>
+          <p className="text-gray-500 text-sm">Track and complete your required actions</p>
+        </div>
+        <button onClick={() => setCreating(prev => !prev)}
+          className="inline-flex items-center justify-center rounded-lg bg-navy-900 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800">
+          Create Task
+        </button>
       </div>
+      {creating && (
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 text-sm font-semibold text-gray-800">Add a new task</div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm text-gray-700">
+              Title
+              <input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm" placeholder="Task title" />
+            </label>
+            <label className="block text-sm text-gray-700">
+              Due date
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm" />
+            </label>
+            <label className="block text-sm text-gray-700 sm:col-span-2">
+              Description
+              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm" placeholder="Task details" />
+            </label>
+            <label className="block text-sm text-gray-700">
+              Priority
+              <select value={priority} onChange={e => setPriority(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
+            {matters.length > 0 && (
+              <label className="block text-sm text-gray-700 sm:col-span-2">
+                Matter
+                <select value={matterId} onChange={e => setMatterId(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+                  <option value="">Select matter (optional)</option>
+                  {matters.map(m => (
+                    <option key={m.id} value={m.id}>{m.case_number || `Matter #${m.id}`} - {m.client_name || m.attorney_name || m.matter_type}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <button onClick={createTask} disabled={!title.trim() || creating}
+              className="rounded-lg bg-navy-900 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50">
+              {creating ? 'Saving...' : 'Save Task'}
+            </button>
+            <button onClick={() => setCreating(false)} className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+          </div>
+          {user?.role === 'attorney' && selectedMatter && (
+            <div className="mt-3 text-xs text-gray-500">This task will be assigned to the client for the selected matter.</div>
+          )}
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-5 flex-wrap">
@@ -73,7 +171,7 @@ export default function CareTasks() {
                   {done && <Check size={12} className="text-white" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <div className={`font-medium text-sm ${done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.title}</div>
+                  <div className={`font-medium text-sm ${done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{normalizeTitle(task.title)}</div>
                   {task.description && <div className="text-xs text-gray-500 mt-0.5">{task.description}</div>}
                   <div className={`text-xs font-medium mt-1 ${color}`}>{text}</div>
                 </div>

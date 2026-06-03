@@ -41,10 +41,12 @@ function RequireAuth({ children }) {
 
 function DashboardRouter() {
   const { user } = useAuth();
-  if (user?.role === 'itsupport') return <ITSupportDashboard />;
-  if (user?.role === 'partner')   return <PartnerDashboard />;
-  if (user?.role === 'attorney')  return <AttorneyDashboard />;
-  return <ClientDashboard />;
+  if (!user?.role) return <Navigate to="/login" replace />;
+  if (user.role === 'itsupport') return <ITSupportDashboard />;
+  if (user.role === 'partner')   return <PartnerDashboard />;
+  if (user.role === 'attorney')  return <AttorneyDashboard />;
+  if (user.role === 'client')    return <ClientDashboard />;
+  return <Navigate to="/login" replace />;
 }
 
 export default function App() {

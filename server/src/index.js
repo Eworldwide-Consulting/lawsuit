@@ -15,6 +15,7 @@ const dashboardRoutes   = require('./routes/dashboard');
 const userRoutes        = require('./routes/users');
 const paymentRoutes     = require('./routes/payments');
 const adminRoutes       = require('./routes/admin');
+const { initDatabase }  = require('./database');
 
 const app          = express();
 const PORT         = process.env.PORT || 5000;
@@ -60,6 +61,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: isProduction ? 'Internal server error' : err.message });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 TriVanta running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+initDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 TriVanta running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+  });
+}).catch(err => {
+  console.error('Failed to initialize database:', err.message);
+  process.exit(1);
 });

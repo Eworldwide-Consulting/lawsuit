@@ -83,11 +83,16 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      const res = await authApi.login(form);
+      const res = await authApi.login({ ...form, portal: activeRole });
       if (res.data.twoFaRequired) {
         sessionStorage.setItem('lp_temp_token', res.data.tempToken);
         navigate('/verify');
       } else {
+        if (res.data.user.role !== activeRole) {
+          setError(`This email is registered as ${res.data.user.role}. Please sign in using the ${res.data.user.role} portal or register a new ${activeRole} account.`);
+          setLoading(false);
+          return;
+        }
         login(res.data.token, res.data.user);
         navigate('/dashboard');
       }

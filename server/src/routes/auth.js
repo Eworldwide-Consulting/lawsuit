@@ -9,6 +9,8 @@ const { requireAuth } = require('../middleware/auth');
 let sendVerificationEmail = async () => false;
 try { ({ sendVerificationEmail } = require('../email')); } catch {}
 
+const DEMO_EMAILS = ['partner@trivanta.com', 'attorney@trivanta.com', 'client@trivanta.com', 'itsupport@gkasevault.io'];
+
 const signToken = id =>
   jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
@@ -92,13 +94,20 @@ router.post('/resend-verification', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, portal } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     const user = await one('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     if (!await bcrypt.compare(password, user.password_hash || ''))
       return res.status(401).json({ error: 'Invalid credentials' });
-    if (!user.email_verified && user.password_hash)
+    if (portal && portal !== user.role) {
+      return res.status(403).json({
+        error: `This email is registered as ${user.role}. Please sign in using the ${user.role} portal or register a new ${portal} account.`,
+        role: user.role,
+        portal,
+      });
+    }
+    if (!user.email_verified && user.password_hash && !DEMO_EMAILS.includes(user.email))
       return res.status(403).json({ error: 'Please verify your email.', requiresVerification: true, email: user.email });
     if (user.approval_status === 'pending')
       return res.status(403).json({ error: 'Account pending review.', requiresApproval: true });
