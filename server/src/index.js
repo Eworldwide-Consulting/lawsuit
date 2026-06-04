@@ -18,6 +18,10 @@ const adminRoutes       = require('./routes/admin');
 const { initDatabase }  = require('./database');
 
 const app          = express();
+// If the app runs behind a reverse proxy (Hostinger, load balancers, etc.)
+// enable trust proxy so Express and express-rate-limit use the X-Forwarded-For
+// header to determine the client's real IP. Use 1 for a single proxy.
+app.set('trust proxy', 1);
 const PORT         = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
 const isDev        = !isProduction;
