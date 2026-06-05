@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2, Mail } from 'lucide-react';
 import { authApi } from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function VerifyEmail() {
   const [params] = useSearchParams();
@@ -9,13 +10,25 @@ export default function VerifyEmail() {
   const [status, setStatus] = useState('loading'); // loading | success | already | expired | error
   const [resent, setResent] = useState(false);
   const [email, setEmail] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!token) { setStatus('error'); return; }
     authApi.verifyEmail(token)
       .then(({ data }) => {
-        if (data.alreadyVerified) setStatus('already');
-        else setStatus('success');
+        if (data.alreadyVerified) {
+          setStatus('already');
+          return;
+        }
+        // Auto-login with the JWT the server returns, then redirect to dashboard
+        if (data.token && data.user) {
+          login(data.token, data.user);
+          setStatus('success');
+          setTimeout(() => navigate('/dashboard', { replace: true }), 2500);
+        } else {
+          setStatus('success');
+        }
       })
       .catch(err => {
         const msg = err.response?.data?.error || '';
@@ -45,22 +58,36 @@ export default function VerifyEmail() {
     );
   }
 
-  if (status === 'success' || status === 'already') {
+  if (status === 'success') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {status === 'already' ? 'Already Verified' : 'Email Verified!'}
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h1>
+          <p className="text-gray-600 mb-2">
+            Your account is now active. Taking you to your dashboard…
+          </p>
+          <div className="flex items-center justify-center gap-2 text-blue-600 text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Redirecting…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'already') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Already Verified</h1>
           <p className="text-gray-600 mb-6">
-            {status === 'already'
-              ? 'Your email has already been verified. You can sign in to your account.'
-              : 'Your email address has been confirmed. Your account is now active.'}
+            Your email has already been verified. Sign in to access your account.
           </p>
           <Link to="/login"
             className="block w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
-            Sign In to Your Account
+            Sign In
           </Link>
         </div>
       </div>

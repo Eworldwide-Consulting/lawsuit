@@ -79,7 +79,7 @@ export default function CareTasks() {
     <div className="p-4 lg:p-6 max-w-3xl mx-auto">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Care Tasks</h1>
+          <h1 className="text-xl font-bold text-gray-900">Open Tasks</h1>
           <p className="text-gray-500 text-sm">Track and complete your required actions</p>
         </div>
         <button onClick={() => setCreating(prev => !prev)}

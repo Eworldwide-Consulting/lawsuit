@@ -10,7 +10,7 @@ import {
 const clientNav = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/my-case',     icon: Briefcase,       label: 'My Case' },
-  { to: '/care-tasks',  icon: CheckSquare,     label: 'Care Tasks' },
+  { to: '/open-tasks',  icon: CheckSquare,     label: 'Open Tasks' },
   { to: '/documents',   icon: Folder,          label: 'Documents' },
   { to: '/appointments',icon: Calendar,        label: 'Appointments' },
   { to: '/messages',    icon: MessageSquare,   label: 'Messages' },

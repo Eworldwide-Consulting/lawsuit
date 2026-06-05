@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
-import { AlertTriangle, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Clock } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
 import DocumentUploadPanel from '../../components/ui/DocumentUploadPanel';
 
@@ -68,6 +68,19 @@ export default function PartnerDashboard() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5 max-w-7xl mx-auto">
+
+      {user?.approval_status === 'pending' && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
+          <Clock size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="text-sm font-semibold text-amber-700">Account Pending Approval</div>
+            <div className="text-xs text-amber-600 mt-0.5">
+              Our team is reviewing your credentials. Full platform access will be enabled once approved (1–2 business days). You'll receive an email when your account is approved.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-xl font-bold text-gray-900">Good morning, {user?.first_name}.</h1>
         <p className="text-gray-500 text-sm">Here's your practice overview for today.</p>

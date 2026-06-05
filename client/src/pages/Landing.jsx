@@ -184,7 +184,7 @@ export default function Landing() {
             </h1>
 
             <p className="text-blue-200 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-              All-in-one legal platform for encrypted storage, AI-assisted review, and seamless attorney consultation — built for privacy-first legal compliance.
+              All-in-one legal platform for encrypted storage, AI-assisted review, and seamless attorney consultation  built for privacy-first legal compliance.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -249,7 +249,7 @@ export default function Landing() {
               {[
                 { step: '01', icon: Upload,       title: 'Upload',  desc: 'Securely upload your legal documents with end-to-end encryption.', iconCls: 'text-blue-600 bg-blue-50' },
                 { step: '02', icon: Search,       title: 'Review',  desc: 'Our attorneys and AI review your documents for completeness.',     iconCls: 'text-gold-600 bg-gold-50'  },
-                { step: '03', icon: Users,        title: 'Connect with your Trusted Attorney', desc: 'Book a consultation with your qualified, trusted attorney in your area.', iconCls: 'text-green-600 bg-green-50' },
+                { step: '03', icon: Users,        title: 'Connect', desc: 'Book a consultation with your attorney', iconCls: 'text-green-600 bg-green-50' },
                 { step: '04', icon: CheckCircle,  title: 'Resolve', desc: 'Track progress and close your matter with full documentation.',    iconCls: 'text-purple-600 bg-purple-50' },
               ].map(({ step, icon: Icon, title, desc, iconCls }) => (
                 <div key={step} className="text-center card-lift">
@@ -356,7 +356,7 @@ export default function Landing() {
                   <span className="gold-shimmer">At Every Layer</span>
                 </h2>
                 <p className="text-blue-200 text-lg leading-relaxed mb-8">
-                  We employ bank-level security protocols to ensure your most sensitive legal documents remain private, accessible only to you and authorised parties.
+                  We employ federal grade security protocols to ensure your most sensitive legal documents remain private, accessible only to you and authorised parties.
                 </p>
 
                 <div className="space-y-3">

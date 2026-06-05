@@ -30,6 +30,9 @@ export const authApi = {
   checkEmail: email => api.get('/auth/check-email', { params: { email } }),
   verifyEmail: token => api.get('/auth/verify-email', { params: { token } }),
   resendVerification: email => api.post('/auth/resend-verification', { email }),
+  setup2fa: () => api.post('/auth/setup-2fa'),
+  enable2fa: code => api.post('/auth/enable-2fa', { code }),
+  dismiss2faPrompt: () => api.post('/auth/dismiss-2fa-prompt'),
 };
 
 export const mattersApi = {

@@ -4,12 +4,22 @@ import Sidebar from './Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { messagesApi } from '../../api';
 import { Bell, Menu, X, Search, LayoutDashboard, FileText, Folder, Calendar, MessageSquare, Settings } from 'lucide-react';
+import TwoFASetupModal from '../ui/TwoFASetupModal';
 
 export default function DashboardLayout({ children }) {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [show2FA, setShow2FA] = useState(false);
   const navigate = useNavigate();
+
+  // Show 2FA setup prompt once per account, for all roles, after first login
+  useEffect(() => {
+    if (user && !user.two_fa_enabled && !user.two_fa_prompt_shown) {
+      const t = setTimeout(() => setShow2FA(true), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     messagesApi.unreadCount().then(r => setUnread(r.data.count)).catch(() => {});
@@ -119,6 +129,8 @@ export default function DashboardLayout({ children }) {
           </div>
         </nav>
       </div>
+
+      {show2FA && <TwoFASetupModal onClose={() => setShow2FA(false)} />}
     </div>
   );
 }

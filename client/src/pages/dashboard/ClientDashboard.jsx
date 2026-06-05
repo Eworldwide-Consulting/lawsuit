@@ -119,16 +119,23 @@ export default function ClientDashboard() {
         {/* Left: case status + tasks + documents */}
         <div className="lg:col-span-2 space-y-5">
 
-          {/* Guardianship / Case Status */}
+          {/* Case Status */}
           <div className="card p-5">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <div className="text-sm font-bold text-gray-800">
-                  {matter?.matter_type === 'guardianship' ? 'Guardianship' : 'Conservatorship'} Status
+                  {matter?.matter_type === 'guardianship'                ? 'Guardianship'
+                   : matter?.matter_type === 'conservatorship'           ? 'Conservatorship'
+                   : matter?.matter_type === 'guardianship_conservatorship' ? 'Guardianship & Conservatorship'
+                   : matter?.matter_type === 'estate_administration'     ? 'Estate Administration'
+                   : 'Case'} Status
                 </div>
                 {matter && (
                   <div className="text-xs text-gray-500 mt-0.5">
-                    {matter.description} · Attorney: {matter.attorney_name}
+                    {matter.description && <span>{matter.description} · </span>}
+                    {matter.attorney_name
+                      ? <span>Attorney: {matter.attorney_name}</span>
+                      : <span className="text-amber-600 font-medium">Attorney not yet assigned</span>}
                   </div>
                 )}
               </div>
@@ -185,7 +192,7 @@ export default function ClientDashboard() {
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="font-semibold text-gray-800 text-sm">Your Next Actions</div>
-              <button onClick={() => navigate('/care-tasks')} className="text-xs text-green-600 hover:text-green-700 font-medium">
+              <button onClick={() => navigate('/open-tasks')} className="text-xs text-green-600 hover:text-green-700 font-medium">
                 View all tasks →
               </button>
             </div>

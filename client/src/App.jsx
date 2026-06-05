@@ -74,7 +74,8 @@ export default function App() {
       <Route path="/documents" element={<RequireAuth><DashboardLayout><Documents /></DashboardLayout></RequireAuth>} />
       <Route path="/messages" element={<RequireAuth><DashboardLayout><Messages /></DashboardLayout></RequireAuth>} />
       <Route path="/appointments" element={<RequireAuth><DashboardLayout><Appointments /></DashboardLayout></RequireAuth>} />
-      <Route path="/care-tasks" element={<RequireAuth><DashboardLayout><CareTasks /></DashboardLayout></RequireAuth>} />
+      <Route path="/open-tasks" element={<RequireAuth><DashboardLayout><CareTasks /></DashboardLayout></RequireAuth>} />
+      <Route path="/care-tasks" element={<Navigate to="/open-tasks" replace />} />
       <Route path="/settings" element={<RequireAuth><DashboardLayout><Settings /></DashboardLayout></RequireAuth>} />
       <Route path="/payments" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />
       <Route path="/payments/success" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />

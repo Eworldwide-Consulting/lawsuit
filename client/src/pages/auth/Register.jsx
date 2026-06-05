@@ -125,14 +125,14 @@ const ROLES = [
     id: 'client',
     icon: User,
     label: 'Client',
-    desc: 'I need legal representation for a guardianship or conservatorship matter.',
+    desc: 'I am a client with on or more conservatorship, guardianship or estate administration legal matter',
     ring: 'ring-blue-500', bg: 'bg-blue-50', iconColor: 'text-blue-600', checkBg: 'bg-blue-600',
   },
   {
     id: 'attorney',
     icon: Scale,
     label: 'Attorney',
-    desc: 'I am a licensed attorney seeking to manage client cases on this platform.',
+    desc: 'I am a licensed attorney representing clients on probate court matters.',
     ring: 'ring-indigo-500', bg: 'bg-indigo-50', iconColor: 'text-indigo-600', checkBg: 'bg-indigo-600',
   },
   {
@@ -282,36 +282,26 @@ export default function Register() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
-            {isProfessional
-              ? <Shield className="w-10 h-10 text-indigo-600" />
-              : <Mail className="w-10 h-10 text-blue-600" />}
+          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            <Mail className="w-10 h-10 text-blue-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {isProfessional ? 'Application Submitted' : 'Check Your Email'}
-          </h1>
-          <p className="text-gray-600 mb-1">
-            {isProfessional
-              ? `Your ${role} account application has been received.`
-              : "We've sent a verification link to:"}
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h1>
+          <p className="text-gray-600 mb-1">We've sent a verification link to:</p>
           <p className="font-semibold text-blue-600 mb-5">{submitResult?.email}</p>
 
-          {isProfessional ? (
-            <div className="bg-indigo-50 rounded-xl p-4 text-left text-sm text-indigo-800 space-y-1.5">
-              <p className="font-semibold mb-2">What happens next?</p>
-              <p>1. Verify your email via the link we sent you.</p>
-              <p>2. Our team reviews your credentials and bar information.</p>
-              <p>3. You will be notified once approved (1–2 business days).</p>
-            </div>
-          ) : (
-            <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800 text-left">
-              Click the link in your email to activate your account. The link expires in 24 hours.
+          <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800 text-left mb-4">
+            Click the link in your email to verify and access your dashboard. The link expires in 24 hours.
+          </div>
+
+          {isProfessional && (
+            <div className="bg-indigo-50 rounded-xl p-4 text-left text-sm text-indigo-800 space-y-1 mb-4">
+              <p className="font-semibold">After email verification:</p>
+              <p>Our team will review your credentials within 1–2 business days. You'll receive an email once your account is fully approved.</p>
             </div>
           )}
 
           <button
-            className="mt-4 text-sm text-gray-500 hover:text-gray-700 underline"
+            className="mt-2 text-sm text-gray-500 hover:text-gray-700 underline"
             onClick={async () => {
               await authApi.resendVerification(submitResult?.email).catch(() => {});
               alert('Verification email resent!');
@@ -499,7 +489,6 @@ export default function Register() {
                         </button>
                       ))}
                     </div>
-                    <FieldError msg={e('matterType')} />
                   </Field>
                   <Field label="Did a law firm direct you to this website?">
                     <div className="flex gap-3 mt-1">
