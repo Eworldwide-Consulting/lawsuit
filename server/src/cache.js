@@ -1,7 +1,8 @@
 const Redis = require('ioredis');
 const logger = require('./logger');
 
-let client = null;
+// undefined = not yet initialized; null = no Redis configured; Redis instance = connected
+let client = undefined;
 const memStore = new Map();
 
 function connect() {
@@ -20,8 +21,8 @@ function connect() {
 }
 
 function getClient() {
-  if (client === undefined) return null;
-  if (client === null) client = connect();
+  if (client !== undefined) return client;
+  client = connect();
   return client;
 }
 

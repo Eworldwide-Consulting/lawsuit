@@ -80,6 +80,9 @@ router.post('/', requireAuth, async (req, res) => {
 
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
+    const isStaff = ['attorney', 'partner', 'itsupport'].includes(req.user.role);
+    if (!isStaff) return res.status(403).json({ error: 'Forbidden' });
+
     const appt = await one('SELECT id FROM appointments WHERE id = ?', [req.params.id]);
     if (!appt) return res.status(404).json({ error: 'Not found' });
     await run('DELETE FROM appointments WHERE id = ?', [req.params.id]);

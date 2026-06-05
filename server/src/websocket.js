@@ -29,9 +29,9 @@ function init(httpServer) {
   });
 
   io.on('connection', (socket) => {
-    const room = `user:${socket.userId}`;
-    socket.join(room);
-    logger.debug({ userId: socket.userId }, 'WebSocket connected');
+    socket.join(`user:${socket.userId}`);
+    if (socket.userRole) socket.join(`role:${socket.userRole}`);
+    logger.debug({ userId: socket.userId, role: socket.userRole }, 'WebSocket connected');
 
     socket.on('join:matter', (matterId) => {
       socket.join(`matter:${matterId}`);
@@ -66,7 +66,7 @@ function emitToMatter(matterId, event, data) {
 
 function emitToRole(role, event, data) {
   if (!io) return;
-  io.emit(event, data);
+  io.to(`role:${role}`).emit(event, data);
 }
 
 module.exports = { init, getIo, emitToUser, emitToMatter, emitToRole };

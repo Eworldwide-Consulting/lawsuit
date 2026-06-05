@@ -12,15 +12,33 @@ function getDb() {
   if (isProductionDb()) {
     const connectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
     if (!connectionString) throw new Error('DATABASE_URL or SUPABASE_DB_URL is required in production');
-    const pool = new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      max: 20,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 5_000,
-    });
-    pool.on('error', (err) => logger.error({ err }, 'Postgres pool error'));
-    db = { type: 'postgres', pool };
+
+    if (connectionString.startsWith('mysql://') || connectionString.startsWith('mysql2://')) {
+      const mysqlRaw = require('mysql2');
+      const rawPool = mysqlRaw.createPool({
+        uri: connectionString,
+        waitForConnections: true,
+        connectionLimit: 20,
+        queueLimit: 0,
+        timezone: 'Z',
+      });
+      // Make || work as string concat (same as SQLite/PostgreSQL) so no SQL changes needed
+      rawPool.on('connection', (conn) => {
+        conn.query("SET sql_mode = 'PIPES_AS_CONCAT,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
+      });
+      rawPool.on('error', (err) => logger.error({ err: err.message }, 'MySQL pool error'));
+      db = { type: 'mysql', pool: rawPool.promise() };
+    } else {
+      const pool = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+        max: 20,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 5_000,
+      });
+      pool.on('error', (err) => logger.error({ err }, 'Postgres pool error'));
+      db = { type: 'postgres', pool };
+    }
   } else {
     const dbPath = process.env.DB_PATH || path.join(__dirname, '../../trivanta.db');
     const sqlite = new Database(dbPath);
@@ -38,6 +56,7 @@ async function initDatabase() {
   if (database.type === 'postgres') {
     await initPostgresSchema(database.pool);
   }
+  // mysql: schema already created via Hostinger phpMyAdmin
   logger.info({ type: database.type }, 'Database initialized');
 }
 

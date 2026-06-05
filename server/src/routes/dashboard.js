@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { all, one }   = require('../db');
+const { getDb }      = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const {
   inList,
@@ -160,13 +161,17 @@ router.get('/attorney', requireAuth, async (req, res) => {
     const ytdRevenue    = Number(revenueRow.ytd); // in cents
 
     // Per-month revenue from real invoice data
-    const monthlyRows = await all(`
-      SELECT strftime('%m', paid_at) AS month_num,
-             SUM(amount)             AS revenue
-      FROM invoices
-      WHERE status = 'paid'
-      GROUP BY month_num
-    `);
+    const dbType = getDb().type;
+    const monthlyRows = await all(
+      dbType === 'postgres'
+        ? `SELECT EXTRACT(MONTH FROM paid_at)::int AS month_num, SUM(amount) AS revenue
+           FROM invoices WHERE status = 'paid' GROUP BY month_num`
+        : dbType === 'mysql'
+        ? `SELECT MONTH(paid_at) AS month_num, SUM(amount) AS revenue
+           FROM invoices WHERE status = 'paid' GROUP BY month_num`
+        : `SELECT CAST(strftime('%m', paid_at) AS INTEGER) AS month_num, SUM(amount) AS revenue
+           FROM invoices WHERE status = 'paid' GROUP BY month_num`
+    );
     const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const monthMap = {};
     for (const r of monthlyRows) monthMap[parseInt(r.month_num, 10) - 1] = Number(r.revenue);
@@ -207,10 +212,9 @@ router.get('/partner', requireAuth, async (req, res) => {
     const [statsRow, matters, appts, clientTasks, allReqDocs] = await Promise.all([
       // Five counts in one pass
       one(`SELECT
-             SUM(CASE WHEN status != 'complete'                                                THEN 1 ELSE 0 END) AS active,
-             SUM(CASE WHEN status  = 'pending' AND required = 1                               THEN 0 ELSE 0 END) AS missing_docs,
-             SUM(CASE WHEN stage   = 'court_review'                                           THEN 1 ELSE 0 END) AS ready_review,
-             SUM(CASE WHEN important_date IS NOT NULL AND important_date >= ? AND important_date <= ? THEN 1 ELSE 0 END) AS deadlines
+             SUM(CASE WHEN status != 'complete'                                                        THEN 1 ELSE 0 END) AS active,
+             SUM(CASE WHEN stage   = 'court_review'                                                    THEN 1 ELSE 0 END) AS ready_review,
+             SUM(CASE WHEN important_date IS NOT NULL AND important_date >= ? AND important_date <= ?   THEN 1 ELSE 0 END) AS deadlines
            FROM matters`,
         [today, in40Days]),
       all(`SELECT m.*,

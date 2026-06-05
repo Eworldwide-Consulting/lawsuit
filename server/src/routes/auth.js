@@ -34,7 +34,9 @@ const signToken = (id) =>
   });
 
 function verificationExpiry() {
-  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
+  // Keep the Z suffix so the stored string is unambiguously UTC.
+  // new Date("...Z") always parses as UTC on all runtimes and timezones.
+  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 }
 
 // ── Public routes ─────────────────────────────────────────────────────────────
@@ -325,7 +327,15 @@ router.get('/google/callback', async (req, res) => {
         [fn, ln, gUser.email.toLowerCase(), '', 'client', `${fn[0]}${(ln[0] || fn[1] || 'U')}`.toUpperCase()]
       );
       user = await one('SELECT * FROM users WHERE id = ?', [r.insertId]);
+    } else if (!user.email_verified) {
+      // Google has verified ownership of this email — mark the local account verified too.
+      await run('UPDATE users SET email_verified = 1, verification_token = NULL, verification_token_expires = NULL WHERE id = ?', [user.id]);
     }
+
+    if (user.approval_status === 'pending')
+      return res.redirect(`${clientUrl}/login?error=approval_pending`);
+    if (user.approval_status === 'rejected')
+      return res.redirect(`${clientUrl}/login?error=account_rejected`);
 
     res.redirect(`${clientUrl}/auth/callback?token=${encodeURIComponent(signToken(user.id))}`);
   } catch (err) {

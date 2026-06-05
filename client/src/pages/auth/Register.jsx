@@ -9,8 +9,12 @@ import Logo from '../../components/ui/Logo';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const ALLOWED_DOMAINS = /^[a-zA-Z0-9._%+\-]+@(gmail|hotmail|outlook|live|yahoo)\.[a-zA-Z]{2,}$/i;
-const emailRe = ALLOWED_DOMAINS;
+const PUBLIC_EMAIL_DOMAINS = new Set(['gmail.com','yahoo.com','hotmail.com','outlook.com','live.com','icloud.com','aol.com','msn.com','protonmail.com','proton.me','ymail.com']);
+const emailRe = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+function isPublicEmail(email) {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return domain ? PUBLIC_EMAIL_DOMAINS.has(domain) : false;
+}
 
 const MAX_DOB = new Date().toISOString().slice(0, 10); // today — DOB cannot be in the future
 const MIN_DOB = '1900-01-01';
@@ -196,7 +200,9 @@ export default function Register() {
       if (!form.firstName.trim()) errs.firstName = 'First name is required';
       if (!form.lastName.trim())  errs.lastName  = 'Last name is required';
       if (!form.email.trim())          errs.email = 'Email is required';
-      else if (!emailRe.test(form.email.trim())) errs.email = 'Please use a Gmail, Hotmail, Outlook, or Live email address';
+      else if (!emailRe.test(form.email.trim())) errs.email = 'Please enter a valid email address';
+      else if ((role === 'attorney' || role === 'partner') && isPublicEmail(form.email.trim()))
+        errs.email = 'Attorneys and partners must register with a professional firm email address';
       if (!form.password)         errs.password  = 'Password is required';
       else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters';
     }
@@ -386,7 +392,9 @@ export default function Register() {
                           const val = ev.target.value;
                           set('email', val);
                           if (val && !emailRe.test(val.trim())) {
-                            setErrors(ex => ({ ...ex, email: 'Please use a Gmail, Hotmail, Outlook, or Live email address' }));
+                            setErrors(ex => ({ ...ex, email: 'Please enter a valid email address' }));
+                          } else if (val && (role === 'attorney' || role === 'partner') && isPublicEmail(val.trim())) {
+                            setErrors(ex => ({ ...ex, email: 'Attorneys and partners must register with a professional firm email address' }));
                           } else {
                             setErrors(ex => ({ ...ex, email: '' }));
                           }
@@ -400,6 +408,11 @@ export default function Register() {
                         <Loader2 size={15} className="absolute right-3 top-3 animate-spin text-gray-400" />
                       )}
                     </div>
+                    {form.email && emailRe.test(form.email.trim()) && (
+                      <p className={`text-xs mt-1 font-medium ${isPublicEmail(form.email.trim()) ? 'text-amber-600' : 'text-green-600'}`}>
+                        {isPublicEmail(form.email.trim()) ? 'Personal email address' : 'Professional email address'}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Password" error={e('password')}>
                     <div className="relative">
@@ -471,6 +484,8 @@ export default function Register() {
                       {[
                         { id: 'guardianship', label: 'Guardianship', desc: 'Care for a person who cannot care for themselves' },
                         { id: 'conservatorship', label: 'Conservatorship', desc: 'Manage finances for someone who cannot do so' },
+                        { id: 'guardianship_conservatorship', label: 'Guardianship & Conservatorship', desc: 'Combined care and financial management for a person' },
+                        { id: 'estate_administration', label: 'Estate Administration', desc: "Manage and distribute a deceased person's estate" },
                       ].map(t => (
                         <button
                           key={t.id}
@@ -486,7 +501,7 @@ export default function Register() {
                     </div>
                     <FieldError msg={e('matterType')} />
                   </Field>
-                  <Field label="Have you worked with our firm before?">
+                  <Field label="Did a law firm direct you to this website?">
                     <div className="flex gap-3 mt-1">
                       {['Yes', 'No'].map(opt => (
                         <button

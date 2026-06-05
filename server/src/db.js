@@ -13,6 +13,10 @@ async function one(sql, params = []) {
     const row = stmt.get(params);
     return row || null;
   }
+  if (db.type === 'mysql') {
+    const [rows] = await db.pool.execute(sql, params);
+    return rows[0] || null;
+  }
   const { text, values } = toPostgresSql(sql, params);
   const result = await db.pool.query({ text, values });
   return result.rows[0] || null;
@@ -23,6 +27,10 @@ async function all(sql, params = []) {
   if (db.type === 'sqlite') {
     const stmt = db.sqlite.prepare(sql);
     return stmt.all(params);
+  }
+  if (db.type === 'mysql') {
+    const [rows] = await db.pool.execute(sql, params);
+    return rows;
   }
   const { text, values } = toPostgresSql(sql, params);
   const result = await db.pool.query({ text, values });
@@ -38,6 +46,14 @@ async function run(sql, params = []) {
       ...result,
       insertId: result.lastInsertRowid,
       affectedRows: result.changes,
+    };
+  }
+  if (db.type === 'mysql') {
+    const [result] = await db.pool.execute(sql, params);
+    return {
+      insertId: result.insertId || null,
+      affectedRows: result.affectedRows,
+      rows: [],
     };
   }
 

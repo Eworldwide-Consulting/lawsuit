@@ -57,6 +57,9 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (!isAssignee && !isStaff)
       return res.status(403).json({ error: 'Forbidden' });
 
+    const VALID_STATUSES = ['pending', 'in_progress', 'completed'];
+    if (!VALID_STATUSES.includes(req.body.status))
+      return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
     await run('UPDATE tasks SET status = ? WHERE id = ?', [req.body.status, req.params.id]);
     res.json({ success: true });
   } catch (err) {

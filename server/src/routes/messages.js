@@ -89,7 +89,7 @@ router.put('/:id/read', requireAuth, async (req, res) => {
       [req.params.id, req.user.id]
     );
     if (!msg) return res.status(404).json({ error: 'Not found' });
-    await run("UPDATE messages SET read_at = datetime('now') WHERE id = ?", [req.params.id]);
+    await run('UPDATE messages SET read_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

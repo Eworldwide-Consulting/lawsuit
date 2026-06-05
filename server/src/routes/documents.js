@@ -96,6 +96,10 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res) 
 
 router.put('/:id/status', requireAuth, requireRole('attorney', 'partner', 'itsupport'), async (req, res) => {
   try {
+    const VALID_STATUSES = ['pending', 'uploaded', 'approved', 'rejected'];
+    if (!VALID_STATUSES.includes(req.body.status))
+      return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+
     const doc = await one('SELECT id FROM documents WHERE id = ?', [req.params.id]);
     if (!doc) return res.status(404).json({ error: 'Not found' });
 

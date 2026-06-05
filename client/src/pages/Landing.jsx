@@ -249,7 +249,7 @@ export default function Landing() {
               {[
                 { step: '01', icon: Upload,       title: 'Upload',  desc: 'Securely upload your legal documents with end-to-end encryption.', iconCls: 'text-blue-600 bg-blue-50' },
                 { step: '02', icon: Search,       title: 'Review',  desc: 'Our attorneys and AI review your documents for completeness.',     iconCls: 'text-gold-600 bg-gold-50'  },
-                { step: '03', icon: Users,        title: 'Connect with your Trusted Attorney', desc: 'Book a consultation with you qualified, trusted attorney in your area.', iconCls: 'text-green-600 bg-green-50' },
+                { step: '03', icon: Users,        title: 'Connect with your Trusted Attorney', desc: 'Book a consultation with your qualified, trusted attorney in your area.', iconCls: 'text-green-600 bg-green-50' },
                 { step: '04', icon: CheckCircle,  title: 'Resolve', desc: 'Track progress and close your matter with full documentation.',    iconCls: 'text-purple-600 bg-purple-50' },
               ].map(({ step, icon: Icon, title, desc, iconCls }) => (
                 <div key={step} className="text-center card-lift">
