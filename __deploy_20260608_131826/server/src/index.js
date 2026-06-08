@@ -1,16 +1,4 @@
-// Early crash reporter — catches any module-load failure before pino initialises
-process.on('uncaughtException', (err) => {
-  console.error('[FATAL] uncaughtException at startup:', err.message, err.stack);
-  process.exit(1);
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('[FATAL] unhandledRejection at startup:', reason);
-  process.exit(1);
-});
-console.log('[BOOT] index.js top reached, Node', process.version);
-
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
-console.log('[BOOT] dotenv loaded, NODE_ENV=' + process.env.NODE_ENV);
 const http       = require('http');
 const express    = require('express');
 const cors       = require('cors');
@@ -126,27 +114,11 @@ app.use((err, req, res, next) => {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function start() {
-  // Listen first — the proxy can reach us immediately, preventing 504 timeouts
-  // that occur when database init hangs before server.listen() is ever called.
-  await new Promise(resolve => server.listen(PORT, resolve));
-  logger.info({ port: PORT, env: process.env.NODE_ENV }, 'TriVanta API listening');
-
-  // Init DB with a hard timeout so a hung connection produces a clear log entry
-  // rather than silently blocking indefinitely.
-  try {
-    await Promise.race([
-      initDatabase(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('initDatabase timed out after 45 s')), 45_000)
-      )
-    ]);
-  } catch (err) {
-    logger.fatal({ err }, 'Database init failed — shutting down');
-    process.exit(1);
-  }
-
+  await initDatabase();
   ws.init(server);
-  logger.info('TriVanta fully started');
+  server.listen(PORT, () => {
+    logger.info({ port: PORT, env: process.env.NODE_ENV }, 'TriVanta API started');
+  });
 }
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────

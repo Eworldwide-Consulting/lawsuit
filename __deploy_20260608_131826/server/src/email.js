@@ -20,14 +20,6 @@ async function sendVerificationEmail(toEmail, token) {
       secure: /^true$/i.test(process.env.SMTP_SECURE || ''),
       auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
-  } else if (process.env.NODE_ENV === 'production') {
-    // In production without SMTP the email cannot be delivered — log the raw
-    // link so IT support can share it manually or use the admin force-verify
-    // endpoint.  Do NOT call createTestAccount() here: it fires an outbound
-    // HTTP request that hangs or fails in sandboxed hosting environments.
-    console.error(`[email] SMTP not configured in production — email NOT sent to ${toEmail}`);
-    console.error(`[email] *** MANUAL VERIFICATION LINK for ${toEmail}: ${link} ***`);
-    return false;
   } else {
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({

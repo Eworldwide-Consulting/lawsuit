@@ -67,18 +67,63 @@ ok "client/dist copied"
 Copy-Item "$root\server\src" "$stagingDir\server\src" -Recurse -Force
 ok "server/src copied"
 
-# package.json + package-lock.json at ROOT (required: Hostinger hPanel looks for
-# package.json at Root directory "./" to run npm install before starting the app)
-Copy-Item "$root\server\package.json" "$stagingDir\package.json" -Force
-if (Test-Path "$root\server\package-lock.json") {
-  Copy-Item "$root\server\package-lock.json" "$stagingDir\package-lock.json" -Force
-  ok "package.json + package-lock.json at root (enables npm ci)"
-} else {
-  warn "server/package-lock.json not found -- run 'npm install --prefix server' locally first"
+# ROOT package.json — Hostinger hPanel requires package.json at "/" to identify
+# the app as Node.js and run npm install. We write one that lists all server
+# PRODUCTION dependencies so npm install at root creates <root>/node_modules/
+# which Node's module resolution finds when running server/src/index.js.
+#
+# We intentionally OMIT devDependencies (better-sqlite3, nodemon, pino-pretty)
+# because managed hosting lacks build tools (Python, gcc, node-gyp) required to
+# compile native modules — including better-sqlite3 — causing npm install to fail.
+$serverPkg = Get-Content "$root\server\package.json" -Raw | ConvertFrom-Json
+
+# Serialise only production dependencies.
+# Avoid ConvertTo-Json here — it escapes > as > which breaks the engines
+# field and is not understood by all npm/platform combinations.
+$depsJson = ($serverPkg.dependencies.PSObject.Properties |
+  ForEach-Object { "    `"$($_.Name)`": `"$($_.Value)`"" }) -join ",`n"
+
+$rootPkgJson = @"
+{
+  "name": "trivanta",
+  "version": "$($serverPkg.version)",
+  "description": "TriVanta Legal Platform",
+  "main": "server/src/index.js",
+  "scripts": {
+    "start": "node server/src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+$depsJson
+  }
 }
+"@
+# Write without BOM (some npm versions choke on UTF-8 BOM)
+[System.IO.File]::WriteAllText(
+  "$stagingDir\package.json",
+  $rootPkgJson,
+  (New-Object System.Text.UTF8Encoding $false)
+)
+ok "Root package.json written (production deps only, no native-module devDeps)"
+
+# Add .npmrc — disables funding/audit noise and prevents engine mismatch from
+# aborting the install on platforms that treat engine-strict as the default.
+# Write with WriteAllText to avoid the UTF-8 BOM that Set-Content adds in PS5.
+[System.IO.File]::WriteAllText(
+  "$stagingDir\.npmrc",
+  "fund=false`naudit=false`nengine-strict=false`n",
+  (New-Object System.Text.UTF8Encoding $false)
+)
+ok ".npmrc written"
 
 # Also keep a copy at server/ for VPS deployments that use startup.sh
 Copy-Item "$root\server\package.json" "$stagingDir\server\package.json" -Force
+
+# Do NOT copy package-lock.json: the lock was generated for the original server/
+# package (different name + includes devDependencies) and would cause `npm ci`
+# to fail with a lockfile mismatch.  Let the platform resolve from scratch.
 
 # Root config files
 $rootFiles = @(

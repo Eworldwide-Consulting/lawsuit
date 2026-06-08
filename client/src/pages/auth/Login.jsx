@@ -52,9 +52,10 @@ export default function Login() {
   const [form, setForm]                         = useState({ email: '', password: '' });
   const [showPwd, setShowPwd]                   = useState(false);
   const [loading, setLoading]                   = useState(false);
-  const [error, setError]                       = useState('');
-  const [needsVerification, setNeedsVerification] = useState('');
+  const [error, setError]                           = useState('');
+  const [needsVerification, setNeedsVerification]   = useState('');
   const [resentVerification, setResentVerification] = useState(false);
+  const [notRegistered, setNotRegistered]           = useState(false);
   const { login } = useAuth();
   const navigate   = useNavigate();
 
@@ -76,12 +77,16 @@ export default function Login() {
     setError('');
     setNeedsVerification('');
     setResentVerification(false);
+    setNotRegistered(false);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setNotRegistered(false);
+    setNeedsVerification('');
+    setResentVerification(false);
     try {
       const res = await authApi.login({ ...form, portal: activeRole });
       if (res.data.twoFaRequired) {
@@ -98,8 +103,24 @@ export default function Login() {
       }
     } catch (err) {
       const d = err.response?.data || {};
-      setError(d.error || 'Login failed. Please try again.');
-      if (d.requiresVerification && d.email) setNeedsVerification(d.email);
+      if (d.requiresVerification && d.email) {
+        setError(d.error || 'Please verify your email.');
+        setNeedsVerification(d.email);
+      } else if (err.response?.status === 401) {
+        // Check whether the email is even registered so we can show a helpful message
+        authApi.checkEmail(form.email).then(r => {
+          if (!r.data.exists) {
+            setNotRegistered(true);
+            setError('');
+          } else {
+            setError('Incorrect password. Please try again or use "Forgot password".');
+          }
+        }).catch(() => {
+          setError(d.error || 'Login failed. Please try again.');
+        });
+      } else {
+        setError(d.error || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -134,14 +155,37 @@ export default function Login() {
         <p className="text-gray-500 text-sm mt-1">{tab.sub}</p>
       </div>
 
+      {/* ── Not registered banner ── */}
+      {notRegistered && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+          <div className="font-semibold text-amber-800 mb-1">No account found for this email</div>
+          <p className="text-amber-700 text-xs mb-2">
+            <strong>{form.email}</strong> is not registered on TriVanta.
+            You need to create an account before signing in.
+          </p>
+          <Link
+            to="/register"
+            className="inline-block mt-1 px-3 py-1.5 bg-amber-700 text-white text-xs font-semibold rounded-lg hover:bg-amber-800 transition-colors"
+          >
+            Register now →
+          </Link>
+        </div>
+      )}
+
       {/* ── Error banner ── */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {error}
           {needsVerification && (
-            <div className="mt-2">
+            <div className="mt-2 space-y-1">
               {resentVerification ? (
-                <span className="text-green-600 font-medium">Verification email sent!</span>
+                <div>
+                  <span className="text-green-600 font-medium">Verification email sent!</span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Check your spam/junk folder if it doesn't arrive within 2 minutes.
+                    Contact support if the issue persists.
+                  </p>
+                </div>
               ) : (
                 <button
                   type="button"

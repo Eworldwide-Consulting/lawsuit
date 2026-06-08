@@ -1,16 +1,11 @@
+const Database = require('better-sqlite3');
 const path = require('path');
 const { Pool } = require('pg');
 const logger = require('./logger');
 
 let db;
 
-const isProductionDb = () => {
-  if (process.env.NODE_ENV === 'production') return true;
-  // Fall back to remote DB if a connection string is present even without NODE_ENV,
-  // so a misconfigured deploy doesn't silently try to open a local SQLite file.
-  if (process.env.DATABASE_URL || process.env.SUPABASE_DB_URL) return true;
-  return false;
-};
+const isProductionDb = () => process.env.NODE_ENV === 'production';
 
 function getDb() {
   if (db) return db;
@@ -20,21 +15,12 @@ function getDb() {
 
     if (connectionString.startsWith('mysql://') || connectionString.startsWith('mysql2://')) {
       const mysqlRaw = require('mysql2');
-      // mysql2.createPool({ uri }) is not a documented option — the URI is only
-      // parsed when passed as a raw string.  Parse it ourselves so credentials
-      // (including %40-encoded @ in passwords) are always extracted correctly.
-      const _url = new URL(connectionString.replace(/^mysql2:\/\//, 'mysql://'));
       const rawPool = mysqlRaw.createPool({
-        host:             _url.hostname,
-        port:             parseInt(_url.port, 10) || 3306,
-        user:             decodeURIComponent(_url.username),
-        password:         decodeURIComponent(_url.password),
-        database:         _url.pathname.slice(1) || undefined,
+        uri: connectionString,
         waitForConnections: true,
-        connectionLimit:  20,
-        queueLimit:       0,
-        timezone:         'Z',
-        connectTimeout:   10_000,
+        connectionLimit: 20,
+        queueLimit: 0,
+        timezone: 'Z',
       });
       // Make || work as string concat (same as SQLite/PostgreSQL) so no SQL changes needed
       rawPool.on('connection', (conn) => {
@@ -54,7 +40,6 @@ function getDb() {
       db = { type: 'postgres', pool };
     }
   } else {
-    const Database = require('better-sqlite3');
     const dbPath = process.env.DB_PATH || path.join(__dirname, '../../trivanta.db');
     const sqlite = new Database(dbPath);
     sqlite.pragma('journal_mode = WAL');
@@ -70,10 +55,8 @@ async function initDatabase() {
   const database = getDb();
   if (database.type === 'postgres') {
     await initPostgresSchema(database.pool);
-  } else if (database.type === 'mysql') {
-    await initMysqlSchema(database.pool);
-    await initMysqlColumns(database.pool);
   }
+  // mysql: schema already created via Hostinger phpMyAdmin
   logger.info({ type: database.type }, 'Database initialized');
 }
 
@@ -91,187 +74,6 @@ async function addPostgresColumnIfMissing(pool, table, column, definition) {
   );
   if (result.rowCount === 0) {
     await pool.query(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
-  }
-}
-
-async function addMysqlColumnIfMissing(pool, table, column, definition) {
-  const [rows] = await pool.execute(
-    'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
-    [table, column]
-  );
-  if (!rows.length) {
-    await pool.execute(`ALTER TABLE \`${table}\` ADD COLUMN ${definition}`);
-  }
-}
-
-async function initMysqlSchema(pool) {
-  const statements = [
-    `CREATE TABLE IF NOT EXISTS users (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      first_name VARCHAR(255) NOT NULL,
-      last_name VARCHAR(255) NOT NULL,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL DEFAULT '',
-      phone VARCHAR(20), dob VARCHAR(10), street VARCHAR(255),
-      city VARCHAR(100), state VARCHAR(50), zip VARCHAR(20),
-      role VARCHAR(50) DEFAULT 'client',
-      two_fa_secret TEXT, two_fa_enabled TINYINT DEFAULT 0,
-      two_fa_prompt_shown TINYINT DEFAULT 0,
-      avatar_initials VARCHAR(10),
-      email_verified TINYINT DEFAULT 0,
-      verification_token VARCHAR(255),
-      verification_token_expires DATETIME,
-      approval_status VARCHAR(50),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS user_profiles (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT UNIQUE,
-      bar_number VARCHAR(100), state_bar VARCHAR(100),
-      years_experience INT, specializations TEXT,
-      firm_role VARCHAR(100), practice_groups TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`,
-    `CREATE TABLE IF NOT EXISTS matters (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      case_number VARCHAR(100) UNIQUE,
-      client_id BIGINT, attorney_id BIGINT,
-      matter_type VARCHAR(100),
-      stage VARCHAR(50) DEFAULT 'intake',
-      status VARCHAR(50) DEFAULT 'active',
-      description TEXT, court VARCHAR(255), county VARCHAR(100),
-      urgent TINYINT DEFAULT 0, important_date VARCHAR(20),
-      has_documents TINYINT DEFAULT 0,
-      worked_with_firm_before TINYINT DEFAULT 0,
-      additional_notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (attorney_id) REFERENCES users(id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS documents (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      matter_id BIGINT, user_id BIGINT,
-      name VARCHAR(255) NOT NULL,
-      category VARCHAR(100), doc_type VARCHAR(100),
-      file_path TEXT, file_size BIGINT, mime_type VARCHAR(128),
-      storage_key TEXT,
-      required TINYINT DEFAULT 0,
-      status VARCHAR(50) DEFAULT 'pending',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (matter_id) REFERENCES matters(id) ON DELETE CASCADE,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS messages (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      matter_id BIGINT, from_user_id BIGINT, to_user_id BIGINT,
-      subject VARCHAR(255), body TEXT NOT NULL, read_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (matter_id) REFERENCES matters(id),
-      FOREIGN KEY (from_user_id) REFERENCES users(id),
-      FOREIGN KEY (to_user_id) REFERENCES users(id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS appointments (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      matter_id BIGINT, title VARCHAR(255) NOT NULL,
-      type VARCHAR(50) DEFAULT 'teleconference',
-      start_time VARCHAR(50) NOT NULL, end_time VARCHAR(50),
-      location VARCHAR(255), notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (matter_id) REFERENCES matters(id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS tasks (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      matter_id BIGINT, assigned_to BIGINT,
-      title VARCHAR(255) NOT NULL, description TEXT,
-      due_date VARCHAR(20),
-      status VARCHAR(50) DEFAULT 'pending',
-      priority VARCHAR(50) DEFAULT 'normal',
-      action_label VARCHAR(255),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (matter_id) REFERENCES matters(id) ON DELETE CASCADE,
-      FOREIGN KEY (assigned_to) REFERENCES users(id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS invoices (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      matter_id BIGINT, client_id BIGINT, created_by BIGINT,
-      stripe_session_id VARCHAR(255), stripe_payment_intent_id VARCHAR(255),
-      amount BIGINT NOT NULL, currency VARCHAR(10) DEFAULT 'usd',
-      description TEXT NOT NULL,
-      service_type VARCHAR(50) DEFAULT 'general',
-      status VARCHAR(50) DEFAULT 'pending',
-      due_date VARCHAR(20), paid_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (matter_id) REFERENCES matters(id),
-      FOREIGN KEY (client_id) REFERENCES users(id),
-      FOREIGN KEY (created_by) REFERENCES users(id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS audit_log (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT,
-      action VARCHAR(100) NOT NULL,
-      entity VARCHAR(50), entity_id BIGINT,
-      meta TEXT, ip_address VARCHAR(64),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-    )`,
-  ];
-  for (const sql of statements) {
-    await pool.execute(sql);
-  }
-
-  // CREATE INDEX IF NOT EXISTS is only supported in MySQL 8.0.29+ and MariaDB 10.1.4+.
-  // For broad compatibility use plain CREATE INDEX and ignore error 1061 (duplicate key
-  // name) which means the index already exists — safe to skip on re-deploy.
-  const indexes = [
-    `CREATE INDEX idx_matters_client   ON matters(client_id)`,
-    `CREATE INDEX idx_matters_attorney ON matters(attorney_id)`,
-    `CREATE INDEX idx_matters_status   ON matters(status)`,
-    `CREATE INDEX idx_documents_matter ON documents(matter_id)`,
-    `CREATE INDEX idx_messages_to      ON messages(to_user_id, read_at)`,
-    `CREATE INDEX idx_messages_from    ON messages(from_user_id)`,
-    `CREATE INDEX idx_tasks_assigned   ON tasks(assigned_to, status)`,
-    `CREATE INDEX idx_invoices_client  ON invoices(client_id, status)`,
-    `CREATE INDEX idx_audit_user       ON audit_log(user_id)`,
-  ];
-  for (const sql of indexes) {
-    try {
-      await pool.execute(sql);
-    } catch (err) {
-      if (err.errno !== 1061) throw err;
-    }
-  }
-}
-
-async function initMysqlColumns(pool) {
-  const cols = [
-    ['users', 'two_fa_prompt_shown',        'two_fa_prompt_shown TINYINT(1) DEFAULT 0'],
-    ['users', 'two_fa_enabled',             'two_fa_enabled TINYINT(1) DEFAULT 0'],
-    ['users', 'two_fa_secret',              'two_fa_secret TEXT'],
-    ['users', 'verification_token',         'verification_token TEXT'],
-    ['users', 'verification_token_expires', 'verification_token_expires TEXT'],
-    ['users', 'avatar_initials',            'avatar_initials VARCHAR(10)'],
-    ['users', 'approval_status',            "approval_status VARCHAR(20) DEFAULT 'pending'"],
-    ['matters', 'urgent',                   'urgent TINYINT(1) DEFAULT 0'],
-    ['matters', 'important_date',           'important_date VARCHAR(32)'],
-    ['matters', 'has_documents',            'has_documents TINYINT(1) DEFAULT 0'],
-    ['matters', 'worked_with_firm_before',  'worked_with_firm_before TINYINT(1) DEFAULT 0'],
-    ['matters', 'additional_notes',         'additional_notes TEXT'],
-    ['documents', 'doc_type',              'doc_type VARCHAR(64)'],
-    ['documents', 'file_path',             'file_path TEXT'],
-    ['documents', 'file_size',             'file_size BIGINT'],
-    ['documents', 'mime_type',             'mime_type VARCHAR(128)'],
-    ['documents', 'storage_key',           'storage_key TEXT'],
-    ['documents', 'required',              'required TINYINT(1) DEFAULT 0'],
-    ['tasks', 'action_label',              'action_label VARCHAR(128)'],
-    ['invoices', 'stripe_session_id',      'stripe_session_id TEXT'],
-    ['invoices', 'stripe_payment_intent_id','stripe_payment_intent_id TEXT'],
-    ['invoices', 'currency',               "currency VARCHAR(8) DEFAULT 'usd'"],
-    ['invoices', 'service_type',           "service_type VARCHAR(64) DEFAULT 'general'"],
-  ];
-  for (const [table, column, definition] of cols) {
-    await addMysqlColumnIfMissing(pool, table, column, definition);
   }
 }
 
