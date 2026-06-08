@@ -77,6 +77,7 @@ export const dashboardApi = {
   client: () => api.get('/dashboard/client'),
   attorney: () => api.get('/dashboard/attorney'),
   partner: () => api.get('/dashboard/partner'),
+  attorneyClients: () => api.get('/dashboard/attorney/clients'),
 };
 
 export const usersApi = {

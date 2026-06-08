@@ -3,9 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
-import { ChevronRight, Clock } from 'lucide-react';
+import { ChevronRight, Clock, Users, Phone, Mail } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
 import DocumentUploadPanel from '../../components/ui/DocumentUploadPanel';
+
+const MATTER_TYPE_LABELS = {
+  guardianship:                  'Guardianship',
+  conservatorship:               'Conservatorship',
+  guardianship_conservatorship:  'Guardianship & Conservatorship',
+  estate_administration:         'Estate Administration',
+  unassigned:                    'No Matter Yet',
+};
+
+const MATTER_TYPE_COLORS = {
+  guardianship:                  'bg-blue-100 text-blue-700',
+  conservatorship:               'bg-purple-100 text-purple-700',
+  guardianship_conservatorship:  'bg-indigo-100 text-indigo-700',
+  estate_administration:         'bg-green-100 text-green-700',
+  unassigned:                    'bg-gray-100 text-gray-600',
+};
 
 const fmt$ = n =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M`
@@ -32,12 +48,15 @@ function HealthScore({ score }) {
 
 export default function AttorneyDashboard() {
   const { user } = useAuth();
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData]               = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [clients, setClients]         = useState({ clients: [], grouped: {} });
+  const [clientsTab, setClientsTab]   = useState('all');
   const navigate = useNavigate();
 
   useEffect(() => {
     dashboardApi.attorney().then(r => setData(r.data)).catch(() => setData(null)).finally(() => setLoading(false));
+    dashboardApi.attorneyClients().then(r => setClients(r.data)).catch(() => {});
   }, []);
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size={8} /></div>;
@@ -309,6 +328,115 @@ export default function AttorneyDashboard() {
 
           {/* Document upload panel */}
           <DocumentUploadPanel matters={data?.matters || []} />
+        </div>
+      </div>
+
+      {/* ── Registered Clients by Matter Type ── */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-[#0f2057]" />
+            <span className="font-semibold text-gray-800 text-sm">Registered Clients by Matter Type</span>
+            <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 font-medium">{clients.clients.length}</span>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {[
+            { key: 'all',                          label: `All (${clients.clients.length})` },
+            ...Object.keys(clients.grouped).filter(k => k !== 'unassigned').map(k => ({
+              key: k,
+              label: `${MATTER_TYPE_LABELS[k] || k} (${clients.grouped[k].length})`,
+            })),
+            ...(clients.grouped.unassigned?.length
+              ? [{ key: 'unassigned', label: `No Matter Yet (${clients.grouped.unassigned.length})` }]
+              : []),
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setClientsTab(tab.key)}
+              className={`text-xs px-3 py-1 rounded-full font-medium transition-colors
+                ${clientsTab === tab.key
+                  ? 'bg-[#0f2057] text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Client list */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100">
+                {['Client', 'Matter Type', 'Case #', 'Stage', 'Status', 'Joined', 'Contact'].map(h => (
+                  <th key={h} className="text-left py-2 pr-3 text-gray-500 font-medium whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(clientsTab === 'all' ? clients.clients : (clients.grouped[clientsTab] || [])).map(c => (
+                <tr key={`${c.id}-${c.matter_id}`} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="py-2 pr-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-[#0f2057] text-white text-[10px] flex items-center justify-center font-bold flex-shrink-0">
+                        {c.avatar_initials || `${c.first_name?.[0]}${c.last_name?.[0]}`}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-800">{c.first_name} {c.last_name}</div>
+                        <div className="text-gray-400 truncate max-w-[140px]">{c.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="pr-3">
+                    {c.matter_type
+                      ? <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${MATTER_TYPE_COLORS[c.matter_type] || 'bg-gray-100 text-gray-600'}`}>
+                          {MATTER_TYPE_LABELS[c.matter_type] || c.matter_type}
+                        </span>
+                      : <span className="text-gray-400">—</span>
+                    }
+                  </td>
+                  <td className="pr-3 text-gray-600 font-mono">{c.case_number || '—'}</td>
+                  <td className="pr-3">
+                    {c.stage
+                      ? <span className="badge badge-blue">{c.stage.replace(/_/g, ' ').replace(/\b\w/g, x => x.toUpperCase())}</span>
+                      : <span className="text-gray-400">—</span>
+                    }
+                  </td>
+                  <td className="pr-3">
+                    {c.status
+                      ? <span className={`badge ${c.status === 'active' ? 'badge-green' : c.status === 'at_risk' ? 'badge-red' : 'badge-gray'}`}>
+                          {c.status === 'at_risk' ? 'At Risk' : c.status === 'active' ? 'On Track' : c.status}
+                        </span>
+                      : <span className="text-gray-400">—</span>
+                    }
+                  </td>
+                  <td className="pr-3 text-gray-500 whitespace-nowrap">
+                    {new Date(c.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric', year: '2-digit' })}
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-1.5">
+                      {c.phone && (
+                        <a href={`tel:${c.phone}`} className="text-gray-400 hover:text-[#0f2057] transition-colors">
+                          <Phone size={12} />
+                        </a>
+                      )}
+                      <a href={`mailto:${c.email}`} className="text-gray-400 hover:text-[#0f2057] transition-colors">
+                        <Mail size={12} />
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {(clientsTab === 'all' ? clients.clients : (clients.grouped[clientsTab] || [])).length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-6 text-center text-xs text-gray-400">No clients in this category</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

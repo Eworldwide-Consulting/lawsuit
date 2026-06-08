@@ -3,7 +3,7 @@ import { Shield, ShieldCheck, X, Copy, Check, Loader2 } from 'lucide-react';
 import { authApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
-export default function TwoFASetupModal({ onClose }) {
+export default function TwoFASetupModal({ onClose, mandatory = false }) {
   const { updateUser } = useAuth();
   const [step, setStep] = useState('intro'); // intro | setup | done
   const [secret, setSecret] = useState('');
@@ -84,10 +84,13 @@ export default function TwoFASetupModal({ onClose }) {
             <Shield size={18} className="text-[#0f2057]" />
             <span className="font-semibold text-gray-900 text-sm">Two-Factor Authentication</span>
           </div>
-          {step !== 'done' && (
+          {step !== 'done' && !mandatory && (
             <button onClick={handleSkip} className="text-gray-400 hover:text-gray-600 transition-colors">
               <X size={18} />
             </button>
+          )}
+          {mandatory && step !== 'done' && (
+            <span className="text-xs font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Required</span>
           )}
         </div>
 
@@ -100,9 +103,13 @@ export default function TwoFASetupModal({ onClose }) {
                 <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
                   <ShieldCheck size={32} className="text-[#0f2057]" />
                 </div>
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Secure your account</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-1">
+                  {mandatory ? 'Two-Factor Authentication Required' : 'Secure your account'}
+                </h2>
                 <p className="text-sm text-gray-500">
-                  Add a second layer of security. Each login will require a 6-digit code from your authenticator app.
+                  {mandatory
+                    ? 'Your role requires 2FA to protect sensitive client data. Set it up now to continue accessing your dashboard.'
+                    : 'Add a second layer of security. Each login will require a 6-digit code from your authenticator app.'}
                 </p>
               </div>
 
@@ -129,12 +136,14 @@ export default function TwoFASetupModal({ onClose }) {
                     ? <Loader2 size={16} className="animate-spin" />
                     : <><ShieldCheck size={16} /> Enable 2FA</>}
                 </button>
-                <button
-                  onClick={handleSkip}
-                  className="w-full py-2 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
-                >
-                  Skip for now
-                </button>
+                {!mandatory && (
+                  <button
+                    onClick={handleSkip}
+                    className="w-full py-2 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                  >
+                    Skip for now
+                  </button>
+                )}
               </div>
             </>
           )}

@@ -13,9 +13,15 @@ export default function DashboardLayout({ children }) {
   const [show2FA, setShow2FA] = useState(false);
   const navigate = useNavigate();
 
-  // Show 2FA setup prompt once per account, for all roles, after first login
+  // Attorneys and partners must enable 2FA — popup reappears every session until done.
+  // Clients see it once; if skipped it never shows again.
   useEffect(() => {
-    if (user && !user.two_fa_enabled && !user.two_fa_prompt_shown) {
+    if (!user) return;
+    const isMandatory = user.role === 'attorney' || user.role === 'partner';
+    const shouldShow = isMandatory
+      ? !user.two_fa_enabled
+      : !user.two_fa_enabled && !user.two_fa_prompt_shown;
+    if (shouldShow) {
       const t = setTimeout(() => setShow2FA(true), 1500);
       return () => clearTimeout(t);
     }
@@ -130,7 +136,12 @@ export default function DashboardLayout({ children }) {
         </nav>
       </div>
 
-      {show2FA && <TwoFASetupModal onClose={() => setShow2FA(false)} />}
+      {show2FA && (
+        <TwoFASetupModal
+          onClose={() => setShow2FA(false)}
+          mandatory={user?.role === 'attorney' || user?.role === 'partner'}
+        />
+      )}
     </div>
   );
 }
