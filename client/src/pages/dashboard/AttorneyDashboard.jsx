@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardApi } from '../../api';
@@ -28,7 +28,9 @@ const fmt$ = n =>
   : n >= 1_000   ? `$${(n / 1_000).toFixed(0)}K`
   : `$${n}`;
 
-function HealthScore({ score }) {
+const stageLabel = s => s?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—';
+
+const HealthScore = memo(function HealthScore({ score }) {
   const r = 52, circ = 2 * Math.PI * r;
   const color = score >= 70 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
   return (
@@ -44,7 +46,7 @@ function HealthScore({ score }) {
       </div>
     </div>
   );
-}
+});
 
 export default function AttorneyDashboard() {
   const { user } = useAuth();
@@ -60,8 +62,6 @@ export default function AttorneyDashboard() {
   }, []);
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size={8} /></div>;
-
-  const stageLabel = s => s?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—';
 
   // Dynamic financial alerts derived from real data
   const alerts = [];

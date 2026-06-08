@@ -24,11 +24,17 @@ function getDb() {
       // parsed when passed as a raw string.  Parse it ourselves so credentials
       // (including %40-encoded @ in passwords) are always extracted correctly.
       const _url = new URL(connectionString.replace(/^mysql2:\/\//, 'mysql://'));
+      // MYSQL_SOCKET bypasses TCP entirely — required on Hostinger shared hosting
+      // where the user only has UNIX socket grants (u511005792_dbadmin@localhost).
+      // Find the path in phpMyAdmin: SHOW VARIABLES LIKE 'socket';
+      const socketPath = process.env.MYSQL_SOCKET;
+      const networkOpts = socketPath
+        ? { socketPath }
+        : { host: _url.hostname, port: parseInt(_url.port, 10) || 3306 };
       const rawPool = mysqlRaw.createPool({
-        host:             _url.hostname,
-        port:             parseInt(_url.port, 10) || 3306,
+        ...networkOpts,
         user:             decodeURIComponent(_url.username),
-        password:         decodeURIComponent(_url.password),
+        password:         process.env.MYSQL_PASS || decodeURIComponent(_url.password),
         database:         _url.pathname.slice(1) || undefined,
         waitForConnections: true,
         connectionLimit:  20,
@@ -265,10 +271,13 @@ async function initMysqlColumns(pool) {
     ['documents', 'storage_key',           'storage_key TEXT'],
     ['documents', 'required',              'required TINYINT(1) DEFAULT 0'],
     ['tasks', 'action_label',              'action_label VARCHAR(128)'],
-    ['invoices', 'stripe_session_id',      'stripe_session_id TEXT'],
-    ['invoices', 'stripe_payment_intent_id','stripe_payment_intent_id TEXT'],
-    ['invoices', 'currency',               "currency VARCHAR(8) DEFAULT 'usd'"],
-    ['invoices', 'service_type',           "service_type VARCHAR(64) DEFAULT 'general'"],
+    ['invoices', 'stripe_session_id',        'stripe_session_id TEXT'],
+    ['invoices', 'stripe_payment_intent_id', 'stripe_payment_intent_id TEXT'],
+    ['invoices', 'currency',                 "currency VARCHAR(8) DEFAULT 'usd'"],
+    ['invoices', 'service_type',             "service_type VARCHAR(64) DEFAULT 'general'"],
+    // password reset (also handled by migration 002 — idempotent here as a safety net)
+    ['users', 'password_reset_token',   'password_reset_token TEXT'],
+    ['users', 'password_reset_expires', 'password_reset_expires TEXT'],
   ];
   for (const [table, column, definition] of cols) {
     await addMysqlColumnIfMissing(pool, table, column, definition);

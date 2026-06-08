@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../../api';
+import adminApi from '../../api/admin.api';
 import { useAuth } from '../../context/AuthContext';
-import { AlertTriangle, ChevronRight, Clock } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Clock, UserCheck } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
 import DocumentUploadPanel from '../../components/ui/DocumentUploadPanel';
 
@@ -31,12 +32,14 @@ const shortCat = cat => cat?.replace(/^\d+\.\s*/, '') ?? cat;
 
 export default function PartnerDashboard() {
   const { user } = useAuth();
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData]           = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     dashboardApi.partner().then(r => setData(r.data)).catch(() => setData(null)).finally(() => setLoading(false));
+    adminApi.pending().then(r => setPendingCount(r.data?.length ?? 0)).catch(() => {});
   }, []);
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size={8} /></div>;
@@ -79,6 +82,24 @@ export default function PartnerDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {pendingCount > 0 && user?.approval_status !== 'pending' && (
+        <button
+          onClick={() => navigate('/admin')}
+          className="w-full rounded-xl bg-indigo-50 border border-indigo-200 p-4 flex items-center gap-3 hover:bg-indigo-100 transition-colors text-left"
+        >
+          <UserCheck size={18} className="text-indigo-600 flex-shrink-0" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-indigo-800">
+              {pendingCount} account{pendingCount > 1 ? 's' : ''} pending approval
+            </div>
+            <div className="text-xs text-indigo-600 mt-0.5">
+              {pendingCount === 1 ? 'An attorney or partner' : 'Attorneys or partners'} need{pendingCount === 1 ? 's' : ''} your review
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-indigo-400 flex-shrink-0" />
+        </button>
       )}
 
       <div>

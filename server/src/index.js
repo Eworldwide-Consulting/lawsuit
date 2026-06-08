@@ -1,30 +1,45 @@
-// Early crash reporter — catches any module-load failure before pino initialises
+// Early crash reporter — stdout so it appears in Hostinger's log panel (stderr is hidden)
 process.on('uncaughtException', (err) => {
-  console.error('[FATAL] uncaughtException at startup:', err.message, err.stack);
+  console.log('[FATAL] uncaughtException:', err.message);
+  console.log('[FATAL] Stack:', err.stack);
   process.exit(1);
 });
 process.on('unhandledRejection', (reason) => {
-  console.error('[FATAL] unhandledRejection at startup:', reason);
+  console.log('[FATAL] unhandledRejection:', reason);
   process.exit(1);
 });
 console.log('[BOOT] index.js top reached, Node', process.version);
 
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 console.log('[BOOT] dotenv loaded, NODE_ENV=' + process.env.NODE_ENV);
-const http       = require('http');
-const express    = require('express');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const rateLimit  = require('express-rate-limit');
-const path       = require('path');
-const pinoHttp   = require('pino-http');
 
+// ── Breadcrumb logs: pinpoint which require() fails if node_modules is missing ─
+console.log('[BOOT] loading npm modules...');
+const http        = require('http');
+const express     = require('express');
+const cors        = require('cors');
+const helmet      = require('helmet');
+const rateLimit   = require('express-rate-limit');
+const compression = require('compression');
+const path        = require('path');
+const pinoHttp    = require('pino-http');
+console.log('[BOOT] npm modules loaded');
+
+console.log('[BOOT] loading app modules...');
 const logger        = require('./logger');
+const config        = require('./config');
 const requestId     = require('./middleware/requestId');
+const errorHandler  = require('./middleware/errorHandler');
 const cache         = require('./cache');
 const ws            = require('./websocket');
-const { initDatabase } = require('./database');
+const { initDatabase }  = require('./database');
+const { runMigrations } = require('./migrations/runner');
+const { startWorkers }  = require('./queue/workers');
+const { queueStats }    = require('./queue');
+const { breakers }      = require('./lib/circuit-breaker');
+console.log('[BOOT] app modules loaded');
 
+console.log('[BOOT] loading routes...');
 const authRoutes        = require('./routes/auth');
 const matterRoutes      = require('./routes/matters');
 const documentRoutes    = require('./routes/documents');
@@ -34,32 +49,83 @@ const taskRoutes        = require('./routes/tasks');
 const dashboardRoutes   = require('./routes/dashboard');
 const userRoutes        = require('./routes/users');
 const paymentRoutes     = require('./routes/payments');
-const adminRoutes       = require('./routes/admin');
+const adminRoutes         = require('./routes/admin');
+const notificationRoutes  = require('./routes/notifications');
+console.log('[BOOT] routes loaded');
 
 const app          = express();
 const server       = http.createServer(app);
-const PORT         = process.env.PORT || 5000;
-const isProduction = process.env.NODE_ENV === 'production';
+const { port: PORT, isProduction, client } = config;
 const isDev        = !isProduction;
 
 app.set('trust proxy', 1);
 
+// ── Production guard ──────────────────────────────────────────────────────────
+// Fail fast if critical env vars are missing — catches misconfigured deploys
+// where NODE_ENV=production wasn't set but DATABASE_URL was provided.
+if (isProduction) {
+  const required = ['JWT_SECRET', 'DATABASE_URL'];
+  const missing  = required.filter(k => !process.env[k]);
+  if (missing.length) {
+    logger.fatal({ missing }, 'Missing required production env vars — aborting');
+    process.exit(1);
+  }
+  if (process.env.JWT_SECRET?.length < 32) {
+    logger.fatal('JWT_SECRET is too short for production (min 32 chars) — aborting');
+    process.exit(1);
+  }
+}
+
 // ── Middleware ────────────────────────────────────────────────────────────────
+// compression must be first — compresses all subsequent responses
+app.use(compression({ threshold: 1024 }));
 app.use(requestId);
 app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/health' } }));
-app.use(helmet({ contentSecurityPolicy: false }));
+
+// L1: Redirect HTTP → HTTPS in production (Hostinger terminates SSL but forwards
+// the original scheme via X-Forwarded-Proto when trust proxy is enabled).
+if (isProduction) {
+  app.use((req, res, next) => {
+    if (req.headers['x-forwarded-proto'] === 'http') {
+      return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    }
+    next();
+  });
+}
+
+// H3: Enable CSP — allow inline styles (used by React/Vite) but block inline scripts.
+// Adjust connect-src / img-src if you add third-party services.
+const cspDirectives = {
+  defaultSrc:     ["'self'"],
+  scriptSrc:      ["'self'"],
+  styleSrc:       ["'self'", "'unsafe-inline'"],
+  imgSrc:         ["'self'", 'data:', 'blob:'],
+  connectSrc:     ["'self'", client.url, 'wss:'],
+  fontSrc:        ["'self'"],
+  objectSrc:      ["'none'"],
+  frameAncestors: ["'none'"],
+};
+if (isProduction) cspDirectives.upgradeInsecureRequests = [];
+
+app.use(helmet({
+  contentSecurityPolicy: { directives: cspDirectives },
+  crossOriginEmbedderPolicy: false,
+}));
 
 // Stripe webhook needs raw body — must come before json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
 app.use(cors({
-  origin: isProduction ? true : (process.env.CLIENT_URL || 'http://localhost:5173'),
+  origin: client.url,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── Rate limiting (in-memory; swap store for Redis when horizontal-scaling) ──
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// M3: In production, swap to a Redis-backed store so counters survive restarts
+// and are shared across PM2 instances. Install rate-limit-redis and set REDIS_URL.
+// Until then the in-memory store provides basic protection.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isDev ? 2000 : 200,
@@ -75,9 +141,10 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/', limiter);
-app.use('/api/auth/login',        authLimiter);
-app.use('/api/auth/register',     authLimiter);
-app.use('/api/auth/check-email',  authLimiter);
+app.use('/api/auth/login',            authLimiter);
+app.use('/api/auth/register',         authLimiter);
+app.use('/api/auth/forgot-password',  authLimiter);
+app.use('/api/auth/reset-password',   authLimiter);
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth',         authRoutes);
@@ -88,18 +155,25 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/tasks',        taskRoutes);
 app.use('/api/dashboard',    dashboardRoutes);
 app.use('/api/users',        userRoutes);
-app.use('/api/payments',     paymentRoutes);
-app.use('/api/admin',        adminRoutes);
+app.use('/api/payments',       paymentRoutes);
+app.use('/api/admin',          adminRoutes);
+app.use('/api/notifications',  notificationRoutes);
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', async (req, res) => {
-  const [cacheHealth] = await Promise.allSettled([cache.healthCheck()]);
+  const [cacheHealth, queues] = await Promise.allSettled([
+    cache.healthCheck(),
+    queueStats(),
+  ]);
   res.json({
-    status: 'ok',
-    version: process.env.npm_package_version || '1.0.0',
-    env: process.env.NODE_ENV,
-    uptime: Math.floor(process.uptime()),
-    cache: cacheHealth.status === 'fulfilled' ? cacheHealth.value : { status: 'error' },
+    status:   'ok',
+    version:  process.env.npm_package_version || '1.0.0',
+    env:      process.env.NODE_ENV,
+    uptime:   Math.floor(process.uptime()),
+    memory:   process.memoryUsage(),
+    cache:    cacheHealth.status === 'fulfilled' ? cacheHealth.value : { status: 'error' },
+    queues:   queues.status === 'fulfilled' ? queues.value : {},
+    circuits: Object.fromEntries(Object.entries(breakers).map(([k, b]) => [k, b.toJSON()])),
     timestamp: new Date().toISOString(),
   });
 });
@@ -107,45 +181,58 @@ app.get('/api/health', async (req, res) => {
 // ── Static (production) ───────────────────────────────────────────────────────
 if (isProduction) {
   const clientBuild = path.join(__dirname, '../../client/dist');
-  app.use(express.static(clientBuild, { maxAge: '1d', etag: true }));
+  // Vite content-hashes every asset filename — safe to cache forever
+  app.use('/assets', express.static(path.join(clientBuild, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  // index.html must never be cached — it's the entry point for all routes
+  app.use(express.static(clientBuild, {
+    maxAge: 0,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+    },
+  }));
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(clientBuild, 'index.html'));
   });
 }
 
 // ── Error handler ─────────────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
-  req.log?.error({ err, requestId: req.id }, 'Unhandled error');
-  res.status(status).json({
-    error: isProduction ? 'Internal server error' : err.message,
-    requestId: req.id,
-  });
-});
+app.use(errorHandler);
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function start() {
-  // Listen first — the proxy can reach us immediately, preventing 504 timeouts
-  // that occur when database init hangs before server.listen() is ever called.
+  // Listen first so the proxy can reach us immediately, preventing 504 timeouts
   await new Promise(resolve => server.listen(PORT, resolve));
   logger.info({ port: PORT, env: process.env.NODE_ENV }, 'TriVanta API listening');
 
-  // Init DB with a hard timeout so a hung connection produces a clear log entry
-  // rather than silently blocking indefinitely.
   try {
     await Promise.race([
       initDatabase(),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error('initDatabase timed out after 45 s')), 45_000)
-      )
+      ),
     ]);
   } catch (err) {
     logger.fatal({ err }, 'Database init failed — shutting down');
     process.exit(1);
   }
 
-  ws.init(server);
+  // Run versioned migrations after DB is confirmed live
+  try {
+    await runMigrations();
+  } catch (err) {
+    logger.fatal({ err }, 'Migrations failed — shutting down');
+    process.exit(1);
+  }
+
+  await ws.init(server);
+  startWorkers();
   logger.info('TriVanta fully started');
 }
 

@@ -1,15 +1,9 @@
 const jwt   = require('jsonwebtoken');
 const { one } = require('../db');
 const cache   = require('../cache');
+const config  = require('../config');
+const { USER_COLUMNS } = require('../domain/user');
 
-// Fields required by route handlers — never expose password_hash or secrets via req.user
-const USER_COLUMNS = `
-  id, first_name, last_name, email, role, phone, avatar_initials,
-  email_verified, approval_status, two_fa_enabled, two_fa_secret, password_hash
-`.trim();
-
-// Cache TTL for user records.
-// Short enough that role/approval changes propagate within 1 minute.
 const USER_CACHE_TTL = 60;
 
 async function requireAuth(req, res, next) {
@@ -18,13 +12,10 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET);
+    const payload = jwt.verify(header.slice(7), config.jwt.secret);
     if (payload.twoFaPending)
       return res.status(401).json({ error: '2FA required' });
 
-    // Cache user by id to avoid a DB round-trip on every authenticated request.
-    // At 1000 req/s this saves 1000 DB queries per second — the single largest
-    // performance lever in the entire codebase.
     const cacheKey = `user:${payload.userId}`;
     let user = await cache.get(cacheKey);
 
@@ -50,8 +41,6 @@ function requireRole(...roles) {
   };
 }
 
-// Call this from routes that modify a user record so the stale cache
-// entry is evicted immediately (e.g. admin approve/reject, profile update).
 async function invalidateUserCache(userId) {
   await cache.del(`user:${userId}`);
 }

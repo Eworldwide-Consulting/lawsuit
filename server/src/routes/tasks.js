@@ -1,70 +1,72 @@
 const router = require('express').Router();
-const { all, one, run }      = require('../db');
-const { requireAuth }        = require('../middleware/auth');
-const { inList, parsePagination } = require('../utils');
+const { requireAuth }  = require('../middleware/auth');
+const TaskRepo         = require('../repositories/task.repository');
+const MatterRepo       = require('../repositories/matter.repository');
+const { parsePagination } = require('../lib/pagination');
+const { isStaff }      = require('../domain/user');
+const { NotFoundError, ForbiddenError, ValidationError } = require('../lib/errors');
+const NotificationService = require('../services/notification.service');
+const AuditService        = require('../services/audit.service');
 
-router.get('/', requireAuth, async (req, res) => {
+const VALID_STATUSES = ['pending', 'in_progress', 'completed'];
+
+router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const { limit, offset } = parsePagination(req.query);
-
+    const pagination = parsePagination(req.query);
     if (req.user.role === 'client') {
-      const matterRows = await all('SELECT id FROM matters WHERE client_id = ?', [req.user.id]);
+      const matterRows = await MatterRepo.idsByClientId(req.user.id);
       if (!matterRows.length) return res.json([]);
-      const ids = matterRows.map((m) => m.id);
-      return res.json(
-        await all(
-          `SELECT * FROM tasks WHERE matter_id IN (${inList(ids)}) ORDER BY due_date ASC LIMIT ? OFFSET ?`,
-          [...ids, limit, offset]
-        )
-      );
+      return res.json(await TaskRepo.findByMatters(matterRows.map(m => m.id), pagination));
     }
-
-    res.json(
-      await all('SELECT * FROM tasks ORDER BY due_date ASC LIMIT ? OFFSET ?', [limit, offset])
-    );
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json(await TaskRepo.findAll(pagination));
+  } catch (err) { next(err); }
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, async (req, res, next) => {
   try {
     const { matterId, assignedTo, title, description, dueDate, priority, actionLabel } = req.body;
     if (!title) return res.status(400).json({ error: 'title required' });
+    const effectiveAssignee = assignedTo || req.user.id;
+    const task = await TaskRepo.create({
+      matterId, assignedTo: effectiveAssignee,
+      title, description, dueDate, priority, actionLabel,
+    });
 
-    const r = await run(
-      'INSERT INTO tasks (matter_id, assigned_to, title, description, due_date, priority, action_label) VALUES (?,?,?,?,?,?,?)',
-      [matterId || null, assignedTo || req.user.id, title, description || null, dueDate || null, priority || 'normal', actionLabel || null]
-    );
-    res.status(201).json(await one('SELECT * FROM tasks WHERE id = ?', [r.insertId]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    // Notify the assignee if someone else created the task for them
+    if (effectiveAssignee !== req.user.id) {
+      NotificationService.taskAssigned(effectiveAssignee, { taskTitle: title, taskId: task.id });
+    }
+
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.TASK_CREATED,
+      entity: 'task', entityId: task.id,
+      meta: { title, assignedTo: effectiveAssignee, matterId: matterId || null },
+      ip: req.ip,
+    });
+
+    res.status(201).json(task);
+  } catch (err) { next(err); }
 });
 
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res, next) => {
   try {
-    const task = await one(
-      'SELECT id, assigned_to, matter_id FROM tasks WHERE id = ?',
-      [req.params.id]
-    );
-    if (!task) return res.status(404).json({ error: 'Not found' });
-
-    // Clients can only update tasks assigned to them.
-    // Staff (attorney/partner/itsupport) can update any task.
-    const isAssignee = task.assigned_to === req.user.id;
-    const isStaff    = ['attorney', 'partner', 'itsupport'].includes(req.user.role);
-    if (!isAssignee && !isStaff)
-      return res.status(403).json({ error: 'Forbidden' });
-
-    const VALID_STATUSES = ['pending', 'in_progress', 'completed'];
+    const task = await TaskRepo.findById(req.params.id);
+    if (!task) throw new NotFoundError('Task');
+    if (task.assigned_to !== req.user.id && !isStaff(req.user.role))
+      throw new ForbiddenError();
     if (!VALID_STATUSES.includes(req.body.status))
-      return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
-    await run('UPDATE tasks SET status = ? WHERE id = ?', [req.body.status, req.params.id]);
+      throw new ValidationError(`status must be one of: ${VALID_STATUSES.join(', ')}`);
+    await TaskRepo.updateStatus(req.params.id, req.body.status);
+
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.TASK_STATUS_CHANGED,
+      entity: 'task', entityId: req.params.id,
+      meta: { status: req.body.status },
+      ip: req.ip,
+    });
+
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

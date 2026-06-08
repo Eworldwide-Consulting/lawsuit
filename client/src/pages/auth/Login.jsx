@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Shield, User, Scale, Briefcase } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
 import Spinner from '../../components/ui/Spinner';
@@ -45,6 +45,16 @@ const ROLE_TABS = [
     active:   'border-purple-600 text-purple-600 bg-purple-50',
     inactive: 'border-transparent text-gray-500 hover:text-gray-700',
   },
+  {
+    id:       'itsupport',
+    label:    'Admin',
+    icon:     Shield,
+    heading:  'Admin Portal',
+    sub:      'Sign in to manage users and approvals.',
+    showSSO:  false,
+    active:   'border-gray-700 text-gray-800 bg-gray-100',
+    inactive: 'border-transparent text-gray-500 hover:text-gray-700',
+  },
 ];
 
 export default function Login() {
@@ -58,6 +68,8 @@ export default function Login() {
   const [notRegistered, setNotRegistered]           = useState(false);
   const { login } = useAuth();
   const navigate   = useNavigate();
+  const location   = useLocation();
+  const fromPath   = location.state?.from || null;
 
   const tab = ROLE_TABS.find(t => t.id === activeRole);
 
@@ -99,7 +111,14 @@ export default function Login() {
           return;
         }
         login(res.data.token, res.data.user);
-        navigate('/dashboard');
+        // Redirect back to the page they were trying to reach, or role-appropriate default
+        if (fromPath) {
+          navigate(fromPath, { replace: true });
+        } else if (['itsupport', 'partner'].includes(res.data.user.role)) {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err) {
       const d = err.response?.data || {};
@@ -107,17 +126,7 @@ export default function Login() {
         setError(d.error || 'Please verify your email.');
         setNeedsVerification(d.email);
       } else if (err.response?.status === 401) {
-        // Check whether the email is even registered so we can show a helpful message
-        authApi.checkEmail(form.email).then(r => {
-          if (!r.data.exists) {
-            setNotRegistered(true);
-            setError('');
-          } else {
-            setError('Incorrect password. Please try again or use "Forgot password".');
-          }
-        }).catch(() => {
-          setError(d.error || 'Login failed. Please try again.');
-        });
+        setError(d.error || 'Invalid email or password. Please check your credentials and try again.');
       } else {
         setError(d.error || 'Login failed. Please try again.');
       }
@@ -306,6 +315,8 @@ export default function Login() {
               Request access
             </Link>
           </>
+        ) : activeRole === 'itsupport' ? (
+          <span className="text-gray-400">Admin accounts are provisioned by your system administrator.</span>
         ) : (
           <>
             Need access?{' '}

@@ -60,7 +60,11 @@ async function delPattern(pattern) {
     if (keys.length) await redis.del(keys);
     return;
   }
-  const re = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+  // Escape all regex metacharacters before converting glob * to .*
+  // Without this, a pattern like 'user.profile:*' would match 'userXprofile:123'
+  // because the unescaped '.' matches any character.
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('^' + escaped.replace(/\*/g, '.*') + '$');
   for (const k of memStore.keys()) { if (re.test(k)) memStore.delete(k); }
 }
 

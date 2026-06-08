@@ -83,6 +83,20 @@
 .page-transition { animation: fadeIn 0.2s ease-in-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
+/* Modal / panel slide-up */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+.animate-slideUp { animation: slideUp 0.18s ease-out both; }
+
+/* Toast slide-in from right */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+.animate-slideInRight { animation: slideInRight 0.2s ease-out both; }
+
 /* Mobile nav safe area */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .mobile-nav { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }

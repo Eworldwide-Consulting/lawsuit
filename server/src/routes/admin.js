@@ -1,138 +1,246 @@
-const router  = require('express').Router();
-const crypto  = require('crypto');
-const { one, all, run }           = require('../db');
+const router = require('express').Router();
+const crypto = require('crypto');
+const { one, all, run }   = require('../db');
 const { requireAuth, requireRole, invalidateUserCache } = require('../middleware/auth');
+const UserRepo        = require('../repositories/user.repository');
+const EmailService    = require('../services/email.service');
+const { in24Hours }   = require('../lib/dates');
+const { parsePagination } = require('../lib/pagination');
+const config          = require('../config');
+const AuditService    = require('../services/audit.service');
 
 const guard = [requireAuth, requireRole('itsupport', 'partner')];
 
-// Helper — shared expiry logic
-function verificationExpiry() {
-  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-}
+// ── Stats ─────────────────────────────────────────────────────────────────────
 
-// ── Stats — single aggregation query instead of 6 separate COUNTs ─────────────
-
-router.get('/stats', ...guard, async (req, res) => {
+router.get('/stats', ...guard, async (req, res, next) => {
   try {
-    // One round-trip to the DB instead of six parallel COUNT(*) queries.
-    // Each subquery hits a different table so they can't be combined further,
-    // but wrapping them in a single SELECT avoids 5 extra network round-trips.
-    const row = await one(`
-      SELECT
-        (SELECT COUNT(*) FROM users)        AS users,
-        (SELECT COUNT(*) FROM matters)      AS matters,
-        (SELECT COUNT(*) FROM documents)    AS documents,
-        (SELECT COUNT(*) FROM messages)     AS messages,
-        (SELECT COUNT(*) FROM appointments) AS appointments,
-        (SELECT COUNT(*) FROM tasks)        AS tasks
-    `);
+    const [u, m, d, t, msg] = await Promise.all([
+      one(`SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN role='client'    THEN 1 ELSE 0 END) AS clients,
+        SUM(CASE WHEN role='attorney'  THEN 1 ELSE 0 END) AS attorneys,
+        SUM(CASE WHEN role='partner'   THEN 1 ELSE 0 END) AS partners,
+        SUM(CASE WHEN approval_status='pending' THEN 1 ELSE 0 END) AS pendingApprovals,
+        SUM(CASE WHEN email_verified=0 THEN 1 ELSE 0 END) AS unverifiedEmails
+        FROM users`),
+      one(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN status='active'  THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN status='at_risk' THEN 1 ELSE 0 END) AS atRisk
+        FROM matters`),
+      one(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending
+        FROM documents`),
+      one(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN status NOT IN ('done','complete') AND due_date IS NOT NULL AND due_date < ? THEN 1 ELSE 0 END) AS overdue
+        FROM tasks`, [new Date().toISOString().slice(0, 10)]),
+      one(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN read_at IS NULL THEN 1 ELSE 0 END) AS unread
+        FROM messages`),
+    ]);
     res.json({
-      users:        Number(row.users),
-      matters:      Number(row.matters),
-      documents:    Number(row.documents),
-      messages:     Number(row.messages),
-      appointments: Number(row.appointments),
-      tasks:        Number(row.tasks),
+      users:     { total: +u.total, clients: +u.clients, attorneys: +u.attorneys, partners: +u.partners, pendingApprovals: +u.pendingApprovals, unverifiedEmails: +u.unverifiedEmails },
+      matters:   { total: +m.total, active: +m.active, atRisk: +m.atRisk },
+      documents: { total: +d.total, pending: +d.pending },
+      tasks:     { total: +t.total, overdue: +t.overdue },
+      messages:  { total: +msg.total, unread: +msg.unread },
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { next(err); }
 });
 
-// ── User list ─────────────────────────────────────────────────────────────────
+// ── Pending approvals ─────────────────────────────────────────────────────────
 
-router.get('/users', ...guard, async (req, res) => {
+router.get('/pending', ...guard, async (req, res, next) => {
   try {
-    res.json(
-      await all(
-        'SELECT id, first_name, last_name, email, role, email_verified, approval_status, created_at FROM users ORDER BY created_at DESC'
-      )
-    );
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const rows = await all(`
+      SELECT u.id, u.first_name, u.last_name, u.email, u.role,
+             u.email_verified, u.approval_status, u.created_at, u.avatar_initials,
+             up.bar_number, up.state_bar, up.years_experience,
+             up.specializations, up.firm_role, up.practice_groups
+      FROM users u
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      WHERE u.approval_status = 'pending'
+      ORDER BY u.created_at ASC
+    `);
+    res.json(rows.map(r => ({
+      id: r.id, first_name: r.first_name, last_name: r.last_name,
+      email: r.email, role: r.role,
+      email_verified: r.email_verified, approval_status: r.approval_status,
+      created_at: r.created_at, avatar_initials: r.avatar_initials,
+      profile: (r.bar_number || r.state_bar || r.years_experience || r.specializations || r.firm_role || r.practice_groups)
+        ? { bar_number: r.bar_number, state_bar: r.state_bar, years_experience: r.years_experience, specializations: r.specializations, firm_role: r.firm_role, practice_groups: r.practice_groups }
+        : null,
+    })));
+  } catch (err) { next(err); }
 });
 
-// ── Lookup user by email ──────────────────────────────────────────────────────
+// ── Health check ─────────────────────────────────────────────────────────────
 
-router.get('/users/by-email', ...guard, async (req, res) => {
-  const { email } = req.query;
-  if (!email) return res.status(400).json({ error: 'email required' });
+router.get('/health', ...guard, async (req, res, next) => {
   try {
-    const user = await one(
-      'SELECT id, first_name, last_name, email, role, email_verified, approval_status, created_at FROM users WHERE email = ?',
-      [email.toLowerCase()]
+    let dbStatus = 'ok', dbMsg = null;
+    try { await one('SELECT 1 AS ping'); } catch (e) { dbStatus = 'error'; dbMsg = e.message; }
+
+    let queueStatus = 'ok';
+    try {
+      const { getQueue, QUEUE_NAMES } = require('../queue');
+      await getQueue(QUEUE_NAMES.EMAIL).getJobCounts();
+    } catch { queueStatus = 'warning'; }
+
+    const memMb = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    res.json({
+      status: dbStatus === 'ok' ? 'ok' : 'error',
+      uptime: Math.round(process.uptime()),
+      nodeVersion: process.version,
+      checks: {
+        database: { label: 'Database',  status: dbStatus,  message: dbMsg },
+        queue:    { label: 'Job Queue', status: queueStatus },
+        memory:   { label: 'Memory',    status: memMb < 400 ? 'ok' : 'warning', message: `${memMb} MB used` },
+        server:   { label: 'Server',    status: 'ok', message: process.env.NODE_ENV },
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// ── Activity log ─────────────────────────────────────────────────────────────
+
+router.get('/activity', ...guard, async (req, res, next) => {
+  try {
+    const rows = await all(`
+      SELECT a.id, a.action, a.entity, a.entity_id, a.created_at,
+             u.first_name, u.last_name, u.avatar_initials, u.role AS actor_role
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      ORDER BY a.created_at DESC
+      LIMIT 50
+    `);
+    res.json(rows.map(r => ({
+      id: r.id,
+      action: r.action,
+      actor_name:     r.first_name ? `${r.first_name} ${r.last_name}` : 'System',
+      actor_initials: r.avatar_initials || 'SY',
+      actor_role:     r.actor_role || null,
+      details:        r.action.replace(/\./g, ' · ').replace(/_/g, ' '),
+      created_at:     r.created_at,
+    })));
+  } catch (err) { next(err); }
+});
+
+// ── DB table row counts ───────────────────────────────────────────────────────
+
+router.get('/db-stats', ...guard, async (req, res, next) => {
+  try {
+    const tables = ['users', 'matters', 'documents', 'messages', 'appointments', 'tasks', 'invoices', 'audit_log'];
+    const counts = await Promise.all(
+      tables.map(t => one(`SELECT COUNT(*) AS cnt FROM \`${t}\``).catch(() => ({ cnt: 0 })))
     );
+    res.json(tables.map((t, i) => ({ table: t, count: Number(counts[i].cnt) })));
+  } catch (err) { next(err); }
+});
+
+// ── List users ────────────────────────────────────────────────────────────────
+
+router.get('/users', ...guard, async (req, res, next) => {
+  try {
+    const { limit, offset } = parsePagination(req.query);
+    res.json(await UserRepo.findAll({ limit, offset }));
+  } catch (err) { next(err); }
+});
+
+router.get('/users/by-email', ...guard, async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'email required' });
+    const user = await UserRepo.findByEmailSafe(email);
     if (!user) return res.status(404).json({ error: 'User not found', registered: false });
     res.json({ registered: true, user });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { next(err); }
 });
 
-// ── Force-verify a user's email (IT Support bypass) ───────────────────────────
+// ── User actions ──────────────────────────────────────────────────────────────
 
-router.post('/users/:id/force-verify', ...guard, async (req, res) => {
+router.post('/users/:id/force-verify', ...guard, async (req, res, next) => {
   try {
     const user = await one('SELECT id, email, email_verified FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    await run(
-      'UPDATE users SET email_verified = 1, verification_token = NULL, verification_token_expires = NULL WHERE id = ?',
-      [req.params.id]
-    );
+    await UserRepo.markVerified(req.params.id);
     await invalidateUserCache(req.params.id);
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.ADMIN_FORCE_VERIFY,
+      entity: 'user', entityId: req.params.id,
+      meta: { targetEmail: user.email },
+      ip: req.ip,
+    });
     res.json({ success: true, email: user.email, was_verified: !!user.email_verified });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { next(err); }
 });
 
-// ── Generate a fresh verification link for a user ────────────────────────────
-
-router.post('/users/:id/resend-verification', ...guard, async (req, res) => {
+router.post('/users/:id/resend-verification', ...guard, async (req, res, next) => {
   try {
     const user = await one('SELECT id, email, email_verified FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.email_verified) return res.json({ success: true, note: 'Already verified' });
-
     const token = crypto.randomBytes(32).toString('hex');
-    const exp   = verificationExpiry();
-    await run(
-      'UPDATE users SET verification_token = ?, verification_token_expires = ? WHERE id = ?',
-      [token, exp, user.id]
-    );
-
-    // Return the raw link so admin can share it manually if SMTP is broken
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    const link = `${clientUrl}/verify-email?token=${token}`;
-    res.json({ success: true, email: user.email, verification_link: link });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    await UserRepo.setVerificationToken(user.id, token, in24Hours());
+    EmailService.sendVerification(user.email, token);
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.ADMIN_RESEND_VERIFY,
+      entity: 'user', entityId: req.params.id,
+      meta: { targetEmail: user.email },
+      ip: req.ip,
+    });
+    res.json({ success: true, email: user.email });
+  } catch (err) { next(err); }
 });
 
-// ── Approve / reject ──────────────────────────────────────────────────────────
-
-router.put('/users/:id/approve', ...guard, async (req, res) => {
+router.put('/users/:id/role', ...guard, async (req, res, next) => {
   try {
-    await run("UPDATE users SET approval_status = 'approved' WHERE id = ?", [req.params.id]);
-    // Evict cached user so the approval takes effect on their next request
+    const { role } = req.body;
+    if (!['client', 'attorney', 'partner', 'itsupport'].includes(role))
+      return res.status(400).json({ error: 'Invalid role' });
+    const user = await one('SELECT id FROM users WHERE id = ?', [req.params.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await run('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
     await invalidateUserCache(req.params.id);
+    AuditService.log({
+      userId: req.user.id, action: 'admin.change_role',
+      entity: 'user', entityId: req.params.id,
+      meta: { newRole: role }, ip: req.ip,
+    });
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { next(err); }
 });
 
-router.put('/users/:id/reject', ...guard, async (req, res) => {
+router.put('/users/:id/approve', ...guard, async (req, res, next) => {
   try {
-    await run("UPDATE users SET approval_status = 'rejected' WHERE id = ?", [req.params.id]);
+    const user = await one('SELECT id, email, first_name FROM users WHERE id = ?', [req.params.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await UserRepo.setApprovalStatus(req.params.id, 'approved');
     await invalidateUserCache(req.params.id);
+    EmailService.sendAttorneyDecision(user.email, { firstName: user.first_name, decision: 'approved' });
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.ADMIN_APPROVE_USER,
+      entity: 'user', entityId: req.params.id,
+      ip: req.ip,
+    });
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { next(err); }
+});
+
+router.put('/users/:id/reject', ...guard, async (req, res, next) => {
+  try {
+    const user = await one('SELECT id, email, first_name FROM users WHERE id = ?', [req.params.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await UserRepo.setApprovalStatus(req.params.id, 'rejected');
+    await invalidateUserCache(req.params.id);
+    EmailService.sendAttorneyDecision(user.email, { firstName: user.first_name, decision: 'rejected' });
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.ADMIN_REJECT_USER,
+      entity: 'user', entityId: req.params.id,
+      ip: req.ip,
+    });
+    res.json({ success: true });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

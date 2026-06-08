@@ -1,0 +1,13 @@
+[BOOT] index.js top reached, Node v24.15.0
+[BOOT] dotenv loaded, NODE_ENV=development
+[BOOT] loading npm modules...
+[BOOT] npm modules loaded
+[BOOT] loading app modules...
+[BOOT] app modules loaded
+[BOOT] loading routes...
+[BOOT] routes loaded
+{"level":"info","time":1780935522491,"service":"trivanta-api","env":"development","port":5000,"env":"development","msg":"TriVanta API listening"}
+{"level":"info","time":1780935522502,"service":"trivanta-api","env":"development","type":"sqlite","msg":"Database initialized"}
+{"level":"info","time":1780935522505,"service":"trivanta-api","env":"development","msg":"WebSocket server initialized"}
+{"level":"info","time":1780935522505,"service":"trivanta-api","env":"development","msg":"Queue workers started"}
+{"level":"info","time":1780935522505,"service":"trivanta-api","env":"development","msg":"TriVanta fully started"}

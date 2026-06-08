@@ -8,10 +8,17 @@ function validate(schema) {
       params: req.params,
     });
     if (!result.success) {
-      const errors = result.error.flatten();
+      // Extract per-field messages from nested body issues so the client
+      // can show "email: Invalid email" rather than a generic "Validation failed".
+      const fields = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] === 'body' && issue.path[1] ? issue.path[1] : issue.path.join('.');
+        if (!fields[field]) fields[field] = issue.message;
+      }
+      const detail = Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join('; ');
       return res.status(422).json({
-        error: 'Validation failed',
-        fields: errors.fieldErrors,
+        error: detail ? `Validation failed — ${detail}` : 'Validation failed',
+        fields,
       });
     }
     req.validated = result.data;
@@ -22,8 +29,8 @@ function validate(schema) {
 const schemas = {
   register: z.object({
     body: z.object({
-      first_name: z.string().min(1).max(100),
-      last_name:  z.string().min(1).max(100),
+      firstName:  z.string().min(1).max(100),
+      lastName:   z.string().min(1).max(100),
       email:      z.string().email().max(255),
       password:   z.string().min(8).max(128),
       role:       z.enum(['client', 'attorney', 'partner', 'itsupport']).default('client'),

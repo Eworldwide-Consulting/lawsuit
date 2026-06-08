@@ -3,14 +3,26 @@ const bcrypt = require('bcryptjs');
 const { one, run, all } = require('./db');
 
 async function seed() {
-  console.log('🌱 Seeding MySQL database...');
-  const hash = await bcrypt.hash('Password123!', 12);
+  console.log('🌱 Seeding database...');
+
+  // L2: Never hardcode demo passwords in source. Use SEED_PASSWORD env var.
+  // On first deploy: set SEED_PASSWORD in .env to a strong value and store it securely.
+  // If unset in dev, a random password is generated and printed once — record it.
+  let seedPassword = process.env.SEED_PASSWORD;
+  if (!seedPassword) {
+    const crypto = require('crypto');
+    seedPassword = crypto.randomBytes(16).toString('hex');
+    console.warn('⚠️  SEED_PASSWORD not set — generated random password for demo accounts:');
+    console.warn('   ', seedPassword);
+    console.warn('   Set SEED_PASSWORD in .env to reuse the same credentials on re-seed.');
+  }
+  const hash = await bcrypt.hash(seedPassword, 12);
 
   const users = [
-    ['Admin',      'Partner',  'partner@trivanta.com',  hash, 'partner',  'AP'],
-    ['Sarah',      'Johnson',  'attorney@trivanta.com', hash, 'attorney', 'SJ'],
-    ['Michael',    'Davis',    'client@trivanta.com',   hash, 'client',   'MD'],
-    ['IT',         'Support',  'itsupport@gkasevault.io', hash, 'client',   'IS'],
+    ['Admin',      'Partner',  'partner@trivanta.com',    hash, 'partner',  'AP'],
+    ['Sarah',      'Johnson',  'attorney@trivanta.com',   hash, 'attorney', 'SJ'],
+    ['Michael',    'Davis',    'client@trivanta.com',     hash, 'client',   'MD'],
+    ['IT',         'Support',  'itsupport@gkasevault.io', hash, 'itsupport','IS'],
   ];
 
   for (const [fn,ln,email,pw,role,ini] of users) {
@@ -63,10 +75,10 @@ async function seed() {
     [client.id,mid,attorney.id,25000,'Initial Consultation Fee','consultation','pending']);
 
   console.log('✅ Demo data created');
-  console.log('   partner@trivanta.com    / Password123!');
-  console.log('   attorney@trivanta.com   / Password123!');
-  console.log('   client@trivanta.com     / Password123!');
-  console.log('   itsupport@gkasevault.io / Password123!');
+  console.log(`   partner@trivanta.com    / ${seedPassword}`);
+  console.log(`   attorney@trivanta.com   / ${seedPassword}`);
+  console.log(`   client@trivanta.com     / ${seedPassword}`);
+  console.log(`   itsupport@gkasevault.io / ${seedPassword}`);
 }
 
 seed().catch(err => { console.error('Seed failed:', err.message); process.exit(1); });

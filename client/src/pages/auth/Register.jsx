@@ -270,7 +270,16 @@ export default function Register() {
       setSubmitResult(data);
       setSubmitState('success');
     } catch (err) {
-      setServerError(err.response?.data?.error || 'Registration failed. Please try again.');
+      const d = err.response?.data || {};
+      // Map server field errors back to inline form errors when possible
+      if (d.fields && typeof d.fields === 'object') {
+        const mapped = {};
+        for (const [k, v] of Object.entries(d.fields)) {
+          mapped[k] = Array.isArray(v) ? v[0] : v;
+        }
+        setErrors(mapped);
+      }
+      setServerError(d.error || 'Registration failed. Please try again.');
       setSubmitState('error');
     }
   };

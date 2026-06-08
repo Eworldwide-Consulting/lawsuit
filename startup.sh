@@ -14,7 +14,7 @@ echo "========================================"
 echo ""
 
 # 1. Node.js check
-command -v node &>/dev/null || err "Node.js not found. Install Node.js 20.x first."
+command -v node &>/dev/null || err "Node.js not found. Install Node.js 22.x via hPanel → Node.js."
 NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
 [ "$NODE_VER" -ge 18 ] || err "Node.js 18+ required (found $(node -v))"
 ok "Node.js $(node -v)"
@@ -23,34 +23,42 @@ ok "Node.js $(node -v)"
 if [ ! -f .env ]; then
   cp .env.example .env
 
+  # Auto-generate a 64-char JWT secret
   JWT=$(node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
   sed -i "s|REPLACE_WITH_64_CHAR_RANDOM_HEX_STRING|$JWT|" .env
+
   ok ".env created with auto-generated JWT secret"
-  warn "IMPORTANT: Open .env and fill in the required values:"
+  warn "IMPORTANT: Open .env and fill in the required values before starting:"
   echo ""
   echo "  Required:"
-  echo "  SUPABASE_URL=https://your-project.supabase.co"
-  echo "  SUPABASE_SERVICE_ROLE_KEY=your-service-role-key"
-  echo "  CLIENT_URL=https://yourdomain.com"
-  echo "  SERVER_URL=https://yourdomain.com"
+  echo "  DATABASE_URL=mysql://USER:PASS@srv1619.hstgr.io:3306/u511005792_lawsuit"
+  echo "  CLIENT_URL=https://gkasevault.io"
+  echo "  SERVER_URL=https://gkasevault.io"
   echo "  SMTP_HOST / SMTP_USER / SMTP_PASS"
   echo ""
-  echo "  Optional (OAuth):"
+  echo "  Optional:"
   echo "  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET"
-  echo "  MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET"
+  echo "  SEED_PASSWORD=<password for demo accounts>"
   echo ""
   read -p "  Press Enter after editing .env to continue..." _
 else
   ok ".env already exists"
 fi
 
-# 3. Install server production dependencies (compiles native modules for Linux)
+# 3. Validate DATABASE_URL is set and is MySQL
+DB_URL=$(grep '^DATABASE_URL=' .env | cut -d= -f2-)
+if [[ -z "$DB_URL" || "$DB_URL" == mysql://USER* ]]; then
+  err "DATABASE_URL is not set in .env — please add your MySQL connection string."
+fi
+ok "DATABASE_URL found"
+
+# 4. Install server production dependencies (compiles native modules for Linux)
 echo ""
 echo "📦 Installing server dependencies..."
 npm install --prefix server --omit=dev
 ok "Server dependencies installed"
 
-# 4. Build React frontend — SKIP if client/dist already exists (pre-built in zip)
+# 5. Build React frontend — SKIP if client/dist already exists (pre-built in zip)
 echo ""
 if [ -f "client/dist/index.html" ]; then
   ok "Frontend already built (client/dist/index.html exists) — skipping build"
@@ -61,21 +69,23 @@ else
   ok "Frontend built → client/dist/"
 fi
 
-# 5. Create required directories
+# 6. Create required directories
 mkdir -p logs uploads
+chmod 755 uploads
 ok "Directories: logs/ uploads/"
 
-# 6. Seed Supabase database with demo accounts (idempotent — safe to run again)
+# 7. Seed MySQL with demo accounts (idempotent — safe to run again)
 echo ""
-read -p "  Seed demo accounts into Supabase? (partner / attorney / client) [y/N]: " DO_SEED
+read -p "  Seed demo accounts into MySQL? [y/N]: " DO_SEED
 if [[ "$DO_SEED" =~ ^[Yy]$ ]]; then
   node server/src/seed.js
-  ok "Supabase seeded with demo accounts"
+  ok "Database seeded with demo accounts"
+  warn "Check SEED_PASSWORD in .env — that is the login password for demo accounts."
 else
   ok "Skipped seed (existing data preserved)"
 fi
 
-# 7. Done
+# 8. Done
 echo ""
 echo "========================================"
 ok "Setup complete!"
@@ -83,16 +93,17 @@ echo ""
 echo "Start options:"
 echo ""
 echo "  A) Hostinger hPanel Node.js (recommended for shared/cloud hosting):"
-echo "     → Go to hPanel → Node.js → click Restart"
-echo "     → Startup file: server/src/index.js"
+echo "     → Go to hPanel → Node.js → set Entry file: server/src/index.js"
+echo "     → Click Restart"
 echo ""
 echo "  B) PM2 (for VPS):"
 echo "     npm install -g pm2"
 echo "     pm2 start ecosystem.config.js --env production"
 echo "     pm2 save && pm2 startup"
 echo ""
-echo "Demo accounts:"
-echo "  Partner:  partner@trivanta.com  / Password123!"
-echo "  Attorney: attorney@trivanta.com / Password123!"
-echo "  Client:   client@trivanta.com   / Password123!"
+echo "Demo accounts (password = SEED_PASSWORD value in .env):"
+echo "  Partner:  partner@trivanta.com"
+echo "  Attorney: attorney@trivanta.com"
+echo "  Client:   client@trivanta.com"
+echo "  IT:       itsupport@gkasevault.io"
 echo "========================================"

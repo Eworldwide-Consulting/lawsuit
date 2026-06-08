@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
@@ -16,7 +16,15 @@ const ACTION_CFG = {
 const STAGES     = ['Intake', 'Petition Filed', 'Hearing Prep', 'Guardian Appointed', 'Care Plan', 'Annual Review', 'Court Review'];
 const STAGE_KEYS = ['intake', 'petition_filed', 'hearing_prep', 'guardian_appointed', 'care_plan', 'annual_review', 'court_review'];
 
-function ReadinessGauge({ value }) {
+const statusColor = status => {
+  if (status === 'overdue') return 'text-red-600';
+  if (status === 'pending') return 'text-amber-600';
+  return 'text-gray-500';
+};
+
+const shortCat = cat => cat.replace(/^\d+\.\s*/, '');
+
+const ReadinessGauge = memo(function ReadinessGauge({ value }) {
   const r = 40, circ = 2 * Math.PI * r;
   const filled = (value / 100) * circ;
   const color = value >= 75 ? '#22c55e' : value >= 50 ? '#f59e0b' : '#ef4444';
@@ -33,7 +41,7 @@ function ReadinessGauge({ value }) {
       </div>
     </div>
   );
-}
+});
 
 export default function ClientDashboard() {
   const { user } = useAuth();
@@ -57,14 +65,6 @@ export default function ClientDashboard() {
   const readiness      = data?.readinessScore ?? 0;
   const readinessLabel = readiness >= 75 ? 'On track' : readiness >= 50 ? 'Needs attention' : 'At risk';
 
-  const statusColor = status => {
-    if (status === 'overdue') return 'text-red-600';
-    if (status === 'pending') return 'text-amber-600';
-    return 'text-gray-500';
-  };
-
-  // Strip "1. " prefix from category names for display
-  const shortCat = cat => cat.replace(/^\d+\.\s*/, '');
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto">

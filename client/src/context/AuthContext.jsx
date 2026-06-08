@@ -7,22 +7,26 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('lp_user')); } catch { return null; }
   });
-  const [loading, setLoading] = useState(true);
+  // If we already have cached user data, start as not-loading so the UI renders
+  // immediately from the cache. Token is validated in the background below.
+  const [loading, setLoading] = useState(() => {
+    try { return !localStorage.getItem('lp_user'); } catch { return true; }
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('lp_token');
-    if (token) {
-      authApi.me().then(res => {
-        setUser(res.data);
-        localStorage.setItem('lp_user', JSON.stringify(res.data));
-      }).catch(() => {
-        localStorage.removeItem('lp_token');
-        localStorage.removeItem('lp_user');
-        setUser(null);
-      }).finally(() => setLoading(false));
-    } else {
+    if (!token) {
       setLoading(false);
+      return;
     }
+    authApi.me().then(res => {
+      setUser(res.data);
+      localStorage.setItem('lp_user', JSON.stringify(res.data));
+    }).catch(() => {
+      localStorage.removeItem('lp_token');
+      localStorage.removeItem('lp_user');
+      setUser(null);
+    }).finally(() => setLoading(false));
   }, []);
 
   const login = useCallback((token, userData) => {

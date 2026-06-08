@@ -1,10 +1,5 @@
 const { getDb } = require('./database');
-
-function toPostgresSql(sql, params = []) {
-  let index = 0;
-  const text = sql.replace(/\?/g, () => `$${++index}`);
-  return { text, values: params };
-}
+const { toPostgresSql } = require('./lib/sql');
 
 async function one(sql, params = []) {
   const db = getDb();

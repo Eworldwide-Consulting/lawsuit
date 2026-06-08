@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mattersApi } from '../api';
 import { Plus, Search, Filter } from 'lucide-react';
@@ -17,12 +17,12 @@ export default function Matters() {
     mattersApi.list().then(r => setMatters(r.data)).finally(() => setLoading(false));
   }, []);
 
-  const filtered = matters.filter(m => {
+  const filtered = useMemo(() => matters.filter(m => {
     const q = search.toLowerCase();
     const matchSearch = !q || (m.description || '').toLowerCase().includes(q) || (m.client_name || '').toLowerCase().includes(q) || (m.case_number || '').includes(q);
     const matchFilter = filter === 'all' || m.status === filter || m.matter_type === filter;
     return matchSearch && matchFilter;
-  });
+  }), [matters, search, filter]);
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
