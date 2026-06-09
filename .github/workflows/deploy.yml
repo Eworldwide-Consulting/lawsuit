@@ -1,0 +1,107 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # allow manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Node.js (same version as production) ───────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package.json
+
+      # ── 3. Build React frontend ───────────────────────────────────────────────
+      - name: Install client dependencies
+        run: npm install --prefix client
+
+      - name: Build React app
+        run: npm run build --prefix client
+        # Output: client/dist/ — served by Express in production
+
+      # ── 4. Deploy via rsync + SSH ─────────────────────────────────────────────
+      # Secrets needed in GitHub → Settings → Secrets and variables → Actions:
+      #   SSH_HOST       — your Hostinger server IP or hostname
+      #   SSH_USER       — Hostinger SSH username (shown in hPanel → SSH Access)
+      #   SSH_KEY        — private key content (the full id_rsa or ed25519 private key)
+      #   SSH_PORT       — SSH port (Hostinger default is 65002 for shared, 22 for VPS)
+      #   DEPLOY_PATH    — absolute path on server, e.g. /home/u511005792/public_html/trivanta
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Accept server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      # Sync source code (excl. node_modules, .env, db) + built client/dist
+      - name: Sync files to server
+        run: |
+          rsync -az --delete \
+            --exclude 'node_modules/' \
+            --exclude 'server/node_modules/' \
+            --exclude 'client/node_modules/' \
+            --exclude 'client/src/' \
+            --exclude '.env' \
+            --exclude '*.db' \
+            --exclude '*.db-shm' \
+            --exclude '*.db-wal' \
+            --exclude 'uploads/' \
+            --exclude 'logs/' \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            -e "ssh -p ${{ secrets.SSH_PORT || 22 }}" \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      # Install server deps on Linux server (never upload Windows-compiled node_modules)
+      - name: Install server production dependencies
+        run: |
+          ssh -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ${{ secrets.DEPLOY_PATH }} && \
+             npm ci --prefix server --omit=dev && \
+             mkdir -p logs uploads && \
+             chmod 755 uploads"
+
+      # ── 5. Restart app ────────────────────────────────────────────────────────
+      # Choose the correct restart command for your hosting type:
+      #   VPS with PM2:          pm2 restart trivanta || pm2 start ecosystem.config.js --env production
+      #   hPanel shared hosting: touch server/src/index.js   (hPanel watches file mtime and auto-restarts)
+      - name: Restart application
+        run: |
+          ssh -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ${{ secrets.DEPLOY_PATH }} && \
+             if command -v pm2 &>/dev/null; then \
+               pm2 restart trivanta 2>/dev/null || pm2 start ecosystem.config.js --env production && pm2 save; \
+             else \
+               touch server/src/index.js; \
+             fi"
+
+      # ── 6. Health check ───────────────────────────────────────────────────────
+      - name: Health check
+        run: |
+          sleep 15
+          curl -fsS https://gkasevault.io/api/health | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print('Status:', d.get('status'))
+          print('Env:   ', d.get('env'))
+          print('Uptime:', d.get('uptime'), 's')
+          sys.exit(0 if d.get('status') == 'ok' else 1)
+          "
+        # If this fails, check GitHub Actions logs — the deploy itself likely succeeded
+        continue-on-error: true
