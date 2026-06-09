@@ -14,5 +14,6 @@ export { default as usersApi } from './users.api';
 export { default as paymentsApi } from './payments.api';
 export { default as adminApi } from './admin.api';
 export { default as notificationsApi } from './notifications.api';
+export { default as checklistApi }     from './checklist.api';
 
 export { default } from './http';

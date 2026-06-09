@@ -25,14 +25,16 @@ const PartnerDashboard   = lazy(() => import('./pages/dashboard/PartnerDashboard
 const ITSupportDashboard = lazy(() => import('./pages/dashboard/ITSupportDashboard'));
 
 // App pages — code split
-const Matters      = lazy(() => import('./pages/Matters'));
-const MatterDetail = lazy(() => import('./pages/MatterDetail'));
-const Documents    = lazy(() => import('./pages/Documents'));
-const Messages     = lazy(() => import('./pages/Messages'));
-const Appointments = lazy(() => import('./pages/Appointments'));
-const Settings     = lazy(() => import('./pages/Settings'));
-const CareTasks    = lazy(() => import('./pages/CareTasks'));
-const Payments     = lazy(() => import('./pages/Payments'));
+const Matters          = lazy(() => import('./pages/Matters'));
+const MatterDetail     = lazy(() => import('./pages/MatterDetail'));
+const Documents        = lazy(() => import('./pages/Documents'));
+const Messages         = lazy(() => import('./pages/Messages'));
+const Appointments     = lazy(() => import('./pages/Appointments'));
+const Settings         = lazy(() => import('./pages/Settings'));
+const CareTasks        = lazy(() => import('./pages/CareTasks'));
+const Payments         = lazy(() => import('./pages/Payments'));
+const Checklist        = lazy(() => import('./pages/Checklist'));
+const ChecklistReview  = lazy(() => import('./pages/ChecklistReview'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -96,6 +98,8 @@ export default function App() {
         <Route path="/settings" element={<RequireAuth><DashboardLayout><Settings /></DashboardLayout></RequireAuth>} />
         <Route path="/payments" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />
         <Route path="/payments/success" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />
+        <Route path="/checklist" element={<RequireAuth><DashboardLayout><Checklist /></DashboardLayout></RequireAuth>} />
+        <Route path="/checklist-review" element={<RequireAuth><DashboardLayout><ChecklistReview /></DashboardLayout></RequireAuth>} />
 
         {/* Admin panel — itsupport and partner roles only */}
         <Route path="/admin" element={<RequireAdmin><DashboardLayout><ITSupportDashboard /></DashboardLayout></RequireAdmin>} />

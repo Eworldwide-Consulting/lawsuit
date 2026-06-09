@@ -4,12 +4,13 @@ import Logo from '../ui/Logo';
 import {
   LayoutDashboard, FileText, Users, CreditCard,
   Calendar, BarChart2, MessageSquare, Settings, LogOut, FileCheck,
-  Briefcase, CheckSquare, Folder,
+  Briefcase, CheckSquare, Folder, ClipboardList, ClipboardCheck,
 } from 'lucide-react';
 
 const clientNav = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/my-case',     icon: Briefcase,       label: 'My Case' },
+  { to: '/checklist',   icon: ClipboardList,   label: 'Checklist' },
   { to: '/open-tasks',  icon: CheckSquare,     label: 'Open Tasks' },
   { to: '/documents',   icon: Folder,          label: 'Documents' },
   { to: '/appointments',icon: Calendar,        label: 'Appointments' },
@@ -19,26 +20,28 @@ const clientNav = [
 ];
 
 const attorneyNav = [
-  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/matters',      icon: FileText,        label: 'Matters' },
-  { to: '/clients',      icon: Users,           label: 'Clients' },
-  { to: '/documents',    icon: Folder,          label: 'Documents' },
-  { to: '/appointments', icon: Calendar,        label: 'Appointments' },
-  { to: '/messages',     icon: MessageSquare,   label: 'Messages' },
-  { to: '/payments',     icon: CreditCard,      label: 'Billing' },
-  { to: '/settings',     icon: Settings,        label: 'Settings' },
+  { to: '/dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/matters',           icon: FileText,        label: 'Matters' },
+  { to: '/clients',           icon: Users,           label: 'Clients' },
+  { to: '/checklist-review',  icon: ClipboardCheck,  label: 'Checklist Review' },
+  { to: '/documents',         icon: Folder,          label: 'Documents' },
+  { to: '/appointments',      icon: Calendar,        label: 'Appointments' },
+  { to: '/messages',          icon: MessageSquare,   label: 'Messages' },
+  { to: '/payments',          icon: CreditCard,      label: 'Billing' },
+  { to: '/settings',          icon: Settings,        label: 'Settings' },
 ];
 
 const partnerNav = [
-  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/matters',      icon: FileText,        label: 'Matters' },
-  { to: '/clients',      icon: Users,           label: 'Clients' },
-  { to: '/documents',    icon: Folder,          label: 'Documents' },
-  { to: '/appointments', icon: Calendar,        label: 'Appointments' },
-  { to: '/messages',     icon: MessageSquare,   label: 'Messages' },
-  { to: '/payments',     icon: CreditCard,      label: 'Billing' },
-  { to: '/reports',      icon: BarChart2,       label: 'Reports' },
-  { to: '/settings',     icon: Settings,        label: 'Settings' },
+  { to: '/dashboard',        icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/matters',          icon: FileText,        label: 'Matters' },
+  { to: '/clients',          icon: Users,           label: 'Clients' },
+  { to: '/checklist-review', icon: ClipboardCheck,  label: 'Checklist Review' },
+  { to: '/documents',        icon: Folder,          label: 'Documents' },
+  { to: '/appointments',     icon: Calendar,        label: 'Appointments' },
+  { to: '/messages',         icon: MessageSquare,   label: 'Messages' },
+  { to: '/payments',         icon: CreditCard,      label: 'Billing' },
+  { to: '/reports',          icon: BarChart2,       label: 'Reports' },
+  { to: '/settings',         icon: Settings,        label: 'Settings' },
 ];
 
 const itsupportNav = [

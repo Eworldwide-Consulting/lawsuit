@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import Sidebar from './Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { messagesApi } from '../../api';
-import { Bell, Menu, Search, LayoutDashboard, FileText, Folder, Calendar, MessageSquare } from 'lucide-react';
+import { Bell, Menu, Search, LayoutDashboard, FileText, Folder, Calendar, MessageSquare, ClipboardList } from 'lucide-react';
 import TwoFASetupModal from '../ui/TwoFASetupModal';
 import NotificationPanel from '../notifications/NotificationPanel';
 import Avatar from '../ui/Avatar';
@@ -48,11 +48,11 @@ export default function DashboardLayout({ children }) {
   }, []);
 
   const mobileClientNav = [
-    { to: '/dashboard',    icon: LayoutDashboard, label: 'Home'     },
-    { to: '/my-case',      icon: FileText,        label: 'Case'     },
-    { to: '/documents',    icon: Folder,          label: 'Docs'     },
-    { to: '/appointments', icon: Calendar,        label: 'Appts'    },
-    { to: '/messages',     icon: MessageSquare,   label: 'Messages' },
+    { to: '/dashboard',    icon: LayoutDashboard, label: 'Home'      },
+    { to: '/my-case',      icon: FileText,        label: 'Case'      },
+    { to: '/checklist',    icon: ClipboardList,   label: 'Checklist' },
+    { to: '/documents',    icon: Folder,          label: 'Docs'      },
+    { to: '/messages',     icon: MessageSquare,   label: 'Messages'  },
   ];
 
   const mobileStaffNav = [

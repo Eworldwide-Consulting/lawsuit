@@ -51,6 +51,7 @@ const userRoutes        = require('./routes/users');
 const paymentRoutes     = require('./routes/payments');
 const adminRoutes         = require('./routes/admin');
 const notificationRoutes  = require('./routes/notifications');
+const checklistRoutes     = require('./routes/checklists');
 console.log('[BOOT] routes loaded');
 
 const app          = express();
@@ -158,6 +159,7 @@ app.use('/api/users',        userRoutes);
 app.use('/api/payments',       paymentRoutes);
 app.use('/api/admin',          adminRoutes);
 app.use('/api/notifications',  notificationRoutes);
+app.use('/api/checklists',     checklistRoutes);
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', async (req, res) => {
