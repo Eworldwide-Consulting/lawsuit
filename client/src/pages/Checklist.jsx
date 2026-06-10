@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ClipboardList, RefreshCw, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardList, RefreshCw, AlertCircle, Briefcase } from 'lucide-react';
 import { checklistApi, mattersApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import MatterReadinessBar from '../components/checklist/MatterReadinessBar';
@@ -16,24 +17,36 @@ const MATTER_TYPE_LABELS = {
 };
 
 export default function Checklist() {
-  const { user } = useAuth();
+  const { user }  = useAuth();
+  const navigate  = useNavigate();
   const [matters, setMatters]   = useState([]);
   const [matterId, setMatterId] = useState(null);
-  const [data, setData]         = useState(null);   // { matterType, sections, progress, totalItems }
+  const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
 
-  // Load the user's matters to pick from
   useEffect(() => {
-    mattersApi.list().then(r => {
-      const list = r.data?.matters || r.data || [];
-      setMatters(list);
-      if (list.length > 0) setMatterId(list[0].id);
-    }).catch(() => setError('Could not load matters.'));
+    mattersApi.list()
+      .then(r => {
+        const list = r.data?.matters || r.data || [];
+        setMatters(list);
+        if (list.length > 0) {
+          setMatterId(list[0].id);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        setError('Could not load matters.');
+        setLoading(false);
+      });
   }, []);
 
   const load = useCallback(() => {
-    if (!matterId) return;
+    if (!matterId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     checklistApi.getByMatter(matterId)
@@ -156,11 +169,19 @@ export default function Checklist() {
 
       {/* No matter */}
       {!loading && !error && matters.length === 0 && (
-        <EmptyState
-          icon={ClipboardList}
-          title="No active matter"
-          description="Your checklist will appear once your attorney opens a matter for your case."
-        />
+        <div className="card p-10 text-center">
+          <ClipboardList size={40} className="mx-auto text-gray-300 mb-3" />
+          <div className="text-gray-700 font-semibold mb-1">No active matter yet</div>
+          <div className="text-gray-400 text-sm mb-5">
+            Your document checklist will appear once your case is set up. Start by telling us about your situation.
+          </div>
+          <button
+            onClick={() => navigate('/my-case')}
+            className="inline-flex items-center gap-2 bg-[#0f2057] hover:bg-[#1a3476] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+          >
+            <Briefcase size={16} /> Set Up My Case
+          </button>
+        </div>
       )}
 
       {/* Checklist */}

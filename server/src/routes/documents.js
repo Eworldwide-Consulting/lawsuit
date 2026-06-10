@@ -58,8 +58,11 @@ router.get('/', requireAuth, async (req, res, next) => {
 
     if (req.user.role === 'client') {
       const matterRows = await MatterRepo.idsByClientId(req.user.id);
-      if (!matterRows.length) return res.json([]);
-      return res.json(await DocumentRepo.findByMatters(matterRows.map(m => m.id), pagination));
+      // Include documents from the client's matters AND any they uploaded directly
+      // (matter_id=null) — those are uploaded via the Documents page without a matter.
+      return res.json(
+        await DocumentRepo.findByClientAll(req.user.id, matterRows.map(m => m.id), pagination)
+      );
     }
 
     res.json(await DocumentRepo.findAll(pagination));

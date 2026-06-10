@@ -36,8 +36,12 @@ export default function Documents() {
     try {
       const fd = new FormData();
       Array.from(files).forEach(f => fd.append('files', f));
-      await documentsApi.upload(fd);
-      await load();
+      const res = await documentsApi.upload(fd);
+      // Optimistically prepend the new docs so they appear immediately,
+      // then reload to get the server-assigned IDs and final state.
+      const newDocs = Array.isArray(res.data) ? res.data : [];
+      if (newDocs.length) setDocs(prev => [...newDocs, ...prev]);
+      load(); // background reload — don't await so UI stays responsive
       toast.success(`${files.length} file${files.length !== 1 ? 's' : ''} uploaded`);
     } catch {
       toast.error('Upload failed. Please try again.');

@@ -17,6 +17,23 @@ const DocumentRepository = {
     );
   },
 
+  // All docs a client can see: their matter docs + any they uploaded without a matter
+  findByClientAll(userId, matterIds, { limit, offset } = {}) {
+    if (matterIds.length > 0) {
+      const il = inList(matterIds);
+      return all(
+        `SELECT * FROM documents
+         WHERE matter_id IN (${il}) OR (user_id = ? AND matter_id IS NULL)
+         ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        [...matterIds, userId, limit, offset]
+      );
+    }
+    return all(
+      `SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      [userId, limit, offset]
+    );
+  },
+
   findAll({ limit, offset } = {}) {
     return all(
       'SELECT * FROM documents ORDER BY created_at DESC LIMIT ? OFFSET ?',

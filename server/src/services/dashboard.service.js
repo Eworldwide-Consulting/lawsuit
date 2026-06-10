@@ -6,6 +6,7 @@ const MessageRepo     = require('../repositories/message.repository');
 const InvoiceRepo     = require('../repositories/invoice.repository');
 const { computeReadinessScore, aggregateDocsByCategory, buildDeadlines } = require('../domain/matter');
 const { getDb } = require('../database');
+const { all: dbAll } = require('../db');
 const { todayIso, nowIso, daysUntil } = require('../lib/dates');
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -37,14 +38,42 @@ const DashboardService = {
       MessageRepo.findRecentForUser(userId, 5),
     ]);
 
-    const tasks       = allActiveTasks.slice(0, 6);
+    // Checklist-based document readiness — use the checklist items for the
+    // client's primary matter as the source of truth for "required docs".
+    let checklistTotal    = 0;
+    let checklistAccepted = 0;
+    let checklistSections = [];
+    if (matter) {
+      try {
+        const clItems = await dbAll(
+          `SELECT status, default_status, section FROM matter_checklist_items WHERE matter_id = ?`,
+          [matter.id]
+        );
+        const neededNow    = clItems.filter(i => i.default_status === 'needed_now');
+        checklistTotal    = neededNow.length;
+        checklistAccepted = neededNow.filter(i => i.status === 'accepted').length;
+
+        // Per-section progress for the upload center widget
+        const secMap = {};
+        for (const i of clItems) {
+          const k = i.section || 'Other';
+          if (!secMap[k]) secMap[k] = { category: k, uploaded: 0, total: 0 };
+          secMap[k].total++;
+          if (['submitted', 'accepted'].includes(i.status)) secMap[k].uploaded++;
+        }
+        checklistSections = Object.values(secMap).slice(0, 5);
+      } catch (_) {}
+    }
+
+    const tasks        = allActiveTasks.slice(0, 6);
     const deadlineRows = allActiveTasks.filter(t => t.due_date && t.due_date > today).slice(0, 4);
 
-    const requiredDocs  = allDocs.filter(d => d.required);
-    const totalDocs     = requiredDocs.length;
-    const completedDocs = requiredDocs.filter(d => d.status === 'uploaded').length;
-    const uploadedDocs  = aggregateDocsByCategory(allDocs);
-    const deadlines     = buildDeadlines(matter, deadlineRows);
+    // Fall back to document-table counts if checklist isn't seeded yet
+    const requiredDocs   = allDocs.filter(d => d.required);
+    const totalDocs      = checklistTotal  || requiredDocs.length;
+    const completedDocs  = checklistAccepted || requiredDocs.filter(d => d.status === 'uploaded').length;
+    const uploadedDocs   = checklistSections.length ? checklistSections : aggregateDocsByCategory(allDocs);
+    const deadlines      = buildDeadlines(matter, deadlineRows);
 
     return {
       matter,
@@ -52,7 +81,7 @@ const DashboardService = {
       overdueTasks:        taskStats.overdue,
       tasks,
       upcomingAppts:       appts,
-      requiredDocsPending: totalDocs - completedDocs,
+      requiredDocsPending: Math.max(0, totalDocs - completedDocs),
       uploadedDocs,
       messages:            msgs,
       deadlines,
@@ -62,7 +91,10 @@ const DashboardService = {
         completedTasks: taskStats.completed,
         overdueTasks:   taskStats.overdue,
       }),
-      totalDocs, completedDocs,
+      totalDocs,
+      completedDocs,
+      checklistTotal,
+      checklistAccepted,
       totalTasks:     taskStats.total,
       completedTasks: taskStats.completed,
     };

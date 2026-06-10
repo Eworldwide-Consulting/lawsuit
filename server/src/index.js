@@ -59,22 +59,29 @@ const server       = http.createServer(app);
 const { port: PORT, isProduction, client } = config;
 const isDev        = !isProduction;
 
+// Sync diagnostic — visible in hPanel runtime log viewer (console.log only)
+console.log('[BOOT] PORT=' + PORT + ' isProduction=' + isProduction);
+console.log('[BOOT] JWT_SECRET set=' + !!process.env.JWT_SECRET + ' len=' + (process.env.JWT_SECRET || '').length);
+console.log('[BOOT] DATABASE_URL set=' + !!process.env.DATABASE_URL);
+console.log('[BOOT] NODE_ENV=' + process.env.NODE_ENV);
+
 app.set('trust proxy', 1);
 
 // ── Production guard ──────────────────────────────────────────────────────────
-// Fail fast if critical env vars are missing — catches misconfigured deploys
-// where NODE_ENV=production wasn't set but DATABASE_URL was provided.
 if (isProduction) {
   const required = ['JWT_SECRET', 'DATABASE_URL'];
   const missing  = required.filter(k => !process.env[k]);
   if (missing.length) {
+    console.error('[FATAL] Missing required env vars: ' + missing.join(', '));
     logger.fatal({ missing }, 'Missing required production env vars — aborting');
     process.exit(1);
   }
   if (process.env.JWT_SECRET?.length < 32) {
+    console.error('[FATAL] JWT_SECRET too short: ' + process.env.JWT_SECRET.length + ' chars (need 32+)');
     logger.fatal('JWT_SECRET is too short for production (min 32 chars) — aborting');
     process.exit(1);
   }
+  console.log('[BOOT] production guard passed');
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -217,6 +224,7 @@ app.use(errorHandler);
 async function start() {
   // Listen first so the proxy can reach us immediately, preventing 504 timeouts
   await new Promise(resolve => server.listen(PORT, resolve));
+  console.log('[BOOT] listening on port ' + PORT);
   logger.info({ port: PORT, env: process.env.NODE_ENV }, 'TriVanta API listening');
 
   try {
@@ -227,6 +235,7 @@ async function start() {
       ),
     ]);
   } catch (err) {
+    console.error('[FATAL] Database init failed: ' + err.message);
     logger.fatal({ err }, 'Database init failed — shutting down');
     process.exit(1);
   }
@@ -235,12 +244,14 @@ async function start() {
   try {
     await runMigrations();
   } catch (err) {
+    console.error('[FATAL] Migrations failed: ' + err.message);
     logger.fatal({ err }, 'Migrations failed — shutting down');
     process.exit(1);
   }
 
   await ws.init(server);
   startWorkers();
+  console.log('[BOOT] fully started');
   logger.info('TriVanta fully started');
 }
 
@@ -271,6 +282,8 @@ process.on('unhandledRejection', (reason) => {
 });
 
 start().catch((err) => {
+  console.error('[FATAL] start() failed: ' + err.message);
+  console.error('[FATAL] Stack: ' + err.stack);
   logger.fatal({ err }, 'Failed to start server');
   process.exit(1);
 });

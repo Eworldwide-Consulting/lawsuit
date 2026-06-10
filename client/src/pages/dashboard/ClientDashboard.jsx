@@ -2,7 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare, Shield, Check, CheckCircle } from 'lucide-react';
+import { Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare, Shield, Check, CheckCircle, Briefcase, ArrowRight, ClipboardList } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
 
 // Fixed icon + colour per action type — same size & min-width for every button
@@ -74,6 +74,27 @@ export default function ClientDashboard() {
         <p className="text-gray-500 text-sm">Here's what needs your attention today.</p>
       </div>
 
+      {/* No-matter onboarding banner */}
+      {!data?.matter && (
+        <div className="rounded-2xl bg-gradient-to-r from-[#0f2057] to-[#1a3476] text-white p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+            <Briefcase size={20} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-base">Set up your case to get started</div>
+            <div className="text-blue-200 text-sm mt-0.5">
+              Tell us what type of legal matter you need help with and your legal team will be ready to assist.
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/my-case')}
+            className="flex items-center gap-2 bg-white text-[#0f2057] font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-blue-50 transition-colors whitespace-nowrap flex-shrink-0"
+          >
+            Get Started <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -94,7 +115,7 @@ export default function ClientDashboard() {
           {
             label: 'Required Documents',
             value: data?.requiredDocsPending ?? 0,
-            sub: `${data?.completedDocs ?? 0} of ${data?.totalDocs ?? 0} uploaded`,
+            sub: `${data?.checklistAccepted ?? data?.completedDocs ?? 0} of ${data?.checklistTotal ?? data?.totalDocs ?? 0} accepted`,
             icon: FileText,
             color: 'text-orange-600 bg-orange-50',
           },
@@ -276,8 +297,11 @@ export default function ClientDashboard() {
             <ReadinessGauge value={readiness} />
             <div className="mt-3 grid grid-cols-3 gap-1 text-center text-xs">
               <div>
-                <div className="font-bold text-gray-700">{data?.completedDocs ?? 0}/{data?.totalDocs ?? 0}</div>
-                <div className="text-gray-400">Documents</div>
+                <div className="font-bold text-gray-700">
+                  {data?.checklistAccepted ?? data?.completedDocs ?? 0}/
+                  {data?.checklistTotal    ?? data?.totalDocs     ?? 0}
+                </div>
+                <div className="text-gray-400">Docs</div>
               </div>
               <div>
                 <div className="font-bold text-gray-700">{data?.completedTasks ?? 0}/{data?.totalTasks ?? 0}</div>
