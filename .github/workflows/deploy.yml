@@ -104,6 +104,7 @@ jobs:
           echo "✅ .env deployed"
 
       # ── 7. Install server dependencies on Linux server ────────────────────────
+      # bash -l loads ~/.bashrc / ~/.profile so NVM and npm are on PATH
       - name: Install server production dependencies
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -112,11 +113,11 @@ jobs:
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd ${{ secrets.DEPLOY_PATH }} && \
+            "bash -l -c 'cd ${{ secrets.DEPLOY_PATH }} && \
              npm install --prefix server --omit=dev && \
              mkdir -p logs uploads && \
              chmod 755 uploads && \
-             echo '✅ Dependencies installed'"
+             echo ✅ Dependencies installed'"
 
       # ── 8. Restart application ────────────────────────────────────────────────
       # hPanel restarts the app when the entry file mtime changes (touch trick)
@@ -128,15 +129,15 @@ jobs:
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd ${{ secrets.DEPLOY_PATH }} && \
+            "bash -l -c 'cd ${{ secrets.DEPLOY_PATH }} && \
              if command -v pm2 &>/dev/null; then \
                pm2 restart trivanta 2>/dev/null || \
                pm2 start ecosystem.config.js --env production && pm2 save; \
-               echo '✅ Restarted via PM2'; \
+               echo ✅ Restarted via PM2; \
              else \
                touch server/src/index.js; \
-               echo '✅ Restarted via hPanel touch trigger'; \
-             fi"
+               echo ✅ Restarted via hPanel touch trigger; \
+             fi'"
 
       # ── 9. Wait for boot and health-check ────────────────────────────────────
       - name: Health check
