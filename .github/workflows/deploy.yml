@@ -143,34 +143,41 @@ jobs:
             '"
 
       # ── 7b. Syntax check before touching the live process ───────────────────
-      # node --check catches parse errors that would crash the process on start.
-      # Also verifies every top-level require() can be resolved (module not found
-      # errors surface here rather than after restart causes downtime).
+      # The module check is written to a temp file locally and SCP'd to the server.
+      # This avoids shell-quoting conflicts: single quotes inside node -e strings
+      # cannot be escaped when the outer bash -c argument is itself single-quoted.
       - name: Pre-restart syntax & module check
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
+          # Write the module check script locally — no quoting issues
+          cat > /tmp/trivanta_modcheck.js << 'JSEOF'
+          var mods = ['express','mysql2','bcryptjs','jsonwebtoken','multer','dotenv','pino','compression'];
+          var missing = [];
+          mods.forEach(function(m) {
+            try { require('./server/node_modules/' + m); }
+            catch(e) { missing.push(m); }
+          });
+          if (missing.length) {
+            console.error('MISSING MODULES: ' + missing.join(', '));
+            process.exit(1);
+          }
+          console.log('Critical modules OK (' + mods.length + ')');
+          JSEOF
+
+          # Upload the check script to the server
+          sshpass -e scp \
+            -P ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            /tmp/trivanta_modcheck.js \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/trivanta_modcheck.js
+
+          # Run syntax check + module check; clean up temp file on success or failure
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "bash -l -c '
-              set -e
-              cd ${{ secrets.DEPLOY_PATH }}
-              node --check server/src/index.js
-              echo \"✅ Syntax OK\"
-              # Verify critical runtime modules are present
-              node -e \"
-                [
-                  'express', 'mysql2', 'bcryptjs', 'jsonwebtoken',
-                  'multer',  'dotenv', 'pino',     'compression'
-                ].forEach(m => {
-                  try { require('./server/node_modules/' + m); }
-                  catch(e) { console.error('MISSING MODULE:', m); process.exit(1); }
-                });
-                console.log('✅ Critical modules present');
-              \"
-            '"
+            "bash -l -c 'set -e; cd ${{ secrets.DEPLOY_PATH }}; node --check server/src/index.js && echo \"Syntax OK\"; node /tmp/trivanta_modcheck.js; rm -f /tmp/trivanta_modcheck.js && echo \"Module check done\"'"
 
       # ── 8. Restart application ───────────────────────────────────────────────
       - name: Restart application
@@ -298,3 +305,31 @@ jobs:
 
           echo ""
           echo "📋 Check the hPanel Logs panel at: https://hpanel.hostinger.com"
+
+      # ── 11. Email notification on failure ───────────────────────────────────
+      # Requires: SMTP_USER and SMTP_PASS secrets (already used for the app).
+      # To send to a different address, add a NOTIFY_EMAIL secret and replace
+      # the `to:` value below with: ${{ secrets.NOTIFY_EMAIL }}
+      - name: Send failure email notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          secure: false
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASS }}
+          subject: "Deploy FAILED — gkasevault.io — ${{ github.ref_name }}"
+          to: ${{ secrets.SMTP_USER }}
+          from: TriVanta Deploy <${{ secrets.SMTP_USER }}>
+          body: |
+            Deployment to gkasevault.io has FAILED.
+
+            Branch   : ${{ github.ref_name }}
+            Commit   : ${{ github.sha }}
+            Pushed by: ${{ github.actor }}
+
+            Full logs:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            — TriVanta CI/CD
