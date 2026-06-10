@@ -73,6 +73,10 @@ const DocumentRepository = {
     return one('SELECT * FROM documents WHERE id = ?', [r.insertId]);
   },
 
+  update(id, { name, category }) {
+    return run('UPDATE documents SET name = ?, category = ? WHERE id = ?', [name, category ?? null, id]);
+  },
+
   updateStatus(id, status) {
     return run('UPDATE documents SET status = ? WHERE id = ?', [status, id]);
   },

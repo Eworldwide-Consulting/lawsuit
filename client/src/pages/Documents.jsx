@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { documentsApi } from '../api';
-import { Upload, Download, Trash2, Search, FileText, File } from 'lucide-react';
+import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import Badge, { statusVariant } from '../components/ui/Badge';
@@ -9,6 +9,17 @@ import { useToast } from '../context/ToastContext';
 
 const fmtSize = (bytes) =>
   bytes > 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
+
+const CATEGORIES = [
+  'Medical Records',
+  'Financial Documents',
+  'Legal Filings',
+  'Court Orders',
+  'Identity Documents',
+  'Insurance Documents',
+  'Correspondence',
+  'Other',
+];
 
 export default function Documents() {
   const toast = useToast();
@@ -22,6 +33,11 @@ export default function Documents() {
   // Confirm-delete state
   const [confirmId, setConfirmId]       = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Edit state
+  const [editDoc, setEditDoc]         = useState(null);
+  const [editForm, setEditForm]       = useState({ name: '', category: '' });
+  const [editLoading, setEditLoading] = useState(false);
 
   const fileRef = useRef();
 
@@ -37,11 +53,9 @@ export default function Documents() {
       const fd = new FormData();
       Array.from(files).forEach(f => fd.append('files', f));
       const res = await documentsApi.upload(fd);
-      // Optimistically prepend the new docs so they appear immediately,
-      // then reload to get the server-assigned IDs and final state.
       const newDocs = Array.isArray(res.data) ? res.data : [];
       if (newDocs.length) setDocs(prev => [...newDocs, ...prev]);
-      load(); // background reload — don't await so UI stays responsive
+      load();
       toast.success(`${files.length} file${files.length !== 1 ? 's' : ''} uploaded`);
     } catch {
       toast.error('Upload failed. Please try again.');
@@ -62,6 +76,26 @@ export default function Documents() {
     } finally {
       setDeleteLoading(false);
       setConfirmId(null);
+    }
+  }
+
+  function openEdit(doc) {
+    setEditDoc(doc);
+    setEditForm({ name: doc.name, category: doc.category || '' });
+  }
+
+  async function saveEdit() {
+    if (!editDoc) return;
+    setEditLoading(true);
+    try {
+      const res = await documentsApi.update(editDoc.id, editForm);
+      setDocs(d => d.map(x => x.id === editDoc.id ? { ...x, ...res.data } : x));
+      toast.success('Document updated');
+      setEditDoc(null);
+    } catch {
+      toast.error('Update failed. Please try again.');
+    } finally {
+      setEditLoading(false);
     }
   }
 
@@ -175,7 +209,7 @@ export default function Documents() {
             <table className="w-full text-sm" role="table" aria-label="Documents">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['File Name', 'Category', 'Size', 'Status', 'Uploaded', ''].map(h => (
+                  {['File Name', 'Category', 'Size', 'Status', 'Uploaded', 'Actions'].map(h => (
                     <th key={h} scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       {h}
                     </th>
@@ -211,15 +245,38 @@ export default function Documents() {
                         {doc.file_path && (
                           <a
                             href={documentsApi.downloadUrl(doc.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`View ${doc.name}`}
+                            title="View document"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          >
+                            <Eye size={14} />
+                          </a>
+                        )}
+                        {doc.file_path && (
+                          <a
+                            href={documentsApi.downloadUrl(doc.id)}
+                            download
                             aria-label={`Download ${doc.name}`}
+                            title="Download"
                             className="p-1.5 text-gray-400 hover:text-[#0f2057] hover:bg-gray-100 rounded transition-colors"
                           >
                             <Download size={14} />
                           </a>
                         )}
                         <button
+                          onClick={() => openEdit(doc)}
+                          aria-label={`Edit ${doc.name}`}
+                          title="Edit details"
+                          className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
                           onClick={() => setConfirmId(doc.id)}
                           aria-label={`Delete ${doc.name}`}
+                          title="Delete"
                           className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                         >
                           <Trash2 size={14} />
@@ -245,6 +302,74 @@ export default function Documents() {
         onCancel={() => setConfirmId(null)}
         loading={deleteLoading}
       />
+
+      {/* Edit modal */}
+      {editDoc && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-800">Edit Document</h2>
+              <button
+                onClick={() => setEditDoc(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="form-label">File Name</label>
+                <input
+                  value={editForm.name}
+                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                  className="form-input"
+                  placeholder="Document name"
+                />
+              </div>
+              <div>
+                <label className="form-label">Category</label>
+                <select
+                  value={editForm.category}
+                  onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                  className="form-input"
+                >
+                  <option value="">— Select category —</option>
+                  {CATEGORIES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              {editForm.category === '' && (
+                <div>
+                  <label className="form-label">Or enter custom category</label>
+                  <input
+                    value={editForm.category}
+                    onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                    className="form-input"
+                    placeholder="e.g. Tax Returns"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-6">
+              <button
+                onClick={() => setEditDoc(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editLoading || !editForm.name.trim()}
+                className="px-4 py-2 text-sm font-semibold bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors"
+              >
+                {editLoading ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

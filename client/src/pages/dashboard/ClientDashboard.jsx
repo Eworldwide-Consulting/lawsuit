@@ -99,9 +99,11 @@ export default function ClientDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {
-            label: 'Open Tasks',
+            label: 'Tasks',
             value: data?.openTasks ?? 0,
-            sub: `${data?.overdueTasks ?? 0} overdue`,
+            sub: (data?.checklistTotal ?? 0) > 0
+              ? `${Math.max(0, (data?.checklistTotal ?? 0) - (data?.checklistAccepted ?? 0))} checklist pending · ${data?.overdueTasks ?? 0} overdue`
+              : `${data?.overdueTasks ?? 0} overdue`,
             icon: CheckSquare,
             color: 'text-blue-600 bg-blue-50',
           },

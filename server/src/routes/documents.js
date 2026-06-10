@@ -97,6 +97,19 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res, 
   } catch (err) { next(err); }
 });
 
+router.patch('/:id', requireAuth, async (req, res, next) => {
+  try {
+    const doc = await DocumentRepo.findById(req.params.id);
+    if (!doc) throw new NotFoundError('Document');
+    if (doc.user_id !== req.user.id && !isStaff(req.user.role))
+      throw new ForbiddenError();
+    const { name, category } = req.body;
+    if (!name?.trim()) throw new ValidationError('name required');
+    await DocumentRepo.update(req.params.id, { name: name.trim(), category: category || null });
+    res.json(await DocumentRepo.findById(req.params.id));
+  } catch (err) { next(err); }
+});
+
 router.put('/:id/status', requireAuth, requireRole('attorney', 'partner', 'itsupport'), async (req, res, next) => {
   try {
     if (!DOCUMENT_STATUSES.includes(req.body.status))

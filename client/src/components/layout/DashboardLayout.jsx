@@ -20,10 +20,10 @@ export default function DashboardLayout({ children }) {
   const socketRef  = useRef(null);
   const bellRef    = useRef(null);
 
-  // 2FA prompt (mandatory for attorneys/partners, once for clients)
+  // 2FA prompt — mandatory only for partners; attorneys and clients see it once (optional)
   useEffect(() => {
     if (!user) return;
-    const mandatory  = user.role === 'attorney' || user.role === 'partner';
+    const mandatory  = user.role === 'partner';
     const shouldShow = mandatory
       ? !user.two_fa_enabled
       : !user.two_fa_enabled && !user.two_fa_prompt_shown;
@@ -206,7 +206,7 @@ export default function DashboardLayout({ children }) {
       {show2FA && (
         <TwoFASetupModal
           onClose={() => setShow2FA(false)}
-          mandatory={user?.role === 'attorney' || user?.role === 'partner'}
+          mandatory={user?.role === 'partner'}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+﻿import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Logo from '../ui/Logo';
 import {
@@ -11,7 +11,7 @@ const clientNav = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/my-case',     icon: Briefcase,       label: 'My Case' },
   { to: '/checklist',   icon: ClipboardList,   label: 'Checklist' },
-  { to: '/open-tasks',  icon: CheckSquare,     label: 'Open Tasks' },
+  { to: '/open-tasks',  icon: CheckSquare,     label: 'Tasks' },
   { to: '/documents',   icon: Folder,          label: 'Documents' },
   { to: '/appointments',icon: Calendar,        label: 'Appointments' },
   { to: '/messages',    icon: MessageSquare,   label: 'Messages' },
