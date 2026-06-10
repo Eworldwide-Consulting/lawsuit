@@ -35,6 +35,7 @@ const CareTasks        = lazy(() => import('./pages/CareTasks'));
 const Payments         = lazy(() => import('./pages/Payments'));
 const Checklist        = lazy(() => import('./pages/Checklist'));
 const ChecklistReview  = lazy(() => import('./pages/ChecklistReview'));
+const MyCase           = lazy(() => import('./pages/MyCase'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -89,7 +90,7 @@ export default function App() {
         <Route path="/dashboard" element={<RequireAuth><DashboardLayout><DashboardRouter /></DashboardLayout></RequireAuth>} />
         <Route path="/matters" element={<RequireAuth><DashboardLayout><Matters /></DashboardLayout></RequireAuth>} />
         <Route path="/matters/:id" element={<RequireAuth><DashboardLayout><MatterDetail /></DashboardLayout></RequireAuth>} />
-        <Route path="/my-case" element={<RequireAuth><DashboardLayout><MatterDetail /></DashboardLayout></RequireAuth>} />
+        <Route path="/my-case" element={<RequireAuth><DashboardLayout><MyCase /></DashboardLayout></RequireAuth>} />
         <Route path="/documents" element={<RequireAuth><DashboardLayout><Documents /></DashboardLayout></RequireAuth>} />
         <Route path="/messages" element={<RequireAuth><DashboardLayout><Messages /></DashboardLayout></RequireAuth>} />
         <Route path="/appointments" element={<RequireAuth><DashboardLayout><Appointments /></DashboardLayout></RequireAuth>} />

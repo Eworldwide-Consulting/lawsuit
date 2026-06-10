@@ -163,16 +163,22 @@ app.use('/api/checklists',     checklistRoutes);
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', async (req, res) => {
-  const [cacheHealth, queues] = await Promise.allSettled([
+  const { one } = require('./db');
+  const [cacheHealth, queues, dbPing] = await Promise.allSettled([
     cache.healthCheck(),
     queueStats(),
+    one('SELECT 1 AS alive'),
   ]);
-  res.json({
-    status:   'ok',
+  const dbOk     = dbPing.status === 'fulfilled';
+  const allOk    = dbOk;
+  const httpCode = allOk ? 200 : 503;
+  res.status(httpCode).json({
+    status:   allOk ? 'ok' : 'degraded',
     version:  process.env.npm_package_version || '1.0.0',
     env:      process.env.NODE_ENV,
     uptime:   Math.floor(process.uptime()),
     memory:   process.memoryUsage(),
+    db:       dbOk ? 'ok' : { error: dbPing.reason?.message || 'unreachable' },
     cache:    cacheHealth.status === 'fulfilled' ? cacheHealth.value : { status: 'error' },
     queues:   queues.status === 'fulfilled' ? queues.value : {},
     circuits: Object.fromEntries(Object.entries(breakers).map(([k, b]) => [k, b.toJSON()])),

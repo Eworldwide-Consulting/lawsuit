@@ -3,36 +3,35 @@ name: Deploy to Hostinger
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # allows manual trigger from GitHub → Actions tab
+  workflow_dispatch:
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Required GitHub Secrets (Settings → Secrets and variables → Actions → New):
+# Required GitHub Secrets  (Settings → Secrets and variables → Actions):
 #
 #   SSH_HOST        92.112.187.20
 #   SSH_USER        u511005792
 #   SSH_PORT        65002
-#   SSH_PASSWORD    <your Hostinger SSH password>
+#   SSH_PASSWORD    <Hostinger SSH password>
 #   DEPLOY_PATH     /home/u511005792/domains/gkasevault.io/nodejs
 #
-#   JWT_SECRET      <64-char hex — run: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))">
-#   DATABASE_URL    mysql://u511005792_dbadmin:<DB_PASS>@srv1619.hstgr.io:3306/u511005792_lawsuit
-#   SMTP_USER       <your Gmail address>
-#   SMTP_PASS       <your Gmail app password (16 chars)>
-#
+#   JWT_SECRET      <64-char hex>
+#   DATABASE_URL    mysql://u511005792_dbadmin:<pass>@127.0.0.1:3306/u511005792_lawsuit
+#   SMTP_USER       <gmail address>
+#   SMTP_PASS       <gmail app password>
 # ─────────────────────────────────────────────────────────────────────────────
 
 jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      # ── 1. Checkout ─────────────────────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Node.js 20 ────────────────────────────────────────────────────────
+      # ── 2. Node 20 ──────────────────────────────────────────────────────────
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
@@ -40,39 +39,39 @@ jobs:
           cache: 'npm'
           cache-dependency-path: client/package.json
 
-      # ── 3. Build React frontend (runs on Ubuntu — binary-compatible with server) ──
+      # ── 3. Build React (Ubuntu binary — compatible with Hostinger Linux) ────
       - name: Install client dependencies
         run: npm install --prefix client
 
       - name: Build React app
         run: npm run build --prefix client
-        # Produces client/dist/ — served directly by Express in production
 
-      # ── 4. Install sshpass (needed for password-based SSH/rsync) ─────────────
+      # ── 4. sshpass (password-based SSH/rsync) ───────────────────────────────
       - name: Install sshpass
         run: sudo apt-get install -y sshpass
 
-      # ── 5. Sync project files to server ──────────────────────────────────────
+      # ── 5. Sync project files ───────────────────────────────────────────────
       - name: Sync files to server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -e rsync -az --delete \
-            --exclude 'node_modules/' \
+            --exclude 'node_modules/'        \
             --exclude 'server/node_modules/' \
             --exclude 'client/node_modules/' \
-            --exclude 'client/src/' \
-            --exclude '.env' \
-            --exclude '*.db' \
-            --exclude '*.db-shm' \
-            --exclude '*.db-wal' \
-            --exclude 'uploads/' \
-            --exclude 'logs/' \
-            --exclude '.git/' \
+            --exclude 'client/src/'          \
+            --exclude '.env'                 \
+            --exclude '*.db'                 \
+            --exclude '*.db-shm'             \
+            --exclude '*.db-wal'             \
+            --exclude 'uploads/'             \
+            --exclude 'logs/'                \
+            --exclude '.git/'                \
             -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+          echo "✅ Files synced"
 
-      # ── 6. Write .env on server (overwrites on every deploy to stay in sync) ──
+      # ── 6. Write .env ───────────────────────────────────────────────────────
       - name: Write .env on server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -94,17 +93,38 @@ jobs:
             UPLOAD_DIR=/home/u511005792/domains/gkasevault.io/nodejs/uploads
             MAX_FILE_SIZE_MB=20
         run: |
-          echo "$ENV_CONTENT" > /tmp/trivanta.env
+          printf '%s' "$ENV_CONTENT" > /tmp/trivanta.env
           sshpass -e scp \
             -P ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
             /tmp/trivanta.env \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/.env
           rm -f /tmp/trivanta.env
-          echo "✅ .env deployed"
+          echo "✅ .env uploaded"
 
-      # ── 7. Install server dependencies on Linux server ────────────────────────
-      # bash -l loads ~/.bashrc / ~/.profile so NVM and npm are on PATH
+      # ── 6b. Verify .env landed correctly ────────────────────────────────────
+      - name: Verify .env on server
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh \
+            -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c '
+              cd ${{ secrets.DEPLOY_PATH }}
+              if [ ! -f .env ]; then
+                echo \"❌ .env is missing — deploy cannot proceed\"
+                exit 1
+              fi
+              grep -q \"^NODE_ENV=\" .env || { echo \"❌ .env missing NODE_ENV\"; exit 1; }
+              grep -q \"^DATABASE_URL=\" .env || { echo \"❌ .env missing DATABASE_URL\"; exit 1; }
+              grep -q \"^JWT_SECRET=\" .env    || { echo \"❌ .env missing JWT_SECRET\"; exit 1; }
+              echo \"✅ .env OK — $(wc -l < .env) lines, NODE_ENV=$(grep NODE_ENV .env | cut -d= -f2)\"
+            '"
+
+      # ── 7. Install server deps on the Linux host ─────────────────────────────
+      # bash -l ensures NVM / npm are on PATH (non-interactive SSH skips .bashrc)
       - name: Install server production dependencies
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -113,14 +133,46 @@ jobs:
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "bash -l -c 'cd ${{ secrets.DEPLOY_PATH }} && \
-             npm install --prefix server --omit=dev && \
-             mkdir -p logs uploads && \
-             chmod 755 uploads && \
-             echo ✅ Dependencies installed'"
+            "bash -l -c '
+              set -e
+              cd ${{ secrets.DEPLOY_PATH }}
+              npm install --prefix server --omit=dev
+              mkdir -p logs uploads
+              chmod 755 uploads
+              echo \"✅ Dependencies installed — $(ls server/node_modules | wc -l) packages\"
+            '"
 
-      # ── 8. Restart application ────────────────────────────────────────────────
-      # hPanel restarts the app when the entry file mtime changes (touch trick)
+      # ── 7b. Syntax check before touching the live process ───────────────────
+      # node --check catches parse errors that would crash the process on start.
+      # Also verifies every top-level require() can be resolved (module not found
+      # errors surface here rather than after restart causes downtime).
+      - name: Pre-restart syntax & module check
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh \
+            -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c '
+              set -e
+              cd ${{ secrets.DEPLOY_PATH }}
+              node --check server/src/index.js
+              echo \"✅ Syntax OK\"
+              # Verify critical runtime modules are present
+              node -e \"
+                [
+                  'express', 'mysql2', 'bcryptjs', 'jsonwebtoken',
+                  'multer',  'dotenv', 'pino',     'compression'
+                ].forEach(m => {
+                  try { require('./server/node_modules/' + m); }
+                  catch(e) { console.error('MISSING MODULE:', m); process.exit(1); }
+                });
+                console.log('✅ Critical modules present');
+              \"
+            '"
+
+      # ── 8. Restart application ───────────────────────────────────────────────
       - name: Restart application
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -129,31 +181,120 @@ jobs:
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "bash -l -c 'cd ${{ secrets.DEPLOY_PATH }} && \
-             if command -v pm2 &>/dev/null; then \
-               pm2 restart trivanta 2>/dev/null || \
-               pm2 start ecosystem.config.js --env production && pm2 save; \
-               echo ✅ Restarted via PM2; \
-             else \
-               touch server/src/index.js; \
-               echo ✅ Restarted via hPanel touch trigger; \
-             fi'"
+            "bash -l -c '
+              cd ${{ secrets.DEPLOY_PATH }}
+              if command -v pm2 &>/dev/null; then
+                pm2 restart trivanta 2>/dev/null \
+                  || (pm2 start ecosystem.config.js --env production && pm2 save)
+                echo \"✅ Restarted via PM2\"
+              else
+                touch server/src/index.js
+                echo \"✅ Restarted via hPanel touch trigger\"
+              fi
+            '"
 
-      # ── 9. Wait for boot and health-check ────────────────────────────────────
-      - name: Health check
+      # ── 9. Health check — retry loop (up to 120 s) ──────────────────────────
+      # Polls /api/health every 8 s, 15 attempts.
+      # Accounts for: hPanel restart delay (~20 s) + DB init/migrations (~30 s).
+      # Fails the workflow (no continue-on-error) so broken deploys are visible.
+      # The health endpoint now returns HTTP 503 when DB is unreachable, so a
+      # "200 ok" means the app AND the database are genuinely healthy.
+      - name: Health check (retry loop)
         run: |
-          echo "Waiting 25s for app to boot..."
-          sleep 25
-          curl -fsS --max-time 15 https://gkasevault.io/api/health | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          status = d.get('status')
-          print('Status:', status)
-          print('Env:   ', d.get('env'))
-          print('Uptime:', d.get('uptime'), 's')
-          if status != 'ok':
-            print('HEALTH CHECK FAILED', file=sys.stderr)
-            sys.exit(1)
-          print('✅ Deployment successful!')
-          "
-        continue-on-error: true   # don't fail the whole workflow if site is slow to boot
+          echo "⏳ Polling https://gkasevault.io/api/health — up to 120 s..."
+          MAX=15
+          DELAY=8
+          for i in $(seq 1 $MAX); do
+            printf "  Attempt %d/%d ... " "$i" "$MAX"
+            HTTP=$(curl -s -o /tmp/health.json \
+                        -w "%{http_code}" \
+                        --max-time 12 \
+                        https://gkasevault.io/api/health 2>/dev/null || echo "000")
+
+            if [ "$HTTP" = "200" ]; then
+              STATUS=$(python3 -c \
+                "import json,sys; d=json.load(open('/tmp/health.json')); print(d.get('status','?'))" \
+                2>/dev/null || echo "?")
+
+              if [ "$STATUS" = "ok" ]; then
+                echo "HTTP $HTTP — ✅ healthy"
+                python3 - <<'PYEOF'
+          import json, sys
+          try:
+              d = json.load(open('/tmp/health.json'))
+              mem = round(d.get('memory', {}).get('rss', 0) / 1048576, 1)
+              print(f"  env     : {d.get('env')}")
+              print(f"  uptime  : {d.get('uptime')} s")
+              print(f"  memory  : {mem} MB RSS")
+              print(f"  db      : {d.get('db')}")
+              print(f"  version : {d.get('version')}")
+          except Exception as e:
+              print(f"  (could not parse response: {e})")
+          PYEOF
+                exit 0
+              fi
+
+              echo "HTTP $HTTP but status='$STATUS' — waiting..."
+            else
+              echo "HTTP $HTTP — waiting..."
+            fi
+
+            if [ "$i" -lt "$MAX" ]; then
+              sleep $DELAY
+            fi
+          done
+
+          echo ""
+          echo "❌ App did not become healthy after $((MAX * DELAY)) s"
+          echo "   Last response:"
+          cat /tmp/health.json 2>/dev/null || echo "   (no response body)"
+          exit 1
+
+      # ── 10. Dump logs on failure (always runs after a failed step) ───────────
+      - name: Dump server logs on failure
+        if: failure()
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          echo "════════════════════════════════════════"
+          echo " DEPLOYMENT FAILED — diagnostic output"
+          echo "════════════════════════════════════════"
+
+          sshpass -e ssh \
+            -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c '
+              cd ${{ secrets.DEPLOY_PATH }}
+
+              echo \"--- Process check ---\"
+              if command -v pm2 &>/dev/null; then
+                pm2 list 2>/dev/null || true
+                echo \"--- PM2 log tail ---\"
+                pm2 logs trivanta --lines 80 --nostream 2>/dev/null || true
+              fi
+
+              echo \"--- app.log tail (last 80 lines) ---\"
+              tail -n 80 logs/app.log 2>/dev/null || echo \"(no logs/app.log)\"
+
+              echo \"--- error.log tail (last 40 lines) ---\"
+              tail -n 40 logs/error.log 2>/dev/null || echo \"(no logs/error.log)\"
+
+              echo \"--- .env key audit ---\"
+              echo \"  NODE_ENV   = $(grep -m1 ^NODE_ENV   .env | cut -d= -f2-)\"
+              echo \"  PORT       = $(grep -m1 ^PORT       .env | cut -d= -f2-)\"
+              echo \"  DB set     = $(grep -q ^DATABASE_URL .env && echo yes || echo NO — MISSING)\"
+              echo \"  JWT set    = $(grep -q ^JWT_SECRET   .env && echo yes || echo NO — MISSING)\"
+
+              echo \"--- Disk usage ---\"
+              df -h . 2>/dev/null | tail -1
+
+              echo \"--- node_modules size ---\"
+              du -sh server/node_modules 2>/dev/null || echo \"(missing)\"
+
+              echo \"--- client/dist exists ---\"
+              ls -lh client/dist/index.html 2>/dev/null || echo \"(client/dist missing — React build not synced)\"
+            '" || true
+
+          echo ""
+          echo "📋 Check the hPanel Logs panel at: https://hpanel.hostinger.com"

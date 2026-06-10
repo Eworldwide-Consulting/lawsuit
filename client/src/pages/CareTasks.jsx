@@ -1,24 +1,49 @@
 import { useState, useEffect } from 'react';
-import { tasksApi, mattersApi } from '../api';
+import { useNavigate } from 'react-router-dom';
+import { tasksApi, mattersApi, checklistApi } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { CheckSquare, Clock, AlertTriangle, Check } from 'lucide-react';
+import { CheckSquare, AlertTriangle, Check, Upload, ClipboardList } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
 export default function CareTasks() {
-  const { user } = useAuth();
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const [matters, setMatters] = useState([]);
-  const [creating, setCreating] = useState(false);
-  const [title, setTitle] = useState('');
+  const { user }   = useAuth();
+  const navigate   = useNavigate();
+  const [tasks, setTasks]           = useState([]);
+  const [checklistTasks, setChecklistTasks] = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [filter, setFilter]         = useState('all');
+  const [matters, setMatters]       = useState([]);
+  const [creating, setCreating]     = useState(false);
+  const [title, setTitle]           = useState('');
   const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [priority, setPriority] = useState('normal');
-  const [matterId, setMatterId] = useState('');
+  const [dueDate, setDueDate]       = useState('');
+  const [priority, setPriority]     = useState('normal');
+  const [matterId, setMatterId]     = useState('');
 
-  const load = () => tasksApi.list().then(r => setTasks(r.data)).finally(() => setLoading(false));
-  const loadMatters = () => mattersApi.list().then(r => setMatters(r.data)).catch(() => setMatters([]));
+  const load        = () => tasksApi.list().then(r => setTasks(r.data)).finally(() => setLoading(false));
+  const loadMatters = () => mattersApi.list().then(r => {
+    const list = r.data?.matters || r.data || [];
+    setMatters(list);
+    if (user?.role === 'client' && list.length > 0) {
+      checklistApi.getByMatter(list[0].id).then(cr => {
+        const items = cr.data?.sections?.flatMap(s => s.items) || [];
+        const pending = items.filter(i =>
+          i.default_status === 'needed_now' &&
+          !['submitted', 'accepted', 'not_applicable'].includes(i.status)
+        );
+        setChecklistTasks(pending.map(i => ({
+          id:            `cl-${i.id}`,
+          title:         i.label,
+          description:   `Section: ${i.section}`,
+          status:        i.status === 'needs_correction' ? 'overdue' : 'pending',
+          due_date:      null,
+          action_label:  i.status === 'needs_correction' ? 'Fix & Re-upload' : 'Upload',
+          _isChecklist:  true,
+          priority:      i.status === 'needs_correction' ? 'high' : 'normal',
+        })));
+      }).catch(() => {});
+    }
+  }).catch(() => setMatters([]));
 
   useEffect(() => { load(); loadMatters(); }, []);
 
@@ -27,7 +52,8 @@ export default function CareTasks() {
     setTasks(t => t.map(x => x.id === id ? { ...x, status: 'completed' } : x));
   }
 
-  const filtered = tasks.filter(t => filter === 'all' || t.status === filter);
+  const allTasks = [...checklistTasks, ...tasks];
+  const filtered = allTasks.filter(t => filter === 'all' || t.status === filter);
 
   const daysLeft = d => d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null;
   const dueLabel = task => {
@@ -44,7 +70,12 @@ export default function CareTasks() {
     ? 'Review attorney appointment notes'
     : title;
 
-  const counts = { all: tasks.length, pending: tasks.filter(t => t.status === 'pending').length, overdue: tasks.filter(t => t.status === 'overdue').length, completed: tasks.filter(t => t.status === 'completed').length };
+  const counts = {
+    all:       allTasks.length,
+    pending:   allTasks.filter(t => t.status === 'pending').length,
+    overdue:   allTasks.filter(t => t.status === 'overdue').length,
+    completed: allTasks.filter(t => t.status === 'completed').length,
+  };
 
   const selectedMatter = matters.find(m => String(m.id) === String(matterId));
   const assignedTo = user?.role === 'attorney' ? selectedMatter?.client_id : user?.id;
@@ -165,18 +196,33 @@ export default function CareTasks() {
             const { text, color } = dueLabel(task);
             const done = task.status === 'completed';
             return (
-              <div key={task.id} className={`card p-4 flex items-start gap-4 ${done ? 'opacity-60' : ''}`}>
-                <button onClick={() => !done && complete(task.id)}
-                  className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors ${done ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-green-500'}`}>
-                  {done && <Check size={12} className="text-white" />}
-                </button>
+              <div key={task.id} className={`card p-4 flex items-start gap-4 ${done ? 'opacity-60' : ''} ${task._isChecklist ? 'border-l-4 border-blue-300' : ''}`}>
+                {task._isChecklist ? (
+                  <div className="w-6 h-6 rounded-full bg-blue-100 border-2 border-blue-300 flex-shrink-0 flex items-center justify-center mt-0.5">
+                    <ClipboardList size={11} className="text-blue-600" />
+                  </div>
+                ) : (
+                  <button onClick={() => !done && complete(task.id)}
+                    className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors ${done ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-green-500'}`}>
+                    {done && <Check size={12} className="text-white" />}
+                  </button>
+                )}
                 <div className="flex-1 min-w-0">
-                  <div className={`font-medium text-sm ${done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{normalizeTitle(task.title)}</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`font-medium text-sm ${done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{normalizeTitle(task.title)}</div>
+                    {task._isChecklist && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Checklist</span>}
+                  </div>
                   {task.description && <div className="text-xs text-gray-500 mt-0.5">{task.description}</div>}
                   <div className={`text-xs font-medium mt-1 ${color}`}>{text}</div>
                 </div>
                 {!done && task.action_label && (
-                  <button className="flex items-center gap-1.5 text-xs bg-navy-900 text-white px-3 py-1.5 rounded-lg hover:bg-navy-800 flex-shrink-0">
+                  <button
+                    onClick={() => task._isChecklist ? navigate('/checklist') : undefined}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg flex-shrink-0 text-white transition-colors ${
+                      task._isChecklist ? 'bg-blue-600 hover:bg-blue-700' : 'bg-navy-900 hover:bg-navy-800'
+                    }`}
+                  >
+                    {task._isChecklist && <Upload size={12} />}
                     {task.action_label}
                   </button>
                 )}
