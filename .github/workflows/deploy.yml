@@ -25,17 +25,19 @@ jobs:
     name: Build & Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       # ── 1. Checkout ─────────────────────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Node 20 ──────────────────────────────────────────────────────────
-      - name: Setup Node.js 20
+      # ── 2. Node 22 (matches Hostinger server) ───────────────────────────────
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: client/package.json
 
@@ -92,8 +94,9 @@ jobs:
             SMTP_FROM=TriVanta Legal <${{ secrets.SMTP_USER }}>
             UPLOAD_DIR=/home/u511005792/domains/gkasevault.io/nodejs/uploads
             MAX_FILE_SIZE_MB=20
+            MYSQL_PASS=${{ secrets.MYSQL_PASS }}
         run: |
-          printf '%s' "$ENV_CONTENT" > /tmp/trivanta.env
+          echo "$ENV_CONTENT" > /tmp/trivanta.env
           sshpass -e scp \
             -P ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
@@ -139,7 +142,7 @@ jobs:
               npm install --prefix server --omit=dev
               mkdir -p logs uploads
               chmod 755 uploads
-              echo \"✅ Dependencies installed — $(ls server/node_modules | wc -l) packages\"
+              echo \"✅ Dependencies installed — $(ls server/node_modules 2>/dev/null | wc -l) packages\"
             '"
 
       # ── 7b. Syntax check before touching the live process ───────────────────
@@ -152,10 +155,12 @@ jobs:
         run: |
           # Write the module check script locally — no quoting issues
           cat > /tmp/trivanta_modcheck.js << 'JSEOF'
+          var path = require('path');
+          var base = process.cwd();
           var mods = ['express','mysql2','bcryptjs','jsonwebtoken','multer','dotenv','pino','compression'];
           var missing = [];
           mods.forEach(function(m) {
-            try { require('./server/node_modules/' + m); }
+            try { require(path.join(base, 'server/node_modules', m)); }
             catch(e) { missing.push(m); }
           });
           if (missing.length) {
