@@ -289,4 +289,30 @@ router.get('/templates/:matterType', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/checklists/client-overview ───────────────────────────────────
+// Attorney view: all clients with their matter and checklist readiness stats
+router.get('/client-overview', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
+  try {
+    const rows = await all(
+      `SELECT
+         u.id         AS user_id,
+         u.first_name, u.last_name, u.email, u.avatar_initials,
+         m.id         AS matter_id,
+         m.case_number, m.matter_type, m.stage, m.status, m.attorney_id,
+         COUNT(ci.id) AS total_items,
+         SUM(CASE WHEN ci.default_status = 'needed_now' THEN 1 ELSE 0 END)                               AS needed_now,
+         SUM(CASE WHEN ci.default_status = 'needed_now' AND ci.status = 'accepted' THEN 1 ELSE 0 END)    AS accepted_count,
+         SUM(CASE WHEN ci.status = 'submitted' THEN 1 ELSE 0 END)                                        AS pending_review
+       FROM users u
+       LEFT JOIN matters m ON m.client_id = u.id
+       LEFT JOIN matter_checklist_items ci ON ci.matter_id = m.id
+       WHERE u.role = 'client'
+       GROUP BY u.id, m.id
+       ORDER BY u.last_name ASC, u.first_name ASC`,
+      []
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

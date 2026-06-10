@@ -6,6 +6,7 @@ const documentsApi = {
   update:       (id, data) => http.patch(`/documents/${id}`, data),
   updateStatus: (id, status) => http.put(`/documents/${id}/status`, { status }),
   delete:       id        => http.delete(`/documents/${id}`),
+  viewUrl:      id        => `/api/documents/view/${id}`,
   downloadUrl:  id        => `/api/documents/download/${id}`,
 };
 

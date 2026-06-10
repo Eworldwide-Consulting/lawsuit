@@ -26,4 +26,20 @@ router.get('/clients', requireAuth, requireRole('attorney', 'partner'), async (r
   } catch (err) { next(err); }
 });
 
+// Clients whose matters are assigned to the current attorney
+router.get('/my-clients', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
+  try {
+    const rows = await all(
+      `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.avatar_initials, u.created_at,
+              m.id AS matter_id, m.case_number, m.matter_type, m.stage, m.status, m.description
+       FROM matters m
+       JOIN users u ON u.id = m.client_id
+       WHERE m.attorney_id = ? AND u.role = 'client'
+       ORDER BY u.last_name ASC, u.first_name ASC`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

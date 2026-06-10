@@ -26,6 +26,7 @@ const ITSupportDashboard = lazy(() => import('./pages/dashboard/ITSupportDashboa
 
 // App pages — code split
 const Matters          = lazy(() => import('./pages/Matters'));
+const Clients          = lazy(() => import('./pages/Clients'));
 const MatterDetail     = lazy(() => import('./pages/MatterDetail'));
 const Documents        = lazy(() => import('./pages/Documents'));
 const Messages         = lazy(() => import('./pages/Messages'));
@@ -89,6 +90,7 @@ export default function App() {
         {/* Dashboard routes */}
         <Route path="/dashboard" element={<RequireAuth><DashboardLayout><DashboardRouter /></DashboardLayout></RequireAuth>} />
         <Route path="/matters" element={<RequireAuth><DashboardLayout><Matters /></DashboardLayout></RequireAuth>} />
+        <Route path="/clients" element={<RequireAuth><DashboardLayout><Clients /></DashboardLayout></RequireAuth>} />
         <Route path="/matters/:id" element={<RequireAuth><DashboardLayout><MatterDetail /></DashboardLayout></RequireAuth>} />
         <Route path="/my-case" element={<RequireAuth><DashboardLayout><MyCase /></DashboardLayout></RequireAuth>} />
         <Route path="/documents" element={<RequireAuth><DashboardLayout><Documents /></DashboardLayout></RequireAuth>} />

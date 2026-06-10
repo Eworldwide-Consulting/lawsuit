@@ -162,6 +162,21 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Inline view — browser renders PDF/images directly; DOCX falls back to download
+router.get('/view/:id', requireAuth, async (req, res, next) => {
+  try {
+    const doc = await DocumentRepo.findByIdWithMatter(req.params.id);
+    if (!doc?.file_path) throw new NotFoundError('File');
+
+    const isOwner = doc.user_id === req.user.id || doc.client_id === req.user.id;
+    if (!isOwner && !isStaff(req.user.role)) throw new ForbiddenError();
+
+    const filePath = path.join(UPLOAD_DIR, path.basename(doc.file_path));
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.name)}"`);
+    res.sendFile(filePath);
+  } catch (err) { next(err); }
+});
+
 router.get('/download/:id', requireAuth, async (req, res, next) => {
   try {
     const doc = await DocumentRepo.findByIdWithMatter(req.params.id);

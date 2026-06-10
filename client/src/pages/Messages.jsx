@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { messagesApi, usersApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Send, Inbox, Send as SendIcon } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
+
+const isStaff = role => ['attorney', 'partner', 'itsupport'].includes(role);
 
 export default function Messages() {
   const { user } = useAuth();
@@ -18,9 +20,31 @@ export default function Messages() {
   const load = async () => {
     setLoading(true);
     try {
-      const [inboxRes, usersRes] = await Promise.all([messagesApi.inbox(), usersApi.attorneys()]);
+      // Attorneys/partners can message their clients + other staff.
+      // Clients can only message attorneys.
+      const recipientFetch = isStaff(user?.role)
+        ? Promise.all([usersApi.attorneys(), usersApi.myClients()])
+            .then(([attyRes, clientRes]) => {
+              const atty    = attyRes.data || [];
+              const clients = (clientRes.data || []).map(c => ({
+                id:         c.user_id ?? c.id,
+                first_name: c.first_name,
+                last_name:  c.last_name,
+                role:       'client',
+              }));
+              // Deduplicate by id
+              const seen = new Set();
+              return [...atty, ...clients].filter(u => {
+                if (seen.has(u.id)) return false;
+                seen.add(u.id);
+                return u.id !== user?.id;
+              });
+            })
+        : usersApi.attorneys().then(r => r.data.filter(u => u.id !== user?.id));
+
+      const [inboxRes, recipientList] = await Promise.all([messagesApi.inbox(), recipientFetch]);
       setInbox(inboxRes.data);
-      setRecipients(usersRes.data.filter(u => u.id !== user?.id));
+      setRecipients(recipientList);
     } finally {
       setLoading(false);
     }
@@ -113,7 +137,7 @@ export default function Messages() {
                   <label className="form-label">To</label>
                   <select value={form.toUserId} onChange={e => setForm(f => ({ ...f, toUserId: e.target.value }))} className="form-input">
                     <option value="">Select recipient</option>
-                    {recipients.map(r => <option key={r.id} value={r.id}>{r.first_name} {r.last_name}</option>)}
+                    {recipients.map(r => (<option key={r.id} value={r.id}>{r.first_name} {r.last_name}{r.role === 'client' ? ' (Client)' : ''}</option>))}
                   </select>
                 </div>
                 <div>

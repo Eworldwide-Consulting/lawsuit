@@ -4,7 +4,9 @@ const { inList } = require('../lib/sql');
 const DocumentRepository = {
   findByMatter(matterId, { limit, offset } = {}) {
     return all(
-      'SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      `SELECT d.*, u.first_name AS uploader_first, u.last_name AS uploader_last
+       FROM documents d LEFT JOIN users u ON u.id = d.user_id
+       WHERE d.matter_id = ? ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
       [matterId, limit, offset]
     );
   },
@@ -12,7 +14,9 @@ const DocumentRepository = {
   findByMatters(ids, { limit, offset } = {}) {
     const il = inList(ids);
     return all(
-      `SELECT * FROM documents WHERE matter_id IN (${il}) ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT d.*, u.first_name AS uploader_first, u.last_name AS uploader_last
+       FROM documents d LEFT JOIN users u ON u.id = d.user_id
+       WHERE d.matter_id IN (${il}) ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
       [...ids, limit, offset]
     );
   },
@@ -22,21 +26,26 @@ const DocumentRepository = {
     if (matterIds.length > 0) {
       const il = inList(matterIds);
       return all(
-        `SELECT * FROM documents
-         WHERE matter_id IN (${il}) OR (user_id = ? AND matter_id IS NULL)
-         ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        `SELECT d.*, u.first_name AS uploader_first, u.last_name AS uploader_last
+         FROM documents d LEFT JOIN users u ON u.id = d.user_id
+         WHERE d.matter_id IN (${il}) OR (d.user_id = ? AND d.matter_id IS NULL)
+         ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
         [...matterIds, userId, limit, offset]
       );
     }
     return all(
-      `SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT d.*, u.first_name AS uploader_first, u.last_name AS uploader_last
+       FROM documents d LEFT JOIN users u ON u.id = d.user_id
+       WHERE d.user_id = ? ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
       [userId, limit, offset]
     );
   },
 
   findAll({ limit, offset } = {}) {
     return all(
-      'SELECT * FROM documents ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      `SELECT d.*, u.first_name AS uploader_first, u.last_name AS uploader_last
+       FROM documents d LEFT JOIN users u ON u.id = d.user_id
+       ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
       [limit, offset]
     );
   },

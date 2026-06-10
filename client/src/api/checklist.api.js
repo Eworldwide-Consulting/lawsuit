@@ -23,6 +23,10 @@ const checklistApi = {
   getReviewQueue: () =>
     http.get('/checklists/review-queue'),
 
+  /** Attorney: all clients with their matter and checklist readiness stats */
+  clientOverview: () =>
+    http.get('/checklists/client-overview'),
+
   /** Download / stream an uploaded file */
   downloadUrl: (itemId) => `/api/checklists/download/${itemId}`,
 };

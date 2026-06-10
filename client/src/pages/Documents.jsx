@@ -209,7 +209,7 @@ export default function Documents() {
             <table className="w-full text-sm" role="table" aria-label="Documents">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['File Name', 'Category', 'Size', 'Status', 'Uploaded', 'Actions'].map(h => (
+                  {['File Name', 'Uploaded By', 'Category', 'Size', 'Status', 'Date', 'Actions'].map(h => (
                     <th key={h} scope="col" className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       {h}
                     </th>
@@ -232,6 +232,11 @@ export default function Documents() {
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">
+                      {doc.uploader_first
+                        ? `${doc.uploader_first} ${doc.uploader_last}`
+                        : '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{doc.category || '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{doc.file_size ? fmtSize(doc.file_size) : '—'}</td>
                     <td className="px-4 py-3">
@@ -244,7 +249,7 @@ export default function Documents() {
                       <div className="flex items-center gap-1">
                         {doc.file_path && (
                           <a
-                            href={documentsApi.downloadUrl(doc.id)}
+                            href={documentsApi.viewUrl(doc.id)}
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label={`View ${doc.name}`}
