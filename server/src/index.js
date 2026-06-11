@@ -123,8 +123,17 @@ app.use(helmet({
 // Stripe webhook needs raw body — must come before json()
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
+const ALLOWED_ORIGINS = [
+  client.url,
+  process.env.ADMIN_URL || 'https://admin.gkasevault.io',
+].filter(Boolean);
+
 app.use(cors({
-  origin: client.url,
+  origin: (origin, cb) => {
+    // Allow same-origin (no Origin header) and any whitelisted origin
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: ${origin} not allowed`));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));

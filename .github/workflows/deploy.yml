@@ -95,6 +95,7 @@ jobs:
             UPLOAD_DIR=/home/u511005792/domains/gkasevault.io/nodejs/uploads
             MAX_FILE_SIZE_MB=20
             MYSQL_PASS=${{ secrets.MYSQL_PASS }}
+            ADMIN_URL=https://admin.gkasevault.io
         run: |
           echo "$ENV_CONTENT" > /tmp/trivanta.env
           sshpass -e scp \
@@ -125,6 +126,22 @@ jobs:
               grep -q \"^JWT_SECRET=\" .env    || { echo \"❌ .env missing JWT_SECRET\"; exit 1; }
               echo \"✅ .env OK — $(wc -l < .env) lines, NODE_ENV=$(grep NODE_ENV .env | cut -d= -f2)\"
             '"
+
+      # ── 5b. Deploy admin subdomain static files ─────────────────────────────
+      - name: Deploy admin login to subdomain
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          ADMIN_PATH="/home/u511005792/domains/gkasevault.io/public_html/admin"
+          sshpass -e ssh \
+            -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c 'mkdir -p ${ADMIN_PATH}'"
+          sshpass -e rsync -az --delete \
+            -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no" \
+            ./admin/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${ADMIN_PATH}/
+          echo "✅ Admin subdomain files deployed to ${ADMIN_PATH}"
 
       # ── 7. Install server deps on the Linux host ─────────────────────────────
       # bash -l ensures NVM / npm are on PATH (non-interactive SSH skips .bashrc)

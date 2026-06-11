@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Spinner from '../../components/ui/Spinner';
@@ -6,6 +6,7 @@ import Spinner from '../../components/ui/Spinner';
 const PROVIDER_LABELS = {
   google:    'Google',
   microsoft: 'Microsoft',
+  admin:     'Admin Portal',
 };
 
 export default function AuthCallback() {
@@ -39,12 +40,12 @@ export default function AuthCallback() {
       .catch(() => navigate(`/login?error=${prov}_failed`, { replace: true }));
   }, []);
 
-  const label = PROVIDER_LABELS[provider] || 'your account';
+  const label = PROVIDER_LABELS[provider] || provider || 'your account';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       <Spinner size={10} />
-      <p className="mt-4 text-gray-500 text-sm">Signing you in with {label}…</p>
+      <p className="mt-4 text-gray-500 text-sm">Signing you in with {label}â€¦</p>
     </div>
   );
 }

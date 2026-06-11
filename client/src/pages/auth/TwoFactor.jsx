@@ -17,6 +17,13 @@ export default function TwoFactor() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Admin login passes tempToken as a URL param from admin.gkasevault.io
+    const params = new URLSearchParams(window.location.search);
+    const adminTempToken = params.get('adminTempToken');
+    if (adminTempToken) {
+      sessionStorage.setItem('lp_temp_token', adminTempToken);
+      window.history.replaceState({}, '', '/verify');
+    }
     refs.current[0]?.focus();
     const t = setInterval(() => setTimeLeft(s => s > 0 ? s - 1 : 0), 1000);
     return () => clearInterval(t);

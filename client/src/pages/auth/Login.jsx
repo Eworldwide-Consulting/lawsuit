@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Shield, User, Scale, Briefcase } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
@@ -43,16 +43,6 @@ const ROLE_TABS = [
     sub:      'Sign in to oversee firm operations.',
     showSSO:  false,
     active:   'border-purple-600 text-purple-600 bg-purple-50',
-    inactive: 'border-transparent text-gray-500 hover:text-gray-700',
-  },
-  {
-    id:       'itsupport',
-    label:    'Admin',
-    icon:     Shield,
-    heading:  'Admin Portal',
-    sub:      'Sign in to manage users and approvals.',
-    showSSO:  false,
-    active:   'border-gray-700 text-gray-800 bg-gray-100',
     inactive: 'border-transparent text-gray-500 hover:text-gray-700',
   },
 ];
@@ -138,7 +128,7 @@ export default function Login() {
   return (
     <AuthLayout variant="login">
 
-      {/* ── Role tabs ── */}
+      {/* â”€â”€ Role tabs â”€â”€ */}
       <div className="flex border-b border-gray-200 mb-6 -mx-1">
         {ROLE_TABS.map(t => {
           const Icon = t.icon;
@@ -158,13 +148,13 @@ export default function Login() {
         })}
       </div>
 
-      {/* ── Heading ── */}
+      {/* â”€â”€ Heading â”€â”€ */}
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">{tab.heading}</h1>
         <p className="text-gray-500 text-sm mt-1">{tab.sub}</p>
       </div>
 
-      {/* ── Not registered banner ── */}
+      {/* â”€â”€ Not registered banner â”€â”€ */}
       {notRegistered && (
         <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
           <div className="font-semibold text-amber-800 mb-1">No account found for this email</div>
@@ -176,12 +166,12 @@ export default function Login() {
             to="/register"
             className="inline-block mt-1 px-3 py-1.5 bg-amber-700 text-white text-xs font-semibold rounded-lg hover:bg-amber-800 transition-colors"
           >
-            Register now →
+            Register now â†’
           </Link>
         </div>
       )}
 
-      {/* ── Error banner ── */}
+      {/* â”€â”€ Error banner â”€â”€ */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {error}
@@ -212,7 +202,7 @@ export default function Login() {
         </div>
       )}
 
-      {/* ── Form ── */}
+      {/* â”€â”€ Form â”€â”€ */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="form-label">Email address</label>
@@ -264,7 +254,7 @@ export default function Login() {
         </button>
       </form>
 
-      {/* ── SSO buttons (Client only) ── */}
+      {/* â”€â”€ SSO buttons (Client only) â”€â”€ */}
       {tab.showSSO && (
         <>
           <div className="relative my-5">
@@ -306,7 +296,7 @@ export default function Login() {
         </>
       )}
 
-      {/* ── Footer ── */}
+      {/* â”€â”€ Footer â”€â”€ */}
       <p className="mt-6 text-center text-sm text-gray-500">
         {activeRole === 'client' ? (
           <>
@@ -315,8 +305,6 @@ export default function Login() {
               Request access
             </Link>
           </>
-        ) : activeRole === 'itsupport' ? (
-          <span className="text-gray-400">Admin accounts are provisioned by your system administrator.</span>
         ) : (
           <>
             Need access?{' '}
