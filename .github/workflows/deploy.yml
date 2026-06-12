@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      FORCE_COLOR: 1
 
     steps:
       # ── 1. Checkout ─────────────────────────────────────────────────────────
@@ -329,11 +329,12 @@ jobs:
           echo "📋 Check the hPanel Logs panel at: https://hpanel.hostinger.com"
 
       # ── 11. Email notification on failure ───────────────────────────────────
-      # Requires: SMTP_USER and SMTP_PASS secrets (already used for the app).
-      # To send to a different address, add a NOTIFY_EMAIL secret and replace
-      # the `to:` value below with: ${{ secrets.NOTIFY_EMAIL }}
+      # SMTP_PASS must be a Gmail App Password (NOT your Google account password).
+      # Generate one at: myaccount.google.com → Security → 2-Step Verification → App passwords
+      # continue-on-error: true so a bad SMTP secret doesn't mask the real failure reason.
       - name: Send failure email notification
         if: failure()
+        continue-on-error: true
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
