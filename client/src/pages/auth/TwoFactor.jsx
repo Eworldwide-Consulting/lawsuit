@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowLeft, Shield } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
@@ -31,13 +31,16 @@ export default function TwoFactor() {
 
   const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  function handleKey(i, e) {
+  function handleChange(i, e) {
     const val = e.target.value.replace(/\D/g, '').slice(-1);
     const next = [...code];
     next[i] = val;
     setCode(next);
     if (val && i < 5) refs.current[i + 1]?.focus();
-    if (!val && e.key === 'Backspace' && i > 0) refs.current[i - 1]?.focus();
+  }
+
+  function handleKeyDown(i, e) {
+    if (e.key === 'Backspace' && !code[i] && i > 0) refs.current[i - 1]?.focus();
   }
 
   function handlePaste(e) {
@@ -75,7 +78,7 @@ export default function TwoFactor() {
         <h1 className="text-2xl font-bold text-gray-900">Two-Factor Authentication</h1>
         <p className="text-gray-500 text-sm mt-2">Enter the 6-digit verification code to access your dashboard.</p>
         <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500 bg-gray-50 py-2 px-4 rounded-lg">
-          <span>ℹ️</span>
+          <span>â„¹ï¸</span>
           <span>We sent a code to <strong>m***@firm.com</strong></span>
         </div>
       </div>
@@ -86,14 +89,14 @@ export default function TwoFactor() {
         {code.map((digit, i) => (
           <input key={i} ref={el => refs.current[i] = el}
             type="text" inputMode="numeric" maxLength={1} value={digit}
-            onChange={e => handleKey(i, e)} onKeyDown={e => handleKey(i, e)}
+            onChange={e => handleChange(i, e)} onKeyDown={e => handleKeyDown(i, e)}
             className={`otp-input ${digit ? 'border-green-500 bg-green-50' : ''}`} />
         ))}
       </div>
 
       <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
         <span className="flex items-center gap-1">
-          <span>⏱</span>
+          <span>â±</span>
           Code expires in <span className={`font-mono font-bold ${timeLeft < 30 ? 'text-red-500' : 'text-gray-700'}`}>{fmt(timeLeft)}</span>
         </span>
         <button className="text-green-600 hover:text-green-700 font-medium" onClick={() => setTimeLeft(102)}>Resend code</button>

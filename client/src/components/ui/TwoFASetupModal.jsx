@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Shield, ShieldCheck, X, Copy, Check, Loader2 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { authApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,6 +9,7 @@ export default function TwoFASetupModal({ onClose, mandatory = false }) {
   const [step, setStep] = useState('intro'); // intro | setup | done
   const [secret, setSecret] = useState('');
   const [otpUrl, setOtpUrl] = useState('');
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,6 +23,16 @@ export default function TwoFASetupModal({ onClose, mandatory = false }) {
       const { data } = await authApi.setup2fa();
       setSecret(data.secret);
       setOtpUrl(data.otpauth_url);
+      try {
+        const qrUrl = await QRCode.toDataURL(data.otpauth_url, {
+          width: 200,
+          margin: 2,
+          color: { dark: '#0f2057', light: '#ffffff' },
+        });
+        setQrDataUrl(qrUrl);
+      } catch {
+        // QR generation is non-critical — fall back to text secret only
+      }
       setStep('setup');
     } catch {
       setError('Failed to initialise 2FA. Please try again.');
@@ -53,13 +65,18 @@ export default function TwoFASetupModal({ onClose, mandatory = false }) {
     }
   }
 
-  function handleKey(i, e) {
+  // onChange: handle digit input and auto-advance to next box
+  function handleChange(i, e) {
     const val = e.target.value.replace(/\D/g, '').slice(-1);
     const next = [...code];
     next[i] = val;
     setCode(next);
     if (val && i < 5) refs.current[i + 1]?.focus();
-    if (!val && e.key === 'Backspace' && i > 0) refs.current[i - 1]?.focus();
+  }
+
+  // onKeyDown: handle Backspace navigation to previous box only
+  function handleKeyDown(i, e) {
+    if (e.key === 'Backspace' && !code[i] && i > 0) refs.current[i - 1]?.focus();
   }
 
   function handlePaste(e) {
@@ -73,6 +90,10 @@ export default function TwoFASetupModal({ onClose, mandatory = false }) {
       setTimeout(() => setCopied(false), 2000);
     });
   }
+
+  useEffect(() => {
+    if (step === 'setup') refs.current[0]?.focus();
+  }, [step]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -152,23 +173,43 @@ export default function TwoFASetupModal({ onClose, mandatory = false }) {
           {step === 'setup' && (
             <>
               <p className="text-sm text-gray-600 mb-4">
-                Open <strong>Google Authenticator</strong>, <strong>Authy</strong>, or any TOTP app. Tap <em>Add account → Enter key manually</em> and paste the secret key below.
+                Open <strong>Google Authenticator</strong> or <strong>Authy</strong>, tap <em>Add account</em>, then scan the QR code below.
               </p>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3">
-                <div className="text-xs text-gray-500 font-medium mb-1.5">Secret key — paste into your authenticator app</div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 text-sm font-mono text-gray-800 break-all leading-relaxed">{secret}</code>
-                  <button
-                    onClick={copySecret}
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-gray-100 transition-colors"
-                  >
-                    {copied
-                      ? <Check size={14} className="text-green-500" />
-                      : <Copy size={14} className="text-gray-500" />}
-                  </button>
+              {/* QR code */}
+              {qrDataUrl ? (
+                <div className="flex flex-col items-center mb-4">
+                  <div className="p-3 bg-white border-2 border-gray-200 rounded-xl inline-block">
+                    <img src={qrDataUrl} alt="Scan with Google Authenticator" width={180} height={180} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">Scan this QR code with your authenticator app</p>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-center h-24 mb-4 text-sm text-gray-400">
+                  No camera? Use the secret key below.
+                </div>
+              )}
+
+              {/* Manual entry fallback */}
+              <details className="mb-4">
+                <summary className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer select-none">
+                  Can't scan? Enter key manually
+                </summary>
+                <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <div className="text-xs text-gray-500 font-medium mb-1">Secret key — type into your authenticator app</div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-sm font-mono text-gray-800 break-all leading-relaxed">{secret}</code>
+                    <button
+                      onClick={copySecret}
+                      className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-gray-100 transition-colors"
+                    >
+                      {copied
+                        ? <Check size={14} className="text-green-500" />
+                        : <Copy size={14} className="text-gray-500" />}
+                    </button>
+                  </div>
+                </div>
+              </details>
 
               <a
                 href={otpUrl}
@@ -190,8 +231,8 @@ export default function TwoFASetupModal({ onClose, mandatory = false }) {
                     inputMode="numeric"
                     maxLength={1}
                     value={digit}
-                    onChange={e => handleKey(i, e)}
-                    onKeyDown={e => handleKey(i, e)}
+                    onChange={e => handleChange(i, e)}
+                    onKeyDown={e => handleKeyDown(i, e)}
                     className={`w-10 h-12 text-center text-lg font-bold border-2 rounded-xl focus:outline-none transition-colors
                       ${digit ? 'border-[#0f2057] bg-blue-50' : 'border-gray-300 focus:border-[#0f2057]'}`}
                   />

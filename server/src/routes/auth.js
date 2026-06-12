@@ -8,6 +8,9 @@ const { sanitizeUser }            = require('../domain/user');
 
 const EmailService = require('../services/email.service');
 const AuditService = require('../services/audit.service');
+const crypto = require('crypto');
+const UserRepo = require('../repositories/user.repository');
+const { in24Hours } = require('../lib/dates');
 
 // ── Public routes ─────────────────────────────────────────────────────────────
 
