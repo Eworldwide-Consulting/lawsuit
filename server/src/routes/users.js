@@ -18,6 +18,22 @@ router.get('/attorneys', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Available (approved + verified) attorneys that clients can self-assign
+router.get('/available-attorneys', requireAuth, async (req, res, next) => {
+  try {
+    res.json(await all(
+      `SELECT u.id, u.first_name, u.last_name, u.email, u.avatar_initials, u.role,
+              up.specializations, up.years_experience, up.firm_role
+       FROM users u
+       LEFT JOIN user_profiles up ON up.user_id = u.id
+       WHERE u.role IN ('attorney','partner')
+         AND u.email_verified = 1
+         AND (u.approval_status = 'approved' OR u.approval_status IS NULL)
+       ORDER BY u.first_name ASC`
+    ));
+  } catch (err) { next(err); }
+});
+
 router.get('/clients', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
   try {
     res.json(await all(

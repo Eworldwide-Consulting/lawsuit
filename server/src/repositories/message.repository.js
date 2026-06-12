@@ -17,7 +17,8 @@ const MessageRepository = {
   findBySender(userId) {
     return all(
       `SELECT m.*,
-              u.first_name || ' ' || u.last_name AS to_name
+              u.first_name || ' ' || u.last_name AS to_name,
+              u.avatar_initials AS to_initials
        FROM messages m
        LEFT JOIN users u ON m.to_user_id = u.id
        WHERE m.from_user_id = ?

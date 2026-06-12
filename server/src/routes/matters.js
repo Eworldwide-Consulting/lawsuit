@@ -5,6 +5,7 @@ const MatterRepo          = require('../repositories/matter.repository');
 const { parsePagination } = require('../lib/pagination');
 const NotificationService = require('../services/notification.service');
 const AuditService        = require('../services/audit.service');
+const { ForbiddenError, NotFoundError, ValidationError } = require('../lib/errors');
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -62,6 +63,35 @@ router.put('/:id', requireAuth, requireRole('attorney', 'partner'), async (req, 
         matterId:   Number(req.params.id),
       });
     }
+
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Client self-assigns an attorney to their own matter
+router.post('/:id/assign-attorney', requireAuth, async (req, res, next) => {
+  try {
+    const matter = await MatterRepo.findById(req.params.id);
+    if (!matter) throw new NotFoundError('Matter');
+    if (req.user.role !== 'client' || matter.client_id !== req.user.id)
+      throw new ForbiddenError('You can only assign an attorney to your own matter');
+    const { attorney_id } = req.body;
+    if (!attorney_id) throw new ValidationError('attorney_id is required');
+
+    await MatterService.update(req.params.id, { attorney_id });
+
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.MATTER_UPDATED,
+      entity: 'matter', entityId: req.params.id,
+      meta: { attorney_id, action: 'client_self_assigned' },
+      ip: req.ip,
+    });
+
+    // Notify the newly assigned attorney
+    NotificationService.matterUpdated(attorney_id, {
+      caseNumber: matter.case_number,
+      matterId:   Number(req.params.id),
+    });
 
     res.json({ success: true });
   } catch (err) { next(err); }

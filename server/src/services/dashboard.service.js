@@ -41,7 +41,8 @@ const DashboardService = {
     // Checklist-based document readiness — use the checklist items for the
     // client's primary matter as the source of truth for "required docs".
     let checklistTotal    = 0;
-    let checklistAccepted = 0;
+    let checklistAccepted = 0;   // attorney-reviewed and accepted
+    let checklistUploaded = 0;   // submitted or accepted by client (pending review or done)
     let checklistSections = [];
     if (matter) {
       try {
@@ -52,6 +53,7 @@ const DashboardService = {
         const neededNow    = clItems.filter(i => i.default_status === 'needed_now');
         checklistTotal    = neededNow.length;
         checklistAccepted = neededNow.filter(i => i.status === 'accepted').length;
+        checklistUploaded = neededNow.filter(i => ['submitted', 'accepted'].includes(i.status)).length;
 
         // Per-section progress for the upload center widget
         const secMap = {};
@@ -63,6 +65,17 @@ const DashboardService = {
         }
         checklistSections = Object.values(secMap).slice(0, 5);
       } catch (_) {}
+
+      // Also count documents uploaded directly via the Documents page
+      try {
+        const docRow = await dbAll(
+          `SELECT COUNT(*) AS cnt FROM documents WHERE matter_id = ?`,
+          [matter.id]
+        );
+        const docsTableCount = Number(docRow[0]?.cnt ?? 0);
+        // Use the higher of checklist-based uploads vs direct document uploads
+        checklistUploaded = Math.max(checklistUploaded, docsTableCount);
+      } catch (_) {}
     }
 
     const tasks        = allActiveTasks.slice(0, 6);
@@ -71,7 +84,8 @@ const DashboardService = {
     // Fall back to document-table counts if checklist isn't seeded yet
     const requiredDocs   = allDocs.filter(d => d.required);
     const totalDocs      = checklistTotal  || requiredDocs.length;
-    const completedDocs  = checklistAccepted || requiredDocs.filter(d => d.status === 'uploaded').length;
+    // completedDocs uses the "uploaded" count (includes attorney-pending) so gauge advances on upload
+    const completedDocs  = checklistUploaded || requiredDocs.filter(d => d.status === 'uploaded').length;
     const uploadedDocs   = checklistSections.length ? checklistSections : aggregateDocsByCategory(allDocs);
     const deadlines      = buildDeadlines(matter, deadlineRows);
 
@@ -94,7 +108,8 @@ const DashboardService = {
       totalDocs,
       completedDocs,
       checklistTotal,
-      checklistAccepted,
+      checklistAccepted,   // attorney-accepted only (shown as "X accepted")
+      checklistUploaded,   // uploaded by client (shown in gauge)
       totalTasks:     taskStats.total,
       completedTasks: taskStats.completed,
     };
