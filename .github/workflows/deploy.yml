@@ -5,8 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Required GitHub Secrets  (Settings → Secrets and variables → Actions):
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Required GitHub Secrets  (Settings â†’ Secrets and variables â†’ Actions):
 #
 #   SSH_HOST        92.112.187.20
 #   SSH_USER        u511005792
@@ -18,7 +18,7 @@ on:
 #   DATABASE_URL    mysql://u511005792_dbadmin:<pass>@127.0.0.1:3306/u511005792_lawsuit
 #   SMTP_USER       <gmail address>
 #   SMTP_PASS       <gmail app password>
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 jobs:
   deploy:
@@ -29,11 +29,11 @@ jobs:
       FORCE_COLOR: 1
 
     steps:
-      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      # â”€â”€ 1. Checkout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Node 22 (matches Hostinger server) ───────────────────────────────
+      # â”€â”€ 2. Node 22 (matches Hostinger server) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -41,18 +41,38 @@ jobs:
           cache: 'npm'
           cache-dependency-path: client/package.json
 
-      # ── 3. Build React (Ubuntu binary — compatible with Hostinger Linux) ────
+      # â”€â”€ 3. Build React (Ubuntu binary â€” compatible with Hostinger Linux) â”€â”€â”€â”€
       - name: Install client dependencies
         run: npm install --prefix client
 
       - name: Build React app
         run: npm run build --prefix client
 
-      # ── 4. sshpass (password-based SSH/rsync) ───────────────────────────────
+      # â”€â”€ 4. sshpass (password-based SSH/rsync) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Install sshpass
-        run: sudo apt-get install -y sshpass
+        run: sudo apt-get install -y sshpass netcat-openbsd
 
-      # ── 5. Sync project files ───────────────────────────────────────────────
+      # â”€â”€ 4b. Pre-flight: verify TCP port is reachable before rsync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # "Connection timed out" means GitHub runner can't reach the host:port at all.
+      # This step prints the exact failure cause and fails fast with a clear message.
+      - name: SSH connectivity pre-check
+        run: |
+          echo "â³ Testing TCP connectivity to ${{ secrets.SSH_HOST }}:${{ secrets.SSH_PORT }} ..."
+          if nc -z -w 15 ${{ secrets.SSH_HOST }} ${{ secrets.SSH_PORT }}; then
+            echo "âœ… TCP port reachable"
+          else
+            echo ""
+            echo "âŒ Cannot reach ${{ secrets.SSH_HOST }}:${{ secrets.SSH_PORT }}"
+            echo ""
+            echo "Checklist â€” fix whichever applies:"
+            echo "  1. hPanel â†’ Advanced â†’ SSH Access â†’ confirm SSH is ENABLED (green)"
+            echo "  2. The SSH port shown in hPanel matches the SSH_PORT GitHub Secret"
+            echo "  3. SSH_HOST secret = the server IP shown in hPanel (not a domain alias)"
+            echo "  4. Hostinger free/starter plans don't support SSH â€” upgrade required"
+            exit 1
+          fi
+
+      # â”€â”€ 5. Sync project files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Sync files to server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -69,11 +89,11 @@ jobs:
             --exclude 'uploads/'             \
             --exclude 'logs/'                \
             --exclude '.git/'                \
-            -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no" \
+            -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=15" \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
-          echo "✅ Files synced"
+          echo "âœ… Files synced"
 
-      # ── 6. Write .env ───────────────────────────────────────────────────────
+      # â”€â”€ 6. Write .env â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Write .env on server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -101,12 +121,13 @@ jobs:
           sshpass -e scp \
             -P ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             /tmp/trivanta.env \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/.env
           rm -f /tmp/trivanta.env
-          echo "✅ .env uploaded"
+          echo "âœ… .env uploaded"
 
-      # ── 6b. Verify .env landed correctly ────────────────────────────────────
+      # â”€â”€ 6b. Verify .env landed correctly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Verify .env on server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -114,20 +135,21 @@ jobs:
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c '
               cd ${{ secrets.DEPLOY_PATH }}
               if [ ! -f .env ]; then
-                echo \"❌ .env is missing — deploy cannot proceed\"
+                echo \"âŒ .env is missing â€” deploy cannot proceed\"
                 exit 1
               fi
-              grep -q \"^NODE_ENV=\" .env || { echo \"❌ .env missing NODE_ENV\"; exit 1; }
-              grep -q \"^DATABASE_URL=\" .env || { echo \"❌ .env missing DATABASE_URL\"; exit 1; }
-              grep -q \"^JWT_SECRET=\" .env    || { echo \"❌ .env missing JWT_SECRET\"; exit 1; }
-              echo \"✅ .env OK — $(wc -l < .env) lines, NODE_ENV=$(grep NODE_ENV .env | cut -d= -f2)\"
+              grep -q \"^NODE_ENV=\" .env || { echo \"âŒ .env missing NODE_ENV\"; exit 1; }
+              grep -q \"^DATABASE_URL=\" .env || { echo \"âŒ .env missing DATABASE_URL\"; exit 1; }
+              grep -q \"^JWT_SECRET=\" .env    || { echo \"âŒ .env missing JWT_SECRET\"; exit 1; }
+              echo \"âœ… .env OK â€” $(wc -l < .env) lines, NODE_ENV=$(grep NODE_ENV .env | cut -d= -f2)\"
             '"
 
-      # ── 5b. Deploy admin subdomain static files ─────────────────────────────
+      # â”€â”€ 5b. Deploy admin subdomain static files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Deploy admin login to subdomain
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -136,14 +158,15 @@ jobs:
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c 'mkdir -p ${ADMIN_PATH}'"
           sshpass -e rsync -az --delete \
-            -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no" \
+            -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
             ./admin/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${ADMIN_PATH}/
-          echo "✅ Admin subdomain files deployed to ${ADMIN_PATH}"
+          echo "âœ… Admin subdomain files deployed to ${ADMIN_PATH}"
 
-      # ── 7. Install server deps on the Linux host ─────────────────────────────
+      # â”€â”€ 7. Install server deps on the Linux host â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # bash -l ensures NVM / npm are on PATH (non-interactive SSH skips .bashrc)
       - name: Install server production dependencies
         env:
@@ -152,6 +175,7 @@ jobs:
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c '
               set -e
@@ -159,10 +183,10 @@ jobs:
               npm install --prefix server --omit=dev
               mkdir -p logs uploads
               chmod 755 uploads
-              echo \"✅ Dependencies installed — $(ls server/node_modules 2>/dev/null | wc -l) packages\"
+              echo \"âœ… Dependencies installed â€” $(ls server/node_modules 2>/dev/null | wc -l) packages\"
             '"
 
-      # ── 7b. Syntax check before touching the live process ───────────────────
+      # â”€â”€ 7b. Syntax check before touching the live process â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # The module check is written to a temp file locally and SCP'd to the server.
       # This avoids shell-quoting conflicts: single quotes inside node -e strings
       # cannot be escaped when the outer bash -c argument is itself single-quoted.
@@ -170,7 +194,7 @@ jobs:
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
-          # Write the module check script locally — no quoting issues
+          # Write the module check script locally â€” no quoting issues
           cat > /tmp/trivanta_modcheck.js << 'JSEOF'
           var path = require('path');
           var base = process.cwd();
@@ -191,6 +215,7 @@ jobs:
           sshpass -e scp \
             -P ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             /tmp/trivanta_modcheck.js \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/trivanta_modcheck.js
 
@@ -198,10 +223,11 @@ jobs:
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c 'set -e; cd ${{ secrets.DEPLOY_PATH }}; node --check server/src/index.js && echo \"Syntax OK\"; node /tmp/trivanta_modcheck.js; rm -f /tmp/trivanta_modcheck.js && echo \"Module check done\"'"
 
-      # ── 8. Restart application ───────────────────────────────────────────────
+      # â”€â”€ 8. Restart application â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Restart application
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -209,20 +235,21 @@ jobs:
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c '
               cd ${{ secrets.DEPLOY_PATH }}
               if command -v pm2 &>/dev/null; then
                 pm2 restart trivanta 2>/dev/null \
                   || (pm2 start ecosystem.config.js --env production && pm2 save)
-                echo \"✅ Restarted via PM2\"
+                echo \"âœ… Restarted via PM2\"
               else
                 touch server/src/index.js
-                echo \"✅ Restarted via hPanel touch trigger\"
+                echo \"âœ… Restarted via hPanel touch trigger\"
               fi
             '"
 
-      # ── 9. Health check — retry loop (up to 120 s) ──────────────────────────
+      # â”€â”€ 9. Health check â€” retry loop (up to 120 s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # Polls /api/health every 8 s, 15 attempts.
       # Accounts for: hPanel restart delay (~20 s) + DB init/migrations (~30 s).
       # Fails the workflow (no continue-on-error) so broken deploys are visible.
@@ -230,7 +257,7 @@ jobs:
       # "200 ok" means the app AND the database are genuinely healthy.
       - name: Health check (retry loop)
         run: |
-          echo "⏳ Polling https://gkasevault.io/api/health — up to 120 s..."
+          echo "â³ Polling https://gkasevault.io/api/health â€” up to 120 s..."
           MAX=15
           DELAY=8
           for i in $(seq 1 $MAX); do
@@ -246,7 +273,7 @@ jobs:
                 2>/dev/null || echo "?")
 
               if [ "$STATUS" = "ok" ]; then
-                echo "HTTP $HTTP — ✅ healthy"
+                echo "HTTP $HTTP â€” âœ… healthy"
                 python3 - <<'PYEOF'
           import json, sys
           try:
@@ -263,9 +290,9 @@ jobs:
                 exit 0
               fi
 
-              echo "HTTP $HTTP but status='$STATUS' — waiting..."
+              echo "HTTP $HTTP but status='$STATUS' â€” waiting..."
             else
-              echo "HTTP $HTTP — waiting..."
+              echo "HTTP $HTTP â€” waiting..."
             fi
 
             if [ "$i" -lt "$MAX" ]; then
@@ -274,24 +301,25 @@ jobs:
           done
 
           echo ""
-          echo "❌ App did not become healthy after $((MAX * DELAY)) s"
+          echo "âŒ App did not become healthy after $((MAX * DELAY)) s"
           echo "   Last response:"
           cat /tmp/health.json 2>/dev/null || echo "   (no response body)"
           exit 1
 
-      # ── 10. Dump logs on failure (always runs after a failed step) ───────────
+      # â”€â”€ 10. Dump logs on failure (always runs after a failed step) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Dump server logs on failure
         if: failure()
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
-          echo "════════════════════════════════════════"
-          echo " DEPLOYMENT FAILED — diagnostic output"
-          echo "════════════════════════════════════════"
+          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo " DEPLOYMENT FAILED â€” diagnostic output"
+          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
 
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c '
               cd ${{ secrets.DEPLOY_PATH }}
@@ -312,8 +340,8 @@ jobs:
               echo \"--- .env key audit ---\"
               echo \"  NODE_ENV   = $(grep -m1 ^NODE_ENV   .env | cut -d= -f2-)\"
               echo \"  PORT       = $(grep -m1 ^PORT       .env | cut -d= -f2-)\"
-              echo \"  DB set     = $(grep -q ^DATABASE_URL .env && echo yes || echo NO — MISSING)\"
-              echo \"  JWT set    = $(grep -q ^JWT_SECRET   .env && echo yes || echo NO — MISSING)\"
+              echo \"  DB set     = $(grep -q ^DATABASE_URL .env && echo yes || echo NO â€” MISSING)\"
+              echo \"  JWT set    = $(grep -q ^JWT_SECRET   .env && echo yes || echo NO â€” MISSING)\"
 
               echo \"--- Disk usage ---\"
               df -h . 2>/dev/null | tail -1
@@ -322,15 +350,15 @@ jobs:
               du -sh server/node_modules 2>/dev/null || echo \"(missing)\"
 
               echo \"--- client/dist exists ---\"
-              ls -lh client/dist/index.html 2>/dev/null || echo \"(client/dist missing — React build not synced)\"
+              ls -lh client/dist/index.html 2>/dev/null || echo \"(client/dist missing â€” React build not synced)\"
             '" || true
 
           echo ""
-          echo "📋 Check the hPanel Logs panel at: https://hpanel.hostinger.com"
+          echo "ðŸ“‹ Check the hPanel Logs panel at: https://hpanel.hostinger.com"
 
-      # ── 11. Email notification on failure ───────────────────────────────────
+      # â”€â”€ 11. Email notification on failure â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # SMTP_PASS must be a Gmail App Password (NOT your Google account password).
-      # Generate one at: myaccount.google.com → Security → 2-Step Verification → App passwords
+      # Generate one at: myaccount.google.com â†’ Security â†’ 2-Step Verification â†’ App passwords
       # continue-on-error: true so a bad SMTP secret doesn't mask the real failure reason.
       - name: Send failure email notification
         if: failure()
@@ -342,7 +370,7 @@ jobs:
           secure: false
           username: ${{ secrets.SMTP_USER }}
           password: ${{ secrets.SMTP_PASS }}
-          subject: "Deploy FAILED — gkasevault.io — ${{ github.ref_name }}"
+          subject: "Deploy FAILED â€” gkasevault.io â€” ${{ github.ref_name }}"
           to: ${{ secrets.SMTP_USER }}
           from: TriVanta Deploy <${{ secrets.SMTP_USER }}>
           body: |
@@ -355,4 +383,4 @@ jobs:
             Full logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            — TriVanta CI/CD
+            â€” TriVanta CI/CD
