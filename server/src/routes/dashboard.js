@@ -44,7 +44,7 @@ router.get('/attorney/clients', requireAuth, async (req, res, next) => {
 
 router.get('/partner', requireAuth, async (req, res, next) => {
   try {
-    res.json(await DashboardService.partnerDashboard());
+    res.json(await DashboardService.partnerDashboard(req.user.id));
   } catch (err) { next(err); }
 });
 

@@ -55,7 +55,9 @@ function RequireAdmin({ children }) {
   const location = useLocation();
   if (loading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-  if (!['itsupport', 'partner'].includes(user?.role)) return <Navigate to="/dashboard" replace />;
+  // Partners have their own dashboard; only itsupport uses the admin panel
+  if (user?.role === 'partner') return <Navigate to="/dashboard" replace />;
+  if (user?.role !== 'itsupport') return <Navigate to="/dashboard" replace />;
   return children;
 }
 

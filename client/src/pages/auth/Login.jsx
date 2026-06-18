@@ -104,7 +104,7 @@ export default function Login() {
         // Redirect back to the page they were trying to reach, or role-appropriate default
         if (fromPath) {
           navigate(fromPath, { replace: true });
-        } else if (['itsupport', 'partner'].includes(res.data.user.role)) {
+        } else if (res.data.user.role === 'itsupport') {
           navigate('/admin');
         } else {
           navigate('/dashboard');
