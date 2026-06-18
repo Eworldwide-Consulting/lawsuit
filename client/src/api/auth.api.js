@@ -12,6 +12,7 @@ const authApi = {
   resendVerification: email => http.post('/auth/resend-verification', { email }),
   setup2fa:           ()    => http.post('/auth/setup-2fa'),
   enable2fa:          code  => http.post('/auth/enable-2fa', { code }),
+  disable2fa:         ()    => http.post('/auth/disable-2fa'),
   dismiss2faPrompt:   ()    => http.post('/auth/dismiss-2fa-prompt'),
 };
 

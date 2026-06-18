@@ -95,6 +95,10 @@ const UserRepository = {
     return run('UPDATE users SET two_fa_prompt_shown = 1 WHERE id = ?', [id]);
   },
 
+  disable2fa(id) {
+    return run('UPDATE users SET two_fa_enabled = 0, two_fa_secret = NULL, two_fa_prompt_shown = 0 WHERE id = ?', [id]);
+  },
+
   // L5: password reset
   setPasswordResetToken(id, token, expires) {
     return run(

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api';
-import { User, Lock, Bell, Shield, Check } from 'lucide-react';
+import { User, Lock, Bell, Shield, Check, ShieldCheck, ShieldOff } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
+import TwoFASetupModal from '../components/ui/TwoFASetupModal';
 
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
@@ -12,6 +13,22 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
   const [error, setError] = useState('');
+  const [show2FA, setShow2FA] = useState(false);
+  const [disabling2FA, setDisabling2FA] = useState(false);
+
+  async function disable2fa() {
+    if (!window.confirm('Are you sure you want to disable two-factor authentication? Your account will be less secure.')) return;
+    setDisabling2FA(true);
+    try {
+      await authApi.disable2fa();
+      updateUser({ two_fa_enabled: 0, two_fa_prompt_shown: 0 });
+      setSaved('Two-factor authentication has been disabled.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to disable 2FA. Please try again.');
+    } finally {
+      setDisabling2FA(false);
+    }
+  }
 
   async function saveProfile(e) {
     e.preventDefault();
@@ -121,16 +138,63 @@ export default function Settings() {
           </form>
 
           <div className="card p-6">
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-semibold text-gray-800 flex items-center gap-2"><Shield size={16} className="text-green-500" /> Two-Factor Authentication</h2>
-                <p className="text-sm text-gray-500 mt-1">Add an extra layer of security to your account.</p>
+                <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+                  {user?.two_fa_enabled
+                    ? <ShieldCheck size={16} className="text-green-500" />
+                    : <Shield size={16} className="text-gray-400" />}
+                  Two-Factor Authentication
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {user?.two_fa_enabled
+                    ? 'Your account is protected with an authenticator app. A 6-digit code is required at every login.'
+                    : 'Add an extra layer of security. Each login will require a 6-digit code from your authenticator app.'}
+                </p>
               </div>
-              <span className="badge badge-gray">Not enabled</span>
+              {user?.two_fa_enabled
+                ? <span className="badge badge-green flex-shrink-0">Enabled</span>
+                : <span className="badge badge-gray flex-shrink-0">Not enabled</span>}
             </div>
-            <button className="mt-4 btn-outline w-auto px-6 flex">Enable 2FA</button>
+
+            <div className="mt-4 flex items-center gap-3">
+              {user?.two_fa_enabled ? (
+                <button
+                  onClick={disable2fa}
+                  disabled={disabling2FA}
+                  className="flex items-center gap-2 px-5 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  {disabling2FA
+                    ? <Spinner size={4} color="text-red-500" />
+                    : <><ShieldOff size={14} /> Disable 2FA</>}
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setError(''); setSaved(''); setShow2FA(true); }}
+                  className="flex items-center gap-2 px-5 py-2 text-sm font-medium bg-[#0f2057] text-white rounded-lg hover:bg-[#1a3476] transition-colors"
+                >
+                  <ShieldCheck size={14} /> Enable 2FA
+                </button>
+              )}
+            </div>
+
+            {!user?.two_fa_enabled && (
+              <p className="mt-3 text-xs text-gray-400">
+                Works with Google Authenticator, Authy, or any TOTP-compatible app.
+              </p>
+            )}
           </div>
         </div>
+      )}
+
+      {show2FA && (
+        <TwoFASetupModal
+          onClose={() => {
+            setShow2FA(false);
+            if (user?.two_fa_enabled) setSaved('Two-factor authentication has been enabled successfully.');
+          }}
+          mandatory={false}
+        />
       )}
 
       {tab === 'notifications' && (

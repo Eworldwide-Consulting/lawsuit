@@ -252,4 +252,17 @@ router.post('/dismiss-2fa-prompt', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/disable-2fa', requireAuth, async (req, res, next) => {
+  try {
+    await UserRepo.disable2fa(req.user.id);
+    await invalidateUserCache(req.user.id);
+    AuditService.log({
+      userId: req.user.id,
+      action: 'user.2fa_disabled',
+      ip: req.ip,
+    });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
