@@ -44,7 +44,13 @@ const config = {
     secure: /^true$/i.test(optional('SMTP_SECURE')),
     user:   optional('SMTP_USER'),
     pass:   optional('SMTP_PASS'),
-    from:   optional('SMTP_FROM', '"TriVanta" <noreply@trivanta.com>'),
+    // CRITICAL: When using Gmail SMTP, the From address MUST match the authenticated
+    // SMTP_USER account. Sending from noreply@trivanta.com while authing as
+    // user@gmail.com causes Gmail 553 rejection, and receiving servers (Hotmail,
+    // Outlook) fail SPF since trivanta.com doesn't authorise Gmail IPs.
+    // Fix: auto-derive From from SMTP_USER when SMTP_FROM is not explicitly set.
+    from:   optional('SMTP_FROM') ||
+            (optional('SMTP_USER') ? `"TriVanta" <${optional('SMTP_USER')}>` : '"TriVanta" <noreply@trivanta.com>'),
   },
 
   stripe: {

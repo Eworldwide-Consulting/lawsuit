@@ -102,6 +102,43 @@ router.get('/health', ...guard, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── SMTP diagnostics ─────────────────────────────────────────────────────────
+
+// GET  /admin/smtp-status  — check if SMTP is reachable (no email sent)
+router.get('/smtp-status', ...guard, async (req, res, next) => {
+  try {
+    const result = await EmailService.verifySmtp();
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// POST /admin/test-email  — send a live test email and return delivery result
+router.post('/test-email', ...guard, async (req, res, next) => {
+  try {
+    const { to } = req.body;
+    if (!to) return res.status(400).json({ error: '"to" email address is required' });
+
+    // Verify SMTP config before attempting send
+    const smtpStatus = await EmailService.verifySmtp();
+    if (!smtpStatus.ok) {
+      return res.status(503).json({
+        delivered: false,
+        smtpError: smtpStatus.reason,
+        hint: 'Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM in the server .env file. ' +
+              'When using Gmail, SMTP_FROM must be the same Gmail address as SMTP_USER.',
+      });
+    }
+
+    const result = await EmailService.sendTestDirect(to);
+    AuditService.log({
+      userId: req.user.id, action: 'admin.smtp_test',
+      meta: { to, delivered: result.delivered },
+      ip: req.ip,
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 // ── Activity log ─────────────────────────────────────────────────────────────
 
 router.get('/activity', ...guard, async (req, res, next) => {

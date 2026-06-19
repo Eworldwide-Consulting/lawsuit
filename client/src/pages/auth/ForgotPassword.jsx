@@ -6,19 +6,24 @@ import Spinner from '../../components/ui/Spinner';
 import { authApi } from '../../api';
 
 export default function ForgotPassword() {
-  const [email,   setEmail]   = useState('');
-  const [loading, setLoading] = useState(false);
-  const [sent,    setSent]    = useState(false);
-  const [error,   setError]   = useState('');
+  const [email,        setEmail]       = useState('');
+  const [loading,      setLoading]     = useState(false);
+  const [sent,         setSent]        = useState(false);
+  const [error,        setError]       = useState('');
+  const [devResetLink, setDevResetLink] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setDevResetLink('');
     try {
-      await authApi.forgotPassword(email.trim().toLowerCase());
+      const res = await authApi.forgotPassword(email.trim().toLowerCase());
       // Backend always returns { sent: true } regardless of whether the email
-      // exists — this prevents user enumeration attacks.
+      // exists — this prevents user-enumeration attacks.
+      // In development the backend also returns _devResetLink so devs can test
+      // without a working SMTP server.
+      if (res.data?._devResetLink) setDevResetLink(res.data._devResetLink);
       setSent(true);
     } catch (err) {
       setError(
@@ -92,16 +97,32 @@ export default function ForgotPassword() {
             <Mail className="text-green-600" size={28} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h1>
-          <p className="text-gray-500 text-sm mb-2">
-            We sent a password reset link to <strong>{email}</strong>
+          <p className="text-gray-500 text-sm mb-1">
+            If <strong>{email}</strong> is registered with TriVanta, you'll
+            receive a password reset link within a few minutes.
           </p>
           <p className="text-gray-400 text-xs mb-6">
-            Didn't receive it? Check your spam folder. The link expires in 1 hour.
+            Don't see it? Check your spam or junk folder. The link expires in 1 hour.
           </p>
+
+          {/* Dev-only: show the reset link directly when SMTP is not configured */}
+          {devResetLink && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-left">
+              <p className="text-yellow-800 text-xs font-semibold mb-1">
+                DEV MODE — SMTP not needed
+              </p>
+              <a
+                href={devResetLink}
+                className="text-blue-600 text-xs break-all hover:underline"
+              >
+                {devResetLink}
+              </a>
+            </div>
+          )}
 
           <button
             type="button"
-            onClick={() => { setSent(false); setError(''); }}
+            onClick={() => { setSent(false); setError(''); setDevResetLink(''); }}
             className="text-sm text-green-600 hover:text-green-700 font-medium underline mb-4 block mx-auto"
           >
             Try a different email

@@ -262,6 +262,21 @@ async function start() {
 
   await ws.init(server);
   startWorkers();
+
+  // SMTP health check — must happen after startWorkers() so the transport is warm
+  const EmailService = require('./services/email.service');
+  EmailService.verifySmtp().then(result => {
+    if (result.ok) {
+      console.log('[BOOT] SMTP OK — host=' + result.host + ' from=' + result.from);
+      logger.info({ smtp: { host: result.host, from: result.from } }, 'SMTP connected');
+    } else {
+      console.warn('[BOOT] *** SMTP NOT AVAILABLE: ' + result.reason + ' ***');
+      console.warn('[BOOT] Password reset & transactional emails will NOT be delivered.');
+      console.warn('[BOOT] Add these to your .env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM');
+      logger.warn({ smtp: result }, 'SMTP unavailable — all outbound email will be dropped');
+    }
+  }).catch(err => console.warn('[BOOT] SMTP check threw: ' + err.message));
+
   console.log('[BOOT] fully started');
   logger.info('TriVanta fully started');
 }

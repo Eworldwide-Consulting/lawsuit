@@ -118,6 +118,41 @@ const EmailService = {
     });
   },
 
+  // Verify SMTP connectivity (used at boot and by admin test endpoint)
+  async verifySmtp() {
+    const transport = getTransport();
+    if (!transport) {
+      return {
+        ok: false,
+        reason: 'SMTP not configured — set SMTP_HOST and SMTP_USER in environment',
+        configured: false,
+      };
+    }
+    try {
+      await transport.verify();
+      return { ok: true, host: config.smtp.host, user: config.smtp.user, from: config.smtp.from };
+    } catch (err) {
+      return { ok: false, reason: err.message, host: config.smtp.host, user: config.smtp.user };
+    }
+  },
+
+  // Send a test email directly (bypasses queue so admin gets immediate feedback)
+  async sendTestDirect(to) {
+    const now = new Date().toLocaleString('en-US', { timeZone: 'UTC' }) + ' UTC';
+    return send({
+      to,
+      subject: 'TriVanta — SMTP Test',
+      html: wrap(`
+        ${h2('SMTP Test Email')}
+        ${p('This test confirms your TriVanta email delivery is working correctly.')}
+        ${p(`<strong>Sent at:</strong> ${esc(now)}`)}
+        ${p(`<strong>SMTP host:</strong> ${esc(config.smtp.host || '—')}`)}
+        ${p(`<strong>From:</strong> ${esc(config.smtp.from || '—')}`)}
+        <p style="color:#9ca3af;font-size:13px">If you received this, password reset and transactional emails are operational.</p>
+      `),
+    });
+  },
+
   // Used by the email worker — processes one queued job
   async processJob(job) {
     const { name, data } = job;

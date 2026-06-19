@@ -99,11 +99,25 @@ router.post('/forgot-password', async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'email required' });
 
+    const logger = require('../logger');
     const result = await AuthService.forgotPassword(email.toLowerCase());
-    // Fire-and-forget: only send if a real account was found (indicated by _email)
+
     if (result._email) {
+      // Registered user found — queue the reset email
       EmailService.sendPasswordReset(result._email, result._token);
+      logger.info({ email: result._email }, 'Password reset email queued');
+
+      // In development: return the reset link directly so devs can test without SMTP
+      if (!config.isProduction) {
+        const resetLink = `${config.client.url}/reset-password?token=${result._token}`;
+        logger.info({ resetLink }, '[DEV] password reset link (no SMTP needed)');
+        return res.json({ sent: true, _devResetLink: resetLink });
+      }
+    } else {
+      // No account found — log it (helps diagnose support requests) but never tell the client
+      logger.warn({ email: email.toLowerCase() }, 'Password reset requested for unregistered email');
     }
+
     // Always return the same response to prevent user enumeration
     res.json({ sent: true });
   } catch (err) { next(err); }
