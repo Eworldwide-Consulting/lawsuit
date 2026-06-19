@@ -103,15 +103,20 @@ router.post('/forgot-password', async (req, res, next) => {
     const result = await AuthService.forgotPassword(email.toLowerCase());
 
     if (result._email) {
-      // Registered user found — queue the reset email
-      EmailService.sendPasswordReset(result._email, result._token);
-      logger.info({ email: result._email }, 'Password reset email queued');
-
-      // In development: return the reset link directly so devs can test without SMTP
       if (!config.isProduction) {
+        // In development: skip SMTP and return the link directly for easy testing
         const resetLink = `${config.client.url}/reset-password?token=${result._token}`;
         logger.info({ resetLink }, '[DEV] password reset link (no SMTP needed)');
         return res.json({ sent: true, _devResetLink: resetLink });
+      }
+
+      // Production: send directly via SMTP (not the in-memory queue) so the email
+      // is never lost if the process restarts before the queued job is processed.
+      const delivery = await EmailService.sendPasswordResetDirect(result._email, result._token);
+      if (delivery?.delivered) {
+        logger.info({ email: result._email }, 'Password reset email sent');
+      } else {
+        logger.error({ email: result._email, reason: delivery?.reason }, 'Password reset email delivery failed');
       }
     } else {
       // No account found — log it (helps diagnose support requests) but never tell the client

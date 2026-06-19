@@ -84,6 +84,13 @@ const EmailService = {
     return queue(JOB.PASSWORD_RESET, { to, token });
   },
 
+  // Direct SMTP send for password reset — bypasses the in-memory queue so the email
+  // is never lost if the Node.js process restarts before the job is processed.
+  sendPasswordResetDirect(to, token) {
+    const link = `${config.client.url}/reset-password?token=${token}`;
+    return send({ to, subject: 'Reset your TriVanta password', html: tmplPasswordReset(link) });
+  },
+
   sendNewMessage(to, { senderName, subject, preview }) {
     return queue(JOB.NEW_MESSAGE, { to, senderName, subject, preview });
   },
