@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
+import ContactSalesModal from '../components/ui/ContactSalesModal';
 import {
   Shield, Lock, FileText, Calendar, MessageSquare,
   CheckCircle, Star, ArrowRight, Upload, Search,
@@ -14,7 +15,9 @@ export default function Landing() {
   const navigate  = useNavigate();
   const [scrolled, setScrolled]   = useState(false);
   const [menuOpen, setMenuOpen]   = useState(false);
-  const [faqOpen,  setFaqOpen]    = useState(null);
+  const [faqOpen,       setFaqOpen]       = useState(null);
+  const [salesModal,    setSalesModal]    = useState(false);
+  const [salesPlan,     setSalesPlan]     = useState('Enterprise');
   const heroRef = useRef(null);
 
   useEffect(() => {
@@ -907,7 +910,14 @@ export default function Landing() {
                   </ul>
 
                   <button
-                    onClick={() => navigate('/register')}
+                    onClick={() => {
+                      if (cta === 'Contact Sales') {
+                        setSalesPlan(name);
+                        setSalesModal(true);
+                      } else {
+                        navigate('/register');
+                      }
+                    }}
                     className={`w-full py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer ${
                       hot
                         ? 'bg-gold-500 text-navy-950 hover:bg-gold-600 hover:shadow-lg hover:shadow-gold-500/25'
@@ -1139,6 +1149,13 @@ export default function Landing() {
         </footer>
 
       </div>
+
+      {salesModal && (
+        <ContactSalesModal
+          defaultPlan={salesPlan}
+          onClose={() => setSalesModal(false)}
+        />
+      )}
     </>
   );
 }

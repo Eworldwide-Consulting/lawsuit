@@ -43,16 +43,16 @@ function getTransport() {
 
 // ── Core send (wrapped in circuit breaker) ────────────────────────────────────
 
-async function send({ to, subject, html, text }) {
+async function send({ to, subject, html, text, replyTo }) {
   const transport = getTransport();
   if (!transport) {
     logger.warn({ to, subject }, 'Email skipped — SMTP not configured');
     return { delivered: false, reason: 'no_transport' };
   }
   try {
-    await breakers.smtp.call(() =>
-      transport.sendMail({ from: config.smtp.from, to, subject, html, text })
-    );
+    const mail = { from: config.smtp.from, to, subject, html, text };
+    if (replyTo) mail.replyTo = replyTo;
+    await breakers.smtp.call(() => transport.sendMail(mail));
     logger.info({ to, subject }, 'Email sent');
     return { delivered: true };
   } catch (err) {
@@ -106,6 +106,16 @@ const EmailService = {
 
   sendAttorneyDecision(to, { firstName, decision }) {
     return queue(JOB.ATTORNEY_DECISION, { to, firstName, decision });
+  },
+
+  sendContactSales({ name, email, company, phone, plan, message }) {
+    const salesTo = config.smtp.user || 'legal@trivanta.com';
+    return send({
+      to:      salesTo,
+      replyTo: email,
+      subject: `[Sales Enquiry] ${name}${company ? ` — ${company}` : ''} (${plan} plan)`,
+      html:    tmplContactSales({ name, email, company, phone, plan, message }),
+    });
   },
 
   // Used by the email worker — processes one queued job
@@ -292,6 +302,29 @@ function tmplAttorneyPending({ firstName, lastName, email, role }) {
     </table>
     ${btn(adminUrl, 'Review in Admin Panel')}
     <p style="color:#9ca3af;font-size:13px">Log in to the admin panel to approve or reject this account.</p>
+  `);
+}
+
+function tmplContactSales({ name, email, company, phone, plan, message }) {
+  return wrap(`
+    ${h2('New Sales Enquiry')}
+    <table style="width:100%;border-collapse:collapse;margin:0 0 20px;font-size:14px">
+      <tr><td style="padding:7px 0;color:#6b7280;width:110px">Name</td>
+          <td style="padding:7px 0;font-weight:600">${esc(name)}</td></tr>
+      <tr><td style="padding:7px 0;color:#6b7280">Email</td>
+          <td style="padding:7px 0"><a href="mailto:${esc(email)}" style="color:#0f2057">${esc(email)}</a></td></tr>
+      ${company ? `<tr><td style="padding:7px 0;color:#6b7280">Company</td>
+          <td style="padding:7px 0">${esc(company)}</td></tr>` : ''}
+      ${phone ? `<tr><td style="padding:7px 0;color:#6b7280">Phone</td>
+          <td style="padding:7px 0">${esc(phone)}</td></tr>` : ''}
+      <tr><td style="padding:7px 0;color:#6b7280">Plan</td>
+          <td style="padding:7px 0"><strong>${esc(plan)}</strong></td></tr>
+    </table>
+    <div style="background:#f9fafb;border-left:3px solid #d4a017;padding:14px 18px;border-radius:4px;margin-bottom:20px">
+      <p style="color:#374151;font-size:14px;line-height:1.6;margin:0">${esc(message).replace(/\n/g, '<br>')}</p>
+    </div>
+    ${btn(`mailto:${esc(email)}`, 'Reply to Enquiry')}
+    <p style="color:#9ca3af;font-size:12px;margin:0">Reply-To is pre-set to the enquirer's email address.</p>
   `);
 }
 
