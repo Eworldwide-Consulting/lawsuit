@@ -18,13 +18,42 @@ export default function Landing() {
   const [faqOpen,       setFaqOpen]       = useState(null);
   const [salesModal,    setSalesModal]    = useState(false);
   const [salesPlan,     setSalesPlan]     = useState('Enterprise');
-  const heroRef = useRef(null);
+  const heroRef     = useRef(null);
+  const servicesRef = useRef(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('srv-in'); }),
+      { threshold: 0.1, rootMargin: '0px 0px -48px 0px' }
+    );
+    servicesRef.current?.querySelectorAll('.srv-card').forEach(c => io.observe(c));
+    return () => io.disconnect();
+  }, []);
+
+  const onSrvMove = (e) => {
+    const el = e.currentTarget;
+    if (!el.classList.contains('srv-in')) return;
+    const r  = el.getBoundingClientRect();
+    const rx = ((e.clientX - r.left) / r.width  - .5) * 14;
+    const ry = ((e.clientY - r.top)  / r.height - .5) * -14;
+    el.style.transition = 'opacity .68s cubic-bezier(.22,1,.36,1), transform .13s ease, box-shadow .18s ease, border-color .18s ease';
+    el.style.transform  = `perspective(920px) rotateX(${ry}deg) rotateY(${rx}deg) translateY(-6px)`;
+    el.style.setProperty('--mx', `${e.clientX - r.left}px`);
+    el.style.setProperty('--my', `${e.clientY - r.top}px`);
+  };
+
+  const onSrvLeave = (e) => {
+    const el = e.currentTarget;
+    el.style.transition = 'opacity .68s cubic-bezier(.22,1,.36,1), transform .52s cubic-bezier(.22,1,.36,1), box-shadow .32s ease, border-color .32s ease';
+    el.style.transform  = '';
+    setTimeout(() => { try { el.style.transition = ''; } catch (_) {} }, 520);
+  };
 
   const scrollTo = (id) => {
     setMenuOpen(false);
@@ -163,10 +192,92 @@ export default function Landing() {
           text-transform: uppercase;
         }
 
+        /* ── Services Section ── */
+        @keyframes srvBeamSwipe {
+          from { transform: translateX(-120%) skewX(-18deg); }
+          to   { transform: translateX(220%)  skewX(-18deg); }
+        }
+        @keyframes srvDotPulse {
+          0%,100% { transform: scale(1);   opacity: 1;   }
+          50%      { transform: scale(1.6); opacity: 0.6; }
+        }
+        .srv-card {
+          opacity: 0;
+          transform: translateY(52px) scale(.97);
+          transition:
+            opacity  .68s cubic-bezier(.22,1,.36,1),
+            transform .68s cubic-bezier(.22,1,.36,1),
+            box-shadow .32s ease,
+            border-color .32s ease;
+        }
+        .srv-card.srv-in {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+        .srv-card.srv-in:hover {
+          border-color: rgba(212,175,55,.32);
+          box-shadow:
+            0 28px 80px rgba(0,0,0,.35),
+            0 0 0 1px rgba(212,175,55,.14) inset,
+            0 0 56px rgba(212,175,55,.09);
+        }
+        .srv-icon {
+          transition: transform .42s cubic-bezier(.34,1.56,.64,1);
+        }
+        .srv-card.srv-in:hover .srv-icon {
+          transform: scale(1.22) rotate(-8deg);
+        }
+        .srv-tag {
+          transition: background .26s, border-color .26s;
+        }
+        .srv-card.srv-in:hover .srv-tag {
+          background: rgba(255,255,255,.1);
+          border-color: rgba(255,255,255,.2);
+        }
+        .srv-stat {
+          transition: opacity .3s, transform .3s;
+        }
+        .srv-card.srv-in:hover .srv-stat {
+          opacity: 1 !important;
+          transform: translateY(-1px);
+        }
+        .srv-spotlight {
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          pointer-events: none;
+          z-index: 0;
+          background: radial-gradient(360px at var(--mx,-9999px) var(--my,-9999px), rgba(255,255,255,.075), transparent 80%);
+          opacity: 0;
+          transition: opacity .38s;
+        }
+        .srv-card.srv-in:hover .srv-spotlight { opacity: 1; }
+        .srv-beam {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 0;
+          background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,.055) 50%, transparent 75%);
+          transform: translateX(-120%) skewX(-18deg);
+        }
+        .srv-card.srv-in:hover .srv-beam {
+          animation: srvBeamSwipe .85s ease forwards;
+        }
+        .srv-content { position: relative; z-index: 1; }
+        .srv-dot { animation: srvDotPulse 1.8s ease-in-out infinite; }
+
         @media (prefers-reduced-motion: reduce) {
           .animate-float, .animate-pulse-glow, .animate-spin-slow,
           .animate-cspin, .animate-fade-up, .animate-slide-in,
           .animate-count-up, .gold-shimmer { animation: none; }
+          .srv-card {
+            opacity: 1;
+            transform: none;
+            transition: box-shadow .3s, border-color .3s;
+          }
+          .srv-card.srv-in { opacity: 1; transform: none; }
+          .srv-icon, .srv-tag, .srv-stat { transition: none; }
+          .srv-dot { animation: none; }
         }
       `}</style>
 
@@ -487,8 +598,24 @@ export default function Landing() {
         {/* ════════════════════════
             SERVICES
         ════════════════════════ */}
-        <section id="services" className="py-24 bg-[#04091e]">
-          <div className="max-w-6xl mx-auto px-6">
+        <section id="services" className="py-28 bg-[#04091e] relative overflow-hidden" ref={servicesRef}>
+          {/* Ambient background */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `
+                radial-gradient(ellipse 55% 45% at 18% 28%, rgba(59,130,246,.09) 0%, transparent 100%),
+                radial-gradient(ellipse 55% 45% at 82% 72%, rgba(212,175,55,.07) 0%, transparent 100%),
+                linear-gradient(rgba(255,255,255,.016) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.016) 1px, transparent 1px)
+              `,
+              backgroundSize: '100% 100%, 100% 100%, 52px 52px, 52px 52px',
+            }}
+          />
+
+          <div className="max-w-6xl mx-auto px-6 relative z-10">
+
+            {/* ── Header ── */}
             <div className="text-center mb-16">
               <span className="section-label text-gold-400 bg-gold-500/10 border border-gold-500/25 rounded-full px-4 py-2 inline-block mb-4">
                 Our Services
@@ -501,66 +628,203 @@ export default function Landing() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {[
-                {
-                  icon: Database,
-                  title: 'Secure Document Vault',
-                  desc: 'Store, organise, and access all your legal documents with military-grade AES-256 encryption. Smart folders, version control, and instant search.',
-                  features: ['End-to-end encrypted', 'Unlimited storage', 'Version history', 'Smart organisation'],
-                  accent: 'from-[#1a2e6b] to-[#0f2057]',
-                  iconBg: 'bg-blue-500/15 text-blue-300',
-                  dotColor: 'text-blue-300',
-                },
-                {
-                  icon: FileText,
-                  title: 'AI-Assisted Document Review',
-                  desc: 'Machine-learning analysis combined with qualified attorney review. Get actionable feedback on contracts, agreements, and filings within 24 hours.',
-                  features: ['AI-powered insights', 'Attorney review', 'Risk flagging', '24 hr turnaround'],
-                  accent: 'from-[#2a1e00] to-[#1a1200]',
-                  iconBg: 'bg-gold-500/15 text-gold-300',
-                  dotColor: 'text-gold-300',
-                },
-                {
-                  icon: Calendar,
-                  title: 'Attorney Booking & Scheduling',
-                  desc: 'Find and book consultations with certified attorneys. Real-time availability, video conferencing, and automated reminders included.',
-                  features: ['Real-time availability', 'Video consultations', 'Auto reminders', 'Instant confirmation'],
-                  accent: 'from-[#0b2a1a] to-[#071a10]',
-                  iconBg: 'bg-green-500/15 text-green-300',
-                  dotColor: 'text-green-300',
-                },
-                {
-                  icon: MessageSquare,
-                  title: 'Encrypted Client Messaging',
-                  desc: 'Secure messaging between clients and attorneys — encrypted chat, file sharing, follow-up tracking, and case status notifications.',
-                  features: ['Encrypted messaging', 'File sharing', 'Follow-up tracking', 'Case notifications'],
-                  accent: 'from-[#1e0b2a] to-[#13071a]',
-                  iconBg: 'bg-purple-500/15 text-purple-300',
-                  dotColor: 'text-purple-300',
-                },
-              ].map(({ icon: Icon, title, desc, features, accent, iconBg, dotColor }) => (
-                <div
-                  key={title}
-                  className={`bg-gradient-to-br ${accent} rounded-2xl p-8 border border-white/8 card-lift gold-border-hover cursor-default`}
-                >
-                  <div className={`w-13 h-13 w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mb-6`}>
-                    <Icon size={26} />
+            {/* ── Bento Grid ── */}
+            <div className="grid md:grid-cols-3 gap-5">
+
+              {/* Card 1 — Secure Document Vault (featured: col-span-2) */}
+              <div
+                className="srv-card md:col-span-2 rounded-2xl border border-white/8 relative overflow-hidden cursor-default"
+                style={{ background: 'linear-gradient(140deg,#0f2057 0%,#0a1540 100%)', transitionDelay: '0s' }}
+                onMouseMove={onSrvMove}
+                onMouseLeave={onSrvLeave}
+              >
+                <div className="srv-spotlight" />
+                <div className="srv-beam" />
+                <div className="srv-content flex flex-col md:flex-row">
+                  {/* Left pane */}
+                  <div className="flex-1 p-7 md:p-8">
+                    <div className="flex flex-wrap items-center gap-3 mb-5">
+                      <div className="srv-icon w-12 h-12 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center">
+                        <Database size={24} className="text-blue-300" />
+                      </div>
+                      <div className="srv-stat flex items-center gap-2 bg-blue-500/12 border border-blue-500/22 rounded-full px-3 py-1.5" style={{ opacity: .75 }}>
+                        <span className="srv-dot w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                        <span className="text-blue-300 text-xs font-bold">50 M+ Docs Secured</span>
+                      </div>
+                    </div>
+                    <h3 className="font-display text-2xl font-bold text-white mb-3">Secure Document Vault</h3>
+                    <p className="text-blue-200/80 text-sm leading-relaxed mb-6">
+                      Store, organise, and access all your legal documents with military-grade AES-256 encryption.
+                      Smart folders, version control, and instant search.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['End-to-end encrypted', 'Unlimited storage', 'Version history', 'Smart organisation'].map(f => (
+                        <div key={f} className="srv-tag flex items-center gap-2 bg-white/5 border border-white/8 rounded-lg px-3 py-2 text-xs text-blue-100">
+                          <Check size={9} className="text-blue-400 flex-shrink-0" />
+                          {f}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <h3 className="font-display text-2xl font-bold text-white mb-3">{title}</h3>
-                  <p className="text-blue-200/80 text-sm leading-relaxed mb-6">{desc}</p>
-                  <ul className="grid grid-cols-2 gap-2.5">
-                    {features.map(f => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-blue-100">
-                        <span className="w-4 h-4 rounded-full bg-white/8 flex items-center justify-center flex-shrink-0">
-                          <Check size={9} className={dotColor} />
-                        </span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
+                  {/* Right pane — mini vault visual */}
+                  <div className="hidden md:flex flex-col justify-center w-52 flex-shrink-0 bg-white/3 border-l border-white/6 p-6">
+                    <div className="text-blue-300/45 text-[9px] font-bold uppercase tracking-widest mb-3">Vault Status</div>
+                    <div className="space-y-2 mb-4">
+                      {[
+                        { name: 'Contract_v3.pdf',   badge: 'Secure',  bc: 'text-green-400 bg-green-400/10' },
+                        { name: 'NDA_Final.pdf',     badge: 'Secure',  bc: 'text-green-400 bg-green-400/10' },
+                        { name: 'Agreement.docx',    badge: 'Pending', bc: 'text-gold-400 bg-gold-400/10'   },
+                      ].map(({ name, badge, bc }) => (
+                        <div key={name} className="flex items-center gap-2 bg-white/5 rounded-lg px-2.5 py-2 border border-white/6">
+                          <div className="w-6 h-6 bg-blue-500/15 rounded flex items-center justify-center flex-shrink-0">
+                            <FileText size={9} className="text-blue-300" />
+                          </div>
+                          <span className="text-[9px] text-blue-200/65 truncate flex-1">{name}</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${bc}`}>{badge}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bg-white/5 rounded-lg p-3 border border-white/6">
+                      <div className="flex justify-between mb-1.5">
+                        <span className="text-[9px] text-blue-300/50">Storage Used</span>
+                        <span className="text-[9px] text-blue-300 font-bold">62%</span>
+                      </div>
+                      <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
+                        <div className="h-full w-[62%] bg-gradient-to-r from-blue-500 to-blue-400 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Card 2 — AI Document Review */}
+              <div
+                className="srv-card rounded-2xl border border-white/8 p-7 relative overflow-hidden cursor-default"
+                style={{ background: 'linear-gradient(140deg,#2a1800 0%,#1a1000 100%)', transitionDelay: '0.12s' }}
+                onMouseMove={onSrvMove}
+                onMouseLeave={onSrvLeave}
+              >
+                <div className="srv-spotlight" />
+                <div className="srv-beam" />
+                <div className="srv-content">
+                  <div className="flex flex-wrap items-center gap-3 mb-5">
+                    <div className="srv-icon w-12 h-12 rounded-xl bg-gold-500/15 border border-gold-500/20 flex items-center justify-center">
+                      <FileText size={24} className="text-gold-300" />
+                    </div>
+                    <div className="srv-stat flex items-center gap-2 bg-gold-500/12 border border-gold-500/22 rounded-full px-3 py-1.5" style={{ opacity: .75 }}>
+                      <span className="srv-dot w-1.5 h-1.5 rounded-full bg-gold-400 flex-shrink-0" />
+                      <span className="text-gold-300 text-xs font-bold">24 hr Turnaround</span>
+                    </div>
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-white mb-3">AI Document Review</h3>
+                  <p className="text-blue-200/80 text-sm leading-relaxed mb-5">
+                    Machine-learning combined with qualified attorney review. Actionable feedback within 24 hours.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['AI insights', 'Attorney review', 'Risk flagging', '24 hr SLA'].map(f => (
+                      <div key={f} className="srv-tag flex items-center gap-1.5 bg-white/5 border border-white/8 rounded-lg px-2.5 py-2 text-[11px] text-blue-100">
+                        <Check size={8} className="text-gold-400 flex-shrink-0" />
+                        {f}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3 — Attorney Booking */}
+              <div
+                className="srv-card rounded-2xl border border-white/8 p-7 relative overflow-hidden cursor-default"
+                style={{ background: 'linear-gradient(140deg,#0b2018 0%,#071510 100%)', transitionDelay: '0.24s' }}
+                onMouseMove={onSrvMove}
+                onMouseLeave={onSrvLeave}
+              >
+                <div className="srv-spotlight" />
+                <div className="srv-beam" />
+                <div className="srv-content">
+                  <div className="flex flex-wrap items-center gap-3 mb-5">
+                    <div className="srv-icon w-12 h-12 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center">
+                      <Calendar size={24} className="text-green-300" />
+                    </div>
+                    <div className="srv-stat flex items-center gap-2 bg-green-500/12 border border-green-500/22 rounded-full px-3 py-1.5" style={{ opacity: .75 }}>
+                      <span className="srv-dot w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                      <span className="text-green-300 text-xs font-bold">640+ Attorneys</span>
+                    </div>
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-white mb-3">Attorney Booking</h3>
+                  <p className="text-blue-200/80 text-sm leading-relaxed mb-5">
+                    Find and book consultations with certified attorneys. Real-time availability and video conferencing.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Live availability', 'Video calls', 'Auto reminders', 'Instant confirm'].map(f => (
+                      <div key={f} className="srv-tag flex items-center gap-1.5 bg-white/5 border border-white/8 rounded-lg px-2.5 py-2 text-[11px] text-blue-100">
+                        <Check size={8} className="text-green-400 flex-shrink-0" />
+                        {f}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4 — Encrypted Messaging (featured: col-span-2) */}
+              <div
+                className="srv-card md:col-span-2 rounded-2xl border border-white/8 relative overflow-hidden cursor-default"
+                style={{ background: 'linear-gradient(140deg,#1a0b2a 0%,#10071a 100%)', transitionDelay: '0.36s' }}
+                onMouseMove={onSrvMove}
+                onMouseLeave={onSrvLeave}
+              >
+                <div className="srv-spotlight" />
+                <div className="srv-beam" />
+                <div className="srv-content flex flex-col md:flex-row-reverse">
+                  {/* Right pane — mini chat visual */}
+                  <div className="hidden md:flex flex-col justify-center w-52 flex-shrink-0 bg-white/3 border-l border-white/6 p-6">
+                    <div className="text-purple-300/45 text-[9px] font-bold uppercase tracking-widest mb-3">Secure Chat</div>
+                    <div className="space-y-2.5 mb-3">
+                      {[
+                        { msg: "I've reviewed your contract.",    from: 'AT', align: 'left'  },
+                        { msg: 'When can we schedule a call?',    from: 'SC', align: 'right' },
+                        { msg: 'Tomorrow 10 AM works for me.',    from: 'AT', align: 'left'  },
+                      ].map(({ msg, from, align }, i) => (
+                        <div key={i} className={`flex ${align === 'right' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`rounded-xl px-3 py-2 max-w-[88%] ${align === 'right' ? 'bg-white/8' : 'bg-purple-500/20'}`}>
+                            <div className="text-[8px] text-purple-300/45 font-bold mb-0.5">{from}</div>
+                            <div className="text-[10px] text-white/80 leading-tight">{msg}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white/5 rounded-xl px-3 py-2 border border-white/8">
+                      <Lock size={8} className="text-purple-400 flex-shrink-0" />
+                      <span className="text-[9px] text-purple-300/55">End-to-end encrypted</span>
+                    </div>
+                  </div>
+                  {/* Left pane */}
+                  <div className="flex-1 p-7 md:p-8">
+                    <div className="flex flex-wrap items-center gap-3 mb-5">
+                      <div className="srv-icon w-12 h-12 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center">
+                        <MessageSquare size={24} className="text-purple-300" />
+                      </div>
+                      <div className="srv-stat flex items-center gap-2 bg-purple-500/12 border border-purple-500/22 rounded-full px-3 py-1.5" style={{ opacity: .75 }}>
+                        <span className="srv-dot w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />
+                        <span className="text-purple-300 text-xs font-bold">100% Encrypted</span>
+                      </div>
+                    </div>
+                    <h3 className="font-display text-2xl font-bold text-white mb-3">Encrypted Messaging</h3>
+                    <p className="text-blue-200/80 text-sm leading-relaxed mb-6">
+                      Secure messaging between clients and attorneys — encrypted chat, file sharing, follow-up
+                      tracking, and case status notifications.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Encrypted messaging', 'File sharing', 'Follow-up tracking', 'Case notifications'].map(f => (
+                        <div key={f} className="srv-tag flex items-center gap-2 bg-white/5 border border-white/8 rounded-lg px-3 py-2 text-xs text-blue-100">
+                          <Check size={9} className="text-purple-400 flex-shrink-0" />
+                          {f}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </section>

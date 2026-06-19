@@ -14,6 +14,8 @@ const authApi = {
   enable2fa:          code  => http.post('/auth/enable-2fa', { code }),
   disable2fa:         ()    => http.post('/auth/disable-2fa'),
   dismiss2faPrompt:   ()    => http.post('/auth/dismiss-2fa-prompt'),
+  forgotPassword:     email => http.post('/auth/forgot-password', { email }),
+  resetPassword:      d     => http.post('/auth/reset-password', d),
 };
 
 export default authApi;
