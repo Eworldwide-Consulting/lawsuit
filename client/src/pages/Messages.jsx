@@ -1,7 +1,8 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { messagesApi, usersApi } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Send, Inbox, Send as SendIcon, Check } from 'lucide-react';
+import { Send, Inbox, Send as SendIcon, Check, AlertCircle } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
 const isStaff = role => ['attorney', 'partner', 'itsupport'].includes(role);
@@ -17,11 +18,15 @@ export default function Messages() {
   const [recipients, setRecipients] = useState([]);
   const [form, setForm]         = useState({ toUserId: '', subject: '', body: '' });
   const [sending, setSending]   = useState(false);
-  const [toast, setToast]       = useState('');
+  const [toast, setToast]       = useState({ msg: '', type: 'success' });
 
-  const showToast = msg => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3500);
+  // Keep a stable ref to load so the socket effect can call it without
+  // re-registering the socket on every render.
+  const loadRef = useRef(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast({ msg: '', type: 'success' }), 3500);
   };
 
   const load = async () => {
@@ -59,7 +64,28 @@ export default function Messages() {
     }
   };
 
+  // Always keep the ref pointing at the latest load closure.
+  loadRef.current = load;
+
   useEffect(() => { load(); }, []);
+
+  // Real-time inbox: listen for new messages via WebSocket and reload.
+  // A separate socket connection per page is acceptable here; the server
+  // deduplicates delivery and the connection is torn down on unmount.
+  useEffect(() => {
+    const token = localStorage.getItem('lp_token');
+    const socket = io({ auth: { token }, transports: ['websocket'], reconnectionDelay: 2000 });
+    socket.on('message:new', () => { loadRef.current(); });
+    return () => { socket.disconnect(); };
+  }, []);
+
+  // Reload inbox when the browser tab regains focus so stale state is
+  // refreshed even when the WebSocket missed an event while the tab was hidden.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') loadRef.current(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   async function markRead(msg) {
     if (!msg.read_at) {
@@ -74,14 +100,18 @@ export default function Messages() {
     if (!form.toUserId || !form.body) return;
     setSending(true);
     try {
-      await messagesApi.send(form);
+      // toUserId comes from a <select> as a string; the server schema requires
+      // a number — coerce it here before sending.
+      await messagesApi.send({ ...form, toUserId: Number(form.toUserId) });
       setCompose(false);
       setForm({ toUserId: '', subject: '', body: '' });
-      showToast('Message sent successfully!');
-      // Switch to Sent tab and reload so new message appears
+      showToast('Message sent successfully!', 'success');
       setTab('sent');
       setSelected(null);
       load();
+    } catch (err) {
+      const detail = err.response?.data?.error || 'Failed to send message. Please try again.';
+      showToast(detail, 'error');
     } finally {
       setSending(false);
     }
@@ -93,9 +123,12 @@ export default function Messages() {
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto h-[calc(100vh-4rem)] flex flex-col">
       {/* Toast */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg animate-fade-in">
-          <Check size={15} /> {toast}
+      {toast.msg && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg animate-fade-in ${
+          toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'
+        }`}>
+          {toast.type === 'error' ? <AlertCircle size={15} /> : <Check size={15} />}
+          {toast.msg}
         </div>
       )}
 

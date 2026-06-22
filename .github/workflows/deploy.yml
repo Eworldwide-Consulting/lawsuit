@@ -72,6 +72,35 @@ jobs:
             exit 1
           fi
 
+      # -- 5a. Backup current deployment for rollback ---------------------------
+      # Snapshot the live files to _backup/ before overwriting them.
+      # Non-fatal: if there is no previous deployment the rsync simply skips.
+      - name: Backup current deployment
+        continue-on-error: true
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh \
+            -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c '
+              if [ -d \"${{ secrets.DEPLOY_PATH }}/server/src\" ]; then
+                mkdir -p \"${{ secrets.DEPLOY_PATH }}/_backup\"
+                rsync -a \
+                  --exclude node_modules \
+                  --exclude _backup \
+                  --exclude logs \
+                  --exclude uploads \
+                  --exclude \"*.db\" \
+                  \"${{ secrets.DEPLOY_PATH }}/\" \"${{ secrets.DEPLOY_PATH }}/_backup/\"
+                echo \"Backup created at ${{ secrets.DEPLOY_PATH }}/_backup\"
+              else
+                echo \"No previous deployment found - skipping backup\"
+              fi
+            '"
+
       # -- 5. Sync project files ---------------------------------------------
       - name: Sync files to server
         env:
@@ -88,6 +117,7 @@ jobs:
             --exclude '*.db-wal'             \
             --exclude 'uploads/'             \
             --exclude 'logs/'                \
+            --exclude '_backup/'             \
             --exclude '.git/'                \
             -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=15" \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
@@ -298,6 +328,50 @@ jobs:
           echo "   Last response:"
           cat /tmp/health.json 2>/dev/null || echo "   (no response body)"
           exit 1
+
+      # -- 10a. Rollback to previous deployment on failure -------------------
+      # Restores the _backup/ snapshot taken before the new files were pushed,
+      # then restarts the app so the previous working version goes live again.
+      # continue-on-error so that a rollback failure still lets log dump run.
+      - name: Rollback to previous deployment
+        if: failure()
+        continue-on-error: true
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          echo "============================================"
+          echo " ROLLING BACK to previous deployment..."
+          echo "============================================"
+          sshpass -e ssh \
+            -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c '
+              BACKUP=\"${{ secrets.DEPLOY_PATH }}/_backup\"
+              if [ ! -d \"\$BACKUP/server/src\" ]; then
+                echo \"No valid backup found at \$BACKUP - skipping rollback\"
+                exit 0
+              fi
+              echo \"Restoring files from \$BACKUP ...\"
+              rsync -a \
+                --exclude node_modules \
+                --exclude _backup \
+                --exclude logs \
+                --exclude uploads \
+                --exclude \"*.db\" \
+                \"\$BACKUP/\" \"${{ secrets.DEPLOY_PATH }}/\"
+              echo \"Files restored - restarting application...\"
+              cd \"${{ secrets.DEPLOY_PATH }}\"
+              if command -v pm2 &>/dev/null; then
+                pm2 restart trivanta 2>/dev/null || true
+                echo \"Restarted via PM2\"
+              else
+                touch server/src/index.js
+                echo \"Restarted via hPanel touch trigger\"
+              fi
+              echo \"ROLLBACK COMPLETE - previous version is live\"
+            '" || true
 
       # -- 10. Dump logs on failure (always runs after a failed step) --------
       - name: Dump server logs on failure
