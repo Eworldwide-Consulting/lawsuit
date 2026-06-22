@@ -6,28 +6,40 @@ import { useAuth } from '../../context/AuthContext';
 import { messagesApi } from '../../api';
 import { Bell, Menu, Search, LayoutDashboard, FileText, Folder, Calendar, MessageSquare, ClipboardList } from 'lucide-react';
 import TwoFASetupModal from '../ui/TwoFASetupModal';
+import ProfileCompletionModal from '../ui/ProfileCompletionModal';
 import NotificationPanel from '../notifications/NotificationPanel';
 import Avatar from '../ui/Avatar';
 
 export default function DashboardLayout({ children }) {
   const { user } = useAuth();
-  const [sidebarOpen, setSidebarOpen]   = useState(false);
-  const [unreadMsg, setUnreadMsg]       = useState(0);
-  const [unreadNotif, setUnreadNotif]   = useState(0);
-  const [notifOpen, setNotifOpen]       = useState(false);
-  const [show2FA, setShow2FA]           = useState(false);
+  const [sidebarOpen, setSidebarOpen]       = useState(false);
+  const [unreadMsg, setUnreadMsg]           = useState(0);
+  const [unreadNotif, setUnreadNotif]       = useState(0);
+  const [notifOpen, setNotifOpen]           = useState(false);
+  const [show2FA, setShow2FA]               = useState(false);
+  const [showProfileComplete, setShowProfileComplete] = useState(false);
   const navigate   = useNavigate();
   const socketRef  = useRef(null);
   const bellRef    = useRef(null);
 
+  // Profile completion prompt for new Google-registered clients
+  useEffect(() => {
+    if (!user || user.role !== 'client') return;
+    if (sessionStorage.getItem('lp_needs_profile') === '1') {
+      const t = setTimeout(() => setShowProfileComplete(true), 800);
+      return () => clearTimeout(t);
+    }
+  }, [user?.id]);
+
   // 2FA prompt — optional for all roles; shown once if not yet set up and not dismissed
   useEffect(() => {
     if (!user) return;
+    if (showProfileComplete) return; // don't stack modals
     const shouldShow = !user.two_fa_enabled && !user.two_fa_prompt_shown;
     if (!shouldShow) return;
     const t = setTimeout(() => setShow2FA(true), 1500);
     return () => clearTimeout(t);
-  }, [user?.id]);
+  }, [user?.id, showProfileComplete]);
 
   // WebSocket — message count + notification count
   useEffect(() => {
@@ -199,6 +211,10 @@ export default function DashboardLayout({ children }) {
           </div>
         </nav>
       </div>
+
+      {showProfileComplete && (
+        <ProfileCompletionModal onClose={() => setShowProfileComplete(false)} />
+      )}
 
       {show2FA && (
         <TwoFASetupModal

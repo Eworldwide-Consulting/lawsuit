@@ -148,6 +148,8 @@ jobs:
             ADMIN_URL=https://admin.gkasevault.io
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
         run: |
           echo "$ENV_CONTENT" > /tmp/trivanta.env
           sshpass -e scp \

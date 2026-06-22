@@ -6,6 +6,7 @@ const authApi = {
   verify2fa:          d     => http.post('/auth/verify-2fa', d),
   me:                 ()    => http.get('/auth/me'),
   updateProfile:      d     => http.put('/auth/profile', d),
+  completeProfile:    d     => http.put('/auth/complete-profile', d),
   changePassword:     d     => http.put('/auth/change-password', d),
   checkEmail:         email => http.get('/auth/check-email', { params: { email } }),
   verifyEmail:        token => http.get('/auth/verify-email', { params: { token } }),
@@ -16,6 +17,7 @@ const authApi = {
   dismiss2faPrompt:   ()    => http.post('/auth/dismiss-2fa-prompt'),
   forgotPassword:     email => http.post('/auth/forgot-password', { email }),
   resetPassword:      d     => http.post('/auth/reset-password', d),
+  googleStatus:       ()    => http.get('/auth/google/status'),
 };
 
 export default authApi;

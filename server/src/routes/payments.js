@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { requireAuth } = require('../middleware/auth');
 const InvoiceRepo         = require('../repositories/invoice.repository');
+const UserRepo            = require('../repositories/user.repository');
 const { parsePagination } = require('../lib/pagination');
 const config              = require('../config');
 const NotificationService = require('../services/notification.service');
@@ -10,6 +11,15 @@ const ws                  = require('../websocket');
 const stripe = config.stripe.secretKey
   ? require('stripe')(config.stripe.secretKey)
   : null;
+
+// Prime plan — $299 / month, USD, US card payments accepted.
+const PRIME_PLAN = {
+  name:        'TriVanta Prime',
+  description: 'Priority attorney access, unlimited documents, monthly strategy call',
+  amount:      29900, // cents
+  currency:    'usd',
+  interval:    'month',
+};
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -79,9 +89,10 @@ router.post('/webhook', async (req, res) => {
     );
     if (event.type === 'checkout.session.completed') {
       const s = event.data.object;
+
+      // One-time invoice payment
       if (s.metadata?.invoiceId) {
         await InvoiceRepo.markPaid(s.metadata.invoiceId, s.payment_intent);
-        // Push real-time confirmation to the client's browser
         const inv = await InvoiceRepo.findById(s.metadata.invoiceId);
         if (inv?.client_id) {
           ws.emitToUser(inv.client_id, 'invoice:paid', { invoiceId: inv.id });
@@ -92,11 +103,66 @@ router.post('/webhook', async (req, res) => {
           meta: { paymentIntent: s.payment_intent },
         });
       }
+
+      // Prime subscription activation — mark user as prime immediately on checkout complete
+      if (s.mode === 'subscription' && s.metadata?.plan === 'prime' && s.metadata?.userId) {
+        const uid = Number(s.metadata.userId);
+        await UserRepo.update(uid, { is_prime: 1 });
+        ws.emitToUser(uid, 'prime:activated', {});
+        AuditService.log({
+          userId: uid, action: 'user.prime_activated',
+          meta: { subscriptionId: s.subscription },
+        });
+      }
+    }
+
+    // Subscription cancelled or payment failed — revoke Prime
+    if (['customer.subscription.deleted', 'customer.subscription.paused'].includes(event.type)) {
+      const s = event.data.object;
+      if (s.metadata?.userId) {
+        await UserRepo.update(Number(s.metadata.userId), { is_prime: 0 });
+      }
     }
     res.json({ received: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// Prime subscription checkout — Stripe hosted page, subscription mode.
+router.post('/prime-checkout', requireAuth, async (req, res, next) => {
+  if (!stripe) return res.status(501).json({ error: 'Payment processing not configured.' });
+  if (req.user.role !== 'client') return res.status(403).json({ error: 'Clients only' });
+  if (req.user.is_prime) return res.status(400).json({ error: 'Already a Prime member' });
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode:                 'subscription',
+      billing_address_collection: 'required',
+      customer_email:       req.user.email,
+      line_items: [{
+        price_data: {
+          currency:    PRIME_PLAN.currency,
+          unit_amount: PRIME_PLAN.amount,
+          recurring:   { interval: PRIME_PLAN.interval },
+          product_data: { name: PRIME_PLAN.name, description: PRIME_PLAN.description },
+        },
+        quantity: 1,
+      }],
+      metadata:    { userId: String(req.user.id), plan: 'prime' },
+      success_url: `${config.client.url}/payments?prime_success=1`,
+      cancel_url:  `${config.client.url}/payments?prime_cancelled=1`,
+    });
+    res.json({ url: session.url });
+  } catch (err) { next(err); }
+});
+
+// Read-only plan-status — client polls this to confirm Prime activation.
+router.get('/plan-status', requireAuth, async (req, res, next) => {
+  try {
+    const user = await UserRepo.findById(req.user.id);
+    res.json({ is_prime: Boolean(user?.is_prime) });
+  } catch (err) { next(err); }
 });
 
 // Read-only confirmation poll — client calls this after Stripe redirect.

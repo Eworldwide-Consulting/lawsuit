@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, Plus, CheckCircle, Clock, AlertCircle, ExternalLink, X, DollarSign } from 'lucide-react';
+import { CreditCard, Plus, CheckCircle, Clock, AlertCircle, ExternalLink, X, DollarSign, Star, Zap, Shield, Phone } from 'lucide-react';
 import { paymentsApi, usersApi, mattersApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/ui/Spinner';
+
+const PRIME_BENEFITS = [
+  { icon: Zap,    text: 'Priority attorney response within 4 hours' },
+  { icon: Shield, text: 'Unlimited secure document storage' },
+  { icon: Phone,  text: 'Monthly 30-min strategy call with your attorney' },
+  { icon: Star,   text: 'Dedicated case manager assigned to your matter' },
+];
 
 const fmt = cents => `$${(cents / 100).toFixed(2)}`;
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -26,14 +33,16 @@ export default function Payments() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
 
-  const [invoices, setInvoices]     = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [paying, setPaying]         = useState(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [clients, setClients]       = useState([]);
-  const [matters, setMatters]       = useState([]);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg]     = useState('');
+  const [invoices, setInvoices]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [paying, setPaying]           = useState(null);
+  const [showCreate, setShowCreate]   = useState(false);
+  const [clients, setClients]         = useState([]);
+  const [matters, setMatters]         = useState([]);
+  const [successMsg, setSuccessMsg]   = useState('');
+  const [errorMsg, setErrorMsg]       = useState('');
+  const [primeLoading, setPrimeLoading] = useState(false);
+  const [isPrime, setIsPrime]         = useState(Boolean(user?.is_prime));
 
   const [form, setForm] = useState({
     clientId: '', matterId: '', serviceType: 'consultation',
@@ -44,17 +53,22 @@ export default function Payments() {
 
   // Handle Stripe redirect back
   useEffect(() => {
-    const sessionId = searchParams.get('session_id');
-    const cancelled = searchParams.get('cancelled');
-    if (cancelled) {
-      setErrorMsg('Payment was cancelled.');
+    const sessionId    = searchParams.get('session_id');
+    const cancelled    = searchParams.get('cancelled');
+    const primeSuccess = searchParams.get('prime_success');
+    const primeCancelled = searchParams.get('prime_cancelled');
+
+    if (cancelled || primeCancelled) { setErrorMsg('Payment was cancelled.'); return; }
+
+    if (primeSuccess) {
+      setSuccessMsg('Welcome to TriVanta Prime! Your account has been upgraded.');
+      paymentsApi.planStatus().then(r => setIsPrime(r.data.is_prime)).catch(() => {});
       return;
     }
+
     if (sessionId) {
       paymentsApi.confirm(sessionId)
-        .then(r => {
-          if (r.data.paid) setSuccessMsg('Payment received. Thank you!');
-        })
+        .then(r => { if (r.data.paid) setSuccessMsg('Payment received. Thank you!'); })
         .catch(() => {})
         .finally(() => load());
     }
@@ -74,6 +88,17 @@ export default function Payments() {
       mattersApi.list().then(r => setMatters(r.data)).catch(() => {});
     }
   }, []);
+
+  async function handlePrimeUpgrade() {
+    setPrimeLoading(true);
+    try {
+      const r = await paymentsApi.primeCheckout();
+      window.location.href = r.data.url;
+    } catch (err) {
+      setErrorMsg(err.response?.data?.error || 'Could not start Prime checkout. Please try again.');
+      setPrimeLoading(false);
+    }
+  }
 
   async function handlePay(invoice) {
     setPaying(invoice.id);
@@ -146,6 +171,48 @@ export default function Payments() {
           <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1 text-red-800 text-sm font-medium">{errorMsg}</div>
           <button onClick={() => setErrorMsg('')}><X size={16} className="text-red-400 hover:text-red-600" /></button>
+        </div>
+      )}
+
+      {/* ── Prime Plan card (clients only) ── */}
+      {!isStaff && (
+        <div className={`mb-6 rounded-2xl overflow-hidden border-2 ${isPrime ? 'border-yellow-400' : 'border-[#0f2057]/20'}`}>
+          <div className="bg-gradient-to-r from-[#0f2057] to-[#1a3476] px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Star size={18} className="text-yellow-400 fill-yellow-400" />
+              <span className="text-white font-bold text-base">TriVanta Prime</span>
+              {isPrime && (
+                <span className="ml-2 px-2 py-0.5 bg-yellow-400 text-[#0f2057] text-xs font-bold rounded-full">ACTIVE</span>
+              )}
+            </div>
+            <span className="text-white/80 text-sm font-semibold">$299 / month</span>
+          </div>
+          <div className="bg-white px-6 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+              {PRIME_BENEFITS.map(({ icon: Icon, text }) => (
+                <div key={text} className="flex items-center gap-2 text-sm text-gray-600">
+                  <Icon size={14} className="text-[#0f2057] flex-shrink-0" />
+                  {text}
+                </div>
+              ))}
+            </div>
+            {isPrime ? (
+              <div className="flex items-center gap-2 text-green-600 text-sm font-semibold">
+                <CheckCircle size={16} /> You are a Prime member — thank you!
+              </div>
+            ) : (
+              <button
+                onClick={handlePrimeUpgrade}
+                disabled={primeLoading}
+                className="flex items-center gap-2 bg-[#0f2057] hover:bg-[#1a3476] disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+              >
+                {primeLoading
+                  ? <Spinner size={4} color="text-white" />
+                  : <><Star size={14} className="fill-yellow-400 text-yellow-400" /> Upgrade to Prime — $299/mo</>
+                }
+              </button>
+            )}
+          </div>
         </div>
       )}
 

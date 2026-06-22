@@ -138,6 +138,12 @@ router.post('/reset-password', async (req, res, next) => {
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 
+// Non-secret health check — lets the login page show a proper message when
+// credentials are not configured instead of silently failing after redirect.
+router.get('/google/status', (req, res) => {
+  res.json({ configured: Boolean(config.google.clientId && config.google.clientSecret) });
+});
+
 const googleCallbackUrl = () =>
   `${config.server.url || config.client.url}/api/auth/google/callback`;
 
@@ -186,8 +192,10 @@ router.get('/google/callback', async (req, res) => {
       return res.redirect(`${config.client.url}/login?error=google_unverified`);
 
     const { run, one } = require('../db');
+    let isNew = false;
     let user = await UserRepo.findByEmail(gUser.email);
     if (!user) {
+      isNew = true;
       const fn = gUser.given_name  || gUser.name?.split(' ')[0]              || 'User';
       const ln = gUser.family_name || gUser.name?.split(' ').slice(1).join(' ') || '';
       // approval_status is explicitly NULL for Google-created clients — identical to
@@ -211,7 +219,12 @@ router.get('/google/callback', async (req, res) => {
         return res.redirect(`${config.client.url}/login?error=account_rejected`);
     }
 
-    res.redirect(`${config.client.url}/auth/callback?token=${encodeURIComponent(AuthService.signToken(user.id))}&provider=google`);
+    const callbackParams = new URLSearchParams({
+      token:    AuthService.signToken(user.id),
+      provider: 'google',
+      ...(isNew ? { isNew: '1' } : {}),
+    });
+    res.redirect(`${config.client.url}/auth/callback?${callbackParams}`);
   } catch (err) {
     require('../logger').error({ err }, 'Google OAuth error');
     res.redirect(`${config.client.url}/login?error=google_failed`);
@@ -287,6 +300,39 @@ router.post('/disable-2fa', requireAuth, async (req, res, next) => {
       action: 'user.2fa_disabled',
       ip: req.ip,
     });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Called once after Google OAuth registration to fill in profile fields that
+// Google doesn't supply: phone, DOB, address, and initial matter type.
+router.put('/complete-profile', requireAuth, async (req, res, next) => {
+  try {
+    const { phone, dob, street, city, state, zip, matterType, workedBefore } = req.body;
+
+    await UserRepo.update(req.user.id, {
+      ...(phone  ? { phone }  : {}),
+      ...(dob    ? { dob }    : {}),
+      ...(street ? { street } : {}),
+      ...(city   ? { city }   : {}),
+      ...(state  ? { state }  : {}),
+      ...(zip    ? { zip }    : {}),
+    });
+
+    if (matterType && matterType !== 'not_sure') {
+      const { run: dbRun, one: dbOne } = require('../db');
+      const { buildCaseNumber } = require('../domain/matter');
+      const existing = await dbOne('SELECT id FROM matters WHERE client_id = ? LIMIT 1', [req.user.id]);
+      if (!existing) {
+        const mr = await dbRun(
+          'INSERT INTO matters (client_id, matter_type, stage, status, worked_with_firm_before) VALUES (?,?,?,?,?)',
+          [req.user.id, matterType, 'intake', 'active', workedBefore === 'yes' ? 1 : 0]
+        );
+        await dbRun('UPDATE matters SET case_number = ? WHERE id = ?', [buildCaseNumber(mr.insertId), mr.insertId]);
+      }
+    }
+
+    await invalidateUserCache(req.user.id);
     res.json({ success: true });
   } catch (err) { next(err); }
 });

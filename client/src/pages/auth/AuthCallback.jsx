@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Spinner from '../../components/ui/Spinner';
@@ -19,6 +19,7 @@ export default function AuthCallback() {
     const token    = params.get('token');
     const error    = params.get('error');
     const prov     = params.get('provider') || 'google';
+    const isNew    = params.get('isNew') === '1';
     setProvider(prov);
 
     if (error || !token) {
@@ -27,6 +28,9 @@ export default function AuthCallback() {
     }
 
     window.history.replaceState({}, '', '/auth/callback');
+
+    // Flag new Google users so DashboardLayout can show the profile-completion modal.
+    if (isNew) sessionStorage.setItem('lp_needs_profile', '1');
 
     fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => {
@@ -45,7 +49,7 @@ export default function AuthCallback() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       <Spinner size={10} />
-      <p className="mt-4 text-gray-500 text-sm">Signing you in with {label}â€¦</p>
+      <p className="mt-4 text-gray-500 text-sm">Signing you in with {label}…</p>
     </div>
   );
 }

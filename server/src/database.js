@@ -128,6 +128,7 @@ async function initMysqlSchema(pool) {
       verification_token VARCHAR(255),
       verification_token_expires DATETIME,
       approval_status VARCHAR(50),
+      is_prime TINYINT DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`,
@@ -278,6 +279,7 @@ async function initMysqlColumns(pool) {
     // password reset (also handled by migration 002 — idempotent here as a safety net)
     ['users', 'password_reset_token',   'password_reset_token TEXT'],
     ['users', 'password_reset_expires', 'password_reset_expires TEXT'],
+    ['users', 'is_prime',               'is_prime TINYINT(1) DEFAULT 0'],
   ];
   for (const [table, column, definition] of cols) {
     await addMysqlColumnIfMissing(pool, table, column, definition);
@@ -302,7 +304,9 @@ function initSqliteSchema(d) {
       verification_token_expires TEXT,
       two_fa_enabled INTEGER DEFAULT 0,
       two_fa_secret  TEXT,
+      two_fa_prompt_shown INTEGER DEFAULT 0,
       approval_status TEXT,
+      is_prime INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
