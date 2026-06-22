@@ -7,11 +7,11 @@ import { authApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
 const SSO_ERRORS = {
-  google_cancelled:    'Google sign-in was cancelled.',
-  google_failed:       'Google sign-in failed. Please try again or use email and password.',
-  google_unverified:   'Your Google account email is not verified.',
-  microsoft_cancelled: 'Microsoft sign-in was cancelled.',
-  microsoft_failed:    'Microsoft sign-in failed. Please try again or use email and password.',
+  google_cancelled:  'Google sign-in was cancelled.',
+  google_failed:     'Google sign-in failed. Please try again or use email and password.',
+  google_unverified: 'Your Google account email is not verified.',
+  approval_pending:  'Your account is pending admin approval. Please check back later.',
+  account_rejected:  'Your account was not approved. Please contact support.',
 };
 
 const ROLE_TABS = [
@@ -282,8 +282,9 @@ export default function Login() {
 
           <button
             type="button"
-            onClick={() => { window.location.href = '/api/auth/microsoft'; }}
-            className="btn-secondary mt-3"
+            disabled
+            title="Microsoft sign-in coming soon"
+            className="btn-secondary mt-3 opacity-40 cursor-not-allowed"
           >
             <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
               <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
@@ -292,6 +293,7 @@ export default function Login() {
               <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
             </svg>
             Continue with Microsoft
+            <span className="ml-1 text-xs text-gray-400">(coming soon)</span>
           </button>
         </>
       )}

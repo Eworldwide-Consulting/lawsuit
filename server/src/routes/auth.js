@@ -190,8 +190,11 @@ router.get('/google/callback', async (req, res) => {
     if (!user) {
       const fn = gUser.given_name  || gUser.name?.split(' ')[0]              || 'User';
       const ln = gUser.family_name || gUser.name?.split(' ').slice(1).join(' ') || '';
+      // approval_status is explicitly NULL for Google-created clients — identical to
+      // regular client registration where isPro=false sets approvalStatus to null.
+      // Without this the MySQL column default ('pending') blocks every new Google user.
       const r  = await run(
-        'INSERT INTO users (first_name, last_name, email, password_hash, role, avatar_initials, email_verified) VALUES (?,?,?,?,?,?,1)',
+        'INSERT INTO users (first_name, last_name, email, password_hash, role, avatar_initials, email_verified, approval_status) VALUES (?,?,?,?,?,?,1,NULL)',
         [fn, ln, gUser.email.toLowerCase(), '', 'client', `${fn[0]}${(ln[0] || fn[1] || 'U')}`.toUpperCase()]
       );
       user = await one('SELECT * FROM users WHERE id = ?', [r.insertId]);
@@ -199,12 +202,16 @@ router.get('/google/callback', async (req, res) => {
       await UserRepo.markVerified(user.id);
     }
 
-    if (user.approval_status === 'pending')
-      return res.redirect(`${config.client.url}/login?error=approval_pending`);
-    if (user.approval_status === 'rejected')
-      return res.redirect(`${config.client.url}/login?error=account_rejected`);
+    // Approval checks apply only to professional roles — consistent with the
+    // regular login flow in auth.service.js which also gates on attorney/partner.
+    if (['attorney', 'partner'].includes(user.role)) {
+      if (user.approval_status === 'pending')
+        return res.redirect(`${config.client.url}/login?error=approval_pending`);
+      if (user.approval_status === 'rejected')
+        return res.redirect(`${config.client.url}/login?error=account_rejected`);
+    }
 
-    res.redirect(`${config.client.url}/auth/callback?token=${encodeURIComponent(AuthService.signToken(user.id))}`);
+    res.redirect(`${config.client.url}/auth/callback?token=${encodeURIComponent(AuthService.signToken(user.id))}&provider=google`);
   } catch (err) {
     require('../logger').error({ err }, 'Google OAuth error');
     res.redirect(`${config.client.url}/login?error=google_failed`);

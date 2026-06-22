@@ -146,6 +146,8 @@ jobs:
             MAX_FILE_SIZE_MB=20
             MYSQL_PASS=${{ secrets.MYSQL_PASS }}
             ADMIN_URL=https://admin.gkasevault.io
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           echo "$ENV_CONTENT" > /tmp/trivanta.env
           sshpass -e scp \
