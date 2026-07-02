@@ -177,9 +177,18 @@ jobs:
                 echo \".env is missing - deploy cannot proceed\"
                 exit 1
               fi
-              grep -q \"^NODE_ENV=\" .env || { echo \".env missing NODE_ENV\"; exit 1; }
+              grep -q \"^NODE_ENV=\" .env     || { echo \".env missing NODE_ENV\"; exit 1; }
               grep -q \"^DATABASE_URL=\" .env || { echo \".env missing DATABASE_URL\"; exit 1; }
-              grep -q \"^JWT_SECRET=\" .env    || { echo \".env missing JWT_SECRET\"; exit 1; }
+              grep -q \"^JWT_SECRET=\" .env   || { echo \".env missing JWT_SECRET\"; exit 1; }
+              SMTP_USER_VAL=$(grep \"^SMTP_USER=\" .env | cut -d= -f2-)
+              SMTP_PASS_VAL=$(grep \"^SMTP_PASS=\" .env | cut -d= -f2-)
+              if [ -z \"\$SMTP_USER_VAL\" ] || [ -z \"\$SMTP_PASS_VAL\" ]; then
+                echo \"WARNING: SMTP_USER or SMTP_PASS is empty — password reset & verification emails will NOT send.\"
+                echo \"         Fix: add SMTP_USER and SMTP_PASS in GitHub Settings → Secrets → Actions.\"
+                echo \"         SMTP_PASS must be a Gmail App Password (myaccount.google.com → Security → App passwords).\"
+              else
+                echo \"SMTP configured for: \$SMTP_USER_VAL\"
+              fi
               echo \".env OK - $(wc -l < .env) lines, NODE_ENV=$(grep NODE_ENV .env | cut -d= -f2)\"
             '"
 

@@ -476,6 +476,12 @@ function initSqliteSchema(d) {
     ['invoices', 'due_date',                'TEXT'],
     ['invoices', 'paid_at',                 'TEXT'],
     ['invoices', 'created_at',              'TEXT'],
+    // Password reset — added in migration 002; listed here so existing SQLite dev
+    // databases gain the columns without wiping and re-creating the database.
+    ['users', 'password_reset_token',       'TEXT'],
+    ['users', 'password_reset_expires',     'TEXT'],
+    // Prime subscription flag — added with Stripe integration
+    ['users', 'is_prime',                   'INTEGER DEFAULT 0'],
   ];
   for (const [table, col, def] of cols) addSqliteColumnIfMissing(d, table, col, `${col} ${def}`);
 }

@@ -190,6 +190,7 @@ app.get('/api/health', async (req, res) => {
   const dbOk     = dbPing.status === 'fulfilled';
   const allOk    = dbOk;
   const httpCode = allOk ? 200 : 503;
+  const smtpConfigured = Boolean(config.smtp.host && config.smtp.user && config.smtp.pass);
   res.status(httpCode).json({
     status:   allOk ? 'ok' : 'degraded',
     version:  process.env.npm_package_version || '1.0.0',
@@ -200,6 +201,7 @@ app.get('/api/health', async (req, res) => {
     cache:    cacheHealth.status === 'fulfilled' ? cacheHealth.value : { status: 'error' },
     queues:   queues.status === 'fulfilled' ? queues.value : {},
     circuits: Object.fromEntries(Object.entries(breakers).map(([k, b]) => [k, b.toJSON()])),
+    smtp:     { configured: smtpConfigured, host: config.smtp.host || null },
     timestamp: new Date().toISOString(),
   });
 });
