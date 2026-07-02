@@ -9,6 +9,7 @@ import TwoFASetupModal from '../ui/TwoFASetupModal';
 import ProfileCompletionModal from '../ui/ProfileCompletionModal';
 import NotificationPanel from '../notifications/NotificationPanel';
 import Avatar from '../ui/Avatar';
+import ThemeToggle from '../ui/ThemeToggle';
 
 export default function DashboardLayout({ children }) {
   const { user } = useAuth();
@@ -75,7 +76,7 @@ export default function DashboardLayout({ children }) {
   const mobileNav = user?.role === 'client' ? mobileClientNav : mobileStaffNav;
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex flex-shrink-0">
         <Sidebar unreadMessages={unreadMsg} />
@@ -94,7 +95,7 @@ export default function DashboardLayout({ children }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* ── Top header ── */}
-        <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 flex items-center gap-3 safe-top flex-shrink-0">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 lg:px-6 py-3 flex items-center gap-3 safe-top flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -109,12 +110,13 @@ export default function DashboardLayout({ children }) {
               <input
                 placeholder="Search matters, clients, documents…"
                 aria-label="Search"
-                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
               />
             </div>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             {/* Notification bell */}
             <div className="relative" ref={bellRef}>
               <button
@@ -178,7 +180,7 @@ export default function DashboardLayout({ children }) {
 
         {/* Mobile bottom navigation */}
         <nav
-          className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 mobile-nav z-40"
+          className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mobile-nav z-40"
           aria-label="Mobile navigation"
         >
           <div className="flex items-center justify-around px-2 pt-2">

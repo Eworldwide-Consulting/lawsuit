@@ -53,6 +53,8 @@ const adminRoutes         = require('./routes/admin');
 const notificationRoutes  = require('./routes/notifications');
 const checklistRoutes     = require('./routes/checklists');
 const contactRoutes       = require('./routes/contact');
+const reportsRoutes       = require('./routes/reports');
+const formsRoutes         = require('./routes/forms');
 console.log('[BOOT] routes loaded');
 
 const app          = express();
@@ -178,6 +180,8 @@ app.use('/api/admin',          adminRoutes);
 app.use('/api/notifications',  notificationRoutes);
 app.use('/api/checklists',     checklistRoutes);
 app.use('/api/contact',        contactRoutes);
+app.use('/api/reports',        reportsRoutes);
+app.use('/api/forms',          formsRoutes);
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', async (req, res) => {

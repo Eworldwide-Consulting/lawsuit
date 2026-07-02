@@ -4,7 +4,7 @@ import Logo from '../ui/Logo';
 import {
   LayoutDashboard, FileText, Users, CreditCard,
   Calendar, BarChart2, MessageSquare, Settings, LogOut, FileCheck,
-  Briefcase, CheckSquare, Folder, ClipboardList, ClipboardCheck,
+  Briefcase, CheckSquare, Folder, ClipboardList, ClipboardCheck, Scale,
 } from 'lucide-react';
 
 const clientNav = [
@@ -28,6 +28,8 @@ const attorneyNav = [
   { to: '/appointments',      icon: Calendar,        label: 'Appointments' },
   { to: '/messages',          icon: MessageSquare,   label: 'Messages' },
   { to: '/payments',          icon: CreditCard,      label: 'Billing' },
+  { to: '/legal-forms',       icon: Scale,           label: 'Legal Forms' },
+  { to: '/reports',           icon: BarChart2,       label: 'Reports' },
   { to: '/settings',          icon: Settings,        label: 'Settings' },
 ];
 
@@ -40,6 +42,7 @@ const partnerNav = [
   { to: '/appointments',     icon: Calendar,        label: 'Appointments' },
   { to: '/messages',         icon: MessageSquare,   label: 'Messages' },
   { to: '/payments',         icon: CreditCard,      label: 'Billing' },
+  { to: '/legal-forms',      icon: Scale,           label: 'Legal Forms' },
   { to: '/reports',          icon: BarChart2,       label: 'Reports' },
   { to: '/settings',         icon: Settings,        label: 'Settings' },
 ];
