@@ -115,6 +115,14 @@ const EmailService = {
     return queue(JOB.ATTORNEY_DECISION, { to, firstName, decision });
   },
 
+  sendAttorneyInvite(to, { clientName, name, signupLink }) {
+    return send({
+      to,
+      subject: `You've been invited to join TriVanta Legal Platform`,
+      html: tmplAttorneyInvite({ to, clientName, name, signupLink }),
+    });
+  },
+
   sendContactSales({ name, email, company, phone, plan, message }) {
     const salesTo = config.smtp.user || 'legal@trivanta.com';
     return send({
@@ -380,5 +388,18 @@ function tmplAttorneyDecision({ firstName, decision }) {
       : p('After reviewing your application, we are unable to approve your TriVanta professional account at this time. Please contact support if you have questions.')
     }
     ${isApproved ? btn(`${config.client.url}/login`, 'Log In to TriVanta') : ''}
+  `);
+}
+
+function tmplAttorneyInvite({ to, clientName, name, signupLink }) {
+  const greeting = name ? `Hi ${esc(name)},` : 'Hello,';
+  return wrap(`
+    ${h2('You\'ve been invited to TriVanta')}
+    ${p(`${greeting}`)}
+    ${p(`<strong>${esc(clientName)}</strong> is looking for legal representation and would like to work with you on their case through the <strong>TriVanta Legal Platform</strong>.`)}
+    ${p('TriVanta helps attorneys manage client cases, documents, appointments, and billing — all in one secure platform.')}
+    ${btn(signupLink, 'Create Your Attorney Account')}
+    ${p(`After registering, ${esc(clientName)} will be able to connect their case to your account directly.`)}
+    <p style="color:#9ca3af;font-size:13px">If you did not expect this invitation, you can safely ignore this email.</p>
   `);
 }

@@ -1,6 +1,8 @@
 const router = require('express').Router();
-const { all }  = require('../db');
+const { all, one } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const EmailService  = require('../services/email.service');
+const config        = require('../config');
 
 router.get('/', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
   try {
@@ -55,6 +57,34 @@ router.get('/my-clients', requireAuth, requireRole('attorney', 'partner'), async
       [req.user.id]
     );
     res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// Client invites an attorney by email — sends a registration invite
+router.post('/invite-attorney', requireAuth, async (req, res, next) => {
+  try {
+    const { email, name } = req.body;
+    if (!email?.trim()) return res.status(400).json({ error: 'email is required' });
+
+    // Check if attorney already registered
+    const existing = await one(
+      `SELECT id, first_name, last_name, role FROM users WHERE email = ? LIMIT 1`,
+      [email.toLowerCase().trim()]
+    );
+
+    if (existing && ['attorney', 'partner'].includes(existing.role)) {
+      return res.json({
+        alreadyRegistered: true,
+        attorney: existing,
+        message: 'Attorney already on platform — you can select them from the list.',
+      });
+    }
+
+    const clientName = `${req.user.first_name} ${req.user.last_name}`;
+    const signupLink = `${config.client.url}/register`;
+    await EmailService.sendAttorneyInvite(email.trim(), { clientName, name: name?.trim() || '', signupLink });
+
+    res.json({ sent: true, email: email.trim() });
   } catch (err) { next(err); }
 });
 

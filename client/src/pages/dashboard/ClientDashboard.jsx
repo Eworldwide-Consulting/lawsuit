@@ -1,9 +1,13 @@
-﻿import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardApi, mattersApi, usersApi } from '../../api';
+import { dashboardApi, mattersApi, usersApi, documentsApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare,
-         Shield, Check, CheckCircle, Briefcase, ArrowRight, Clock, UserCheck, X } from 'lucide-react';
+import {
+  Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare,
+  Shield, Check, CheckCircle, Briefcase, ArrowRight, Clock, UserCheck, X,
+  Mail, Send, AlertCircle, Star, ChevronRight, Lock, ThumbsUp, ThumbsDown,
+  Download, ExternalLink,
+} from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
 
 const ACTION_CFG = {
@@ -16,11 +20,29 @@ const ACTION_CFG = {
 const STAGES     = ['Intake', 'Petition Filed', 'Hearing Prep', 'Guardian Appointed', 'Care Plan', 'Annual Review', 'Court Review'];
 const STAGE_KEYS = ['intake', 'petition_filed', 'hearing_prep', 'guardian_appointed', 'care_plan', 'annual_review', 'court_review'];
 
-// Orange for overdue (amber-600 reads as orange in most contexts)
+const MATTER_TYPE_DOCS = {
+  guardianship: ['Petition for Guardianship', 'Medical Records', 'Financial Disclosure', 'Background Check', 'Letters of Guardianship', 'Annual Guardian Report'],
+  conservatorship: ['Petition for Conservatorship', 'Financial Inventory', 'Bank Statements (3 months)', 'Tax Returns', 'Bond Insurance', 'Annual Accounting'],
+  guardianship_conservatorship: ['Petition for Guardian & Conservator', 'Medical Records', 'Financial Inventory', 'Background Check', 'Bond Insurance', 'Annual Report'],
+  estate_administration: ['Death Certificate', 'Will (if any)', 'Asset Inventory', 'Creditor Notification', 'Tax Returns', 'Final Accounting'],
+};
+
 const statusColor = status => {
   if (status === 'overdue') return 'text-orange-500';
   if (status === 'pending') return 'text-amber-600';
   return 'text-gray-500';
+};
+
+const docStatusBadge = status => {
+  if (status === 'accepted') return 'badge-green';
+  if (status === 'rejected') return 'badge-red';
+  return 'badge-yellow';
+};
+
+const docStatusLabel = status => {
+  if (status === 'accepted') return 'Approved';
+  if (status === 'rejected') return 'Needs Revision';
+  return 'Under Review';
 };
 
 const shortCat = cat => cat.replace(/^\d+\.\s*/, '');
@@ -37,25 +59,24 @@ const ReadinessGauge = memo(function ReadinessGauge({ value }) {
           strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-2xl font-bold text-gray-800">{value}%</div>
+        <div className="text-2xl font-bold text-gray-800 dark:text-white">{value}%</div>
         <div className="text-xs text-gray-500">{value >= 75 ? 'On track' : value >= 50 ? 'Attention' : 'At risk'}</div>
       </div>
     </div>
   );
 });
 
-// Attorney card used inside the picker modal
 function AttorneyCard({ attorney, onAssign, assigning }) {
   const specs = attorney.specializations
     ? attorney.specializations.split(',').slice(0, 2).join(', ')
     : null;
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 hover:border-[#0f2057]/30 hover:bg-blue-50/30 transition-all">
+    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-[#0f2057]/30 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all">
       <div className="w-10 h-10 rounded-full bg-[#0f2057] text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
         {attorney.avatar_initials || `${attorney.first_name[0]}${attorney.last_name[0]}`}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-gray-800">
+        <div className="text-sm font-semibold text-gray-800 dark:text-white">
           {attorney.first_name} {attorney.last_name}
           <span className="ml-1.5 text-xs text-gray-400 font-normal capitalize">{attorney.role}</span>
         </div>
@@ -75,17 +96,195 @@ function AttorneyCard({ attorney, onAssign, assigning }) {
   );
 }
 
+// ── Invite Attorney Modal ────────────────────────────────────────────────────
+function InviteAttorneyModal({ onClose }) {
+  const [email, setEmail]     = useState('');
+  const [name, setName]       = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult]   = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setSending(true);
+    try {
+      const r = await usersApi.inviteAttorney(email.trim(), name.trim());
+      setResult(r.data);
+    } catch (err) {
+      setResult({ error: err.response?.data?.error || 'Failed to send invite' });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-slideUp">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-bold text-gray-900 dark:text-white text-lg">Invite Your Attorney</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Send a registration invite to an attorney not yet on the platform</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1"><X size={18} /></button>
+        </div>
+
+        {!result ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="form-label">Attorney's Name <span className="text-xs text-gray-400">(optional)</span></label>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith"
+                className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Attorney's Email <span className="text-red-500">*</span></label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="attorney@lawfirm.com" required className="form-input" />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={onClose}
+                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700">
+                Cancel
+              </button>
+              <button type="submit" disabled={sending || !email.trim()}
+                className="flex-1 py-2.5 bg-[#0f2057] hover:bg-[#1a3476] text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                {sending ? <><Spinner size={4} /> Sending…</> : <><Send size={14} /> Send Invite</>}
+              </button>
+            </div>
+          </form>
+        ) : result.error ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-xl text-sm">
+              <AlertCircle size={16} /> {result.error}
+            </div>
+            <button onClick={onClose} className="w-full py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">Close</button>
+          </div>
+        ) : result.alreadyRegistered ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
+              <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-semibold text-green-700 dark:text-green-400">Already on TriVanta!</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                  {result.attorney.first_name} {result.attorney.last_name} is already registered. You can select them from the attorney list.
+                </div>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-full py-2.5 bg-[#0f2057] text-white rounded-lg text-sm font-semibold hover:bg-[#1a3476]">
+              Select from Attorney List
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
+              <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-semibold text-green-700 dark:text-green-400">Invite sent!</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                  A registration invite was emailed to <strong>{result.email}</strong>. Once they register, you can select them as your attorney.
+                </div>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-full py-2.5 bg-[#0f2057] text-white rounded-lg text-sm font-semibold hover:bg-[#1a3476]">Done</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Required Documents by Case Type ─────────────────────────────────────────
+function RequiredDocsPanel({ matterType, uploadedDocs }) {
+  const docs = MATTER_TYPE_DOCS[matterType] || [];
+  if (!docs.length) return null;
+  const uploadedNames = (uploadedDocs || []).flatMap(d => [d.category, d.name]).map(n => (n || '').toLowerCase());
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="font-semibold text-gray-800 dark:text-white text-sm flex items-center gap-2">
+          <FileText size={14} className="text-[#0f2057]" />
+          Required Documents for Your Case
+        </div>
+        <span className="text-xs text-gray-400">{matterType?.replace(/_/g, ' ')}</span>
+      </div>
+      <div className="space-y-1.5">
+        {docs.map((doc, i) => {
+          const uploaded = uploadedNames.some(n => n.includes(doc.toLowerCase().split(' ')[0]));
+          return (
+            <div key={i} className={`flex items-center gap-3 py-1.5 px-3 rounded-lg text-sm ${
+              uploaded ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-700/30'
+            }`}>
+              {uploaded
+                ? <Check size={14} className="text-green-600 flex-shrink-0" />
+                : <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300 flex-shrink-0" />}
+              <span className={`flex-1 text-xs ${uploaded ? 'text-green-700 dark:text-green-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>{doc}</span>
+              {!uploaded && <span className="text-xs text-amber-600 font-medium">Needed</span>}
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-xs text-gray-400 mt-3">
+        Completing these documents speeds up your case significantly. Upload via the Documents tab.
+      </p>
+    </div>
+  );
+}
+
+// ── Approved / Reviewed Documents ────────────────────────────────────────────
+function ReviewedDocsPanel({ matterId }) {
+  const [docs, setDocs]       = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!matterId) { setLoading(false); return; }
+    documentsApi.list({ matterId })
+      .then(r => setDocs((r.data.documents || r.data || []).filter(d => d.status && d.status !== 'pending')))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [matterId]);
+
+  if (loading) return null;
+  if (!docs.length) return null;
+
+  return (
+    <div className="card p-5">
+      <div className="font-semibold text-gray-800 dark:text-white text-sm mb-3 flex items-center gap-2">
+        <CheckCircle size={14} className="text-green-500" /> Attorney-Reviewed Documents
+      </div>
+      <div className="space-y-2">
+        {docs.map(doc => (
+          <div key={doc.id} className="flex items-center gap-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0">
+            <FileText size={13} className="text-gray-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{doc.name}</div>
+              <div className="text-xs text-gray-400">{doc.category || 'General'}</div>
+            </div>
+            <span className={`badge ${docStatusBadge(doc.status)}`}>
+              {docStatusLabel(doc.status)}
+            </span>
+            <a href={documentsApi.viewUrl(doc.id)} target="_blank" rel="noreferrer"
+              className="text-gray-400 hover:text-[#0f2057] transition-colors flex-shrink-0">
+              <ExternalLink size={13} />
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ClientDashboard() {
   const { user } = useAuth();
   const navigate  = useNavigate();
 
-  const [data, setData]             = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [showAttyPicker, setShowAttyPicker] = useState(false);
-  const [attorneys, setAttorneys]   = useState([]);
-  const [attysLoading, setAttysLoading] = useState(false);
-  const [assigning, setAssigning]   = useState(false);
-  const [assignMsg, setAssignMsg]   = useState('');
+  const [data, setData]                         = useState(null);
+  const [loading, setLoading]                   = useState(true);
+  const [showAttyPicker, setShowAttyPicker]     = useState(false);
+  const [showInvite, setShowInvite]             = useState(false);
+  const [attorneys, setAttorneys]               = useState([]);
+  const [attysLoading, setAttysLoading]         = useState(false);
+  const [assigning, setAssigning]               = useState(false);
+  const [assignMsg, setAssignMsg]               = useState('');
 
   const loadDashboard = () =>
     dashboardApi.client().then(r => setData(r.data)).catch(() => setData(null)).finally(() => setLoading(false));
@@ -110,9 +309,8 @@ export default function ClientDashboard() {
     try {
       await mattersApi.assignAttorney(data.matter.id, attorneyId);
       setShowAttyPicker(false);
-      setAssignMsg('Attorney assigned successfully!');
-      setTimeout(() => setAssignMsg(''), 4000);
-      // Reload dashboard so attorney name appears
+      setAssignMsg('Attorney request sent! They will review and accept your case.');
+      setTimeout(() => setAssignMsg(''), 5000);
       setLoading(true);
       loadDashboard();
     } catch (err) {
@@ -135,38 +333,39 @@ export default function ClientDashboard() {
   const readiness      = data?.readinessScore ?? 0;
   const readinessLabel = readiness >= 75 ? 'On track' : readiness >= 50 ? 'Needs attention' : 'At risk';
 
-  // Tasks: show pending checklist count when no explicit open tasks
   const checklistPending = Math.max(0, (data?.checklistTotal ?? 0) - (data?.checklistAccepted ?? 0));
   const displayTasks     = (data?.openTasks ?? 0) > 0 ? data.openTasks : checklistPending;
+  const docsUploaded     = data?.checklistUploaded ?? data?.completedDocs ?? 0;
+  const docsTotal        = data?.checklistTotal    ?? data?.totalDocs     ?? 0;
 
-  // Docs: use uploaded count (includes submitted-not-yet-reviewed) for the gauge
-  const docsUploaded = data?.checklistUploaded ?? data?.completedDocs ?? 0;
-  const docsTotal    = data?.checklistTotal    ?? data?.totalDocs     ?? 0;
-
-  // Days until court date / important date (for document deadline prompt)
   const courtDate   = matter?.important_date ? new Date(matter.important_date) : null;
   const daysToCount = courtDate ? Math.ceil((courtDate - new Date()) / 86400000) : null;
   const courtUrgent = daysToCount !== null && daysToCount < 30;
 
+  const hasAttorney     = Boolean(matter?.attorney_id);
+  const caseAccepted    = matter?.case_accepted === 1 || matter?.case_accepted === true;
+  const pendingAccept   = hasAttorney && !caseAccepted;
+
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Success banner */}
+      {/* Banner */}
       {assignMsg && (
         <div className={`rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2 ${
-          assignMsg.includes('success') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+          assignMsg.includes('success') || assignMsg.includes('sent')
+            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
         }`}>
-          {assignMsg.includes('success') ? <Check size={15} /> : null}
-          {assignMsg}
+          <Check size={15} /> {assignMsg}
         </div>
       )}
 
       {/* Greeting */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Welcome back, {user?.first_name}.</h1>
-        <p className="text-gray-500 text-sm">Here's what needs your attention today.</p>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Welcome back, {user?.first_name}.</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Here's what needs your attention today.</p>
       </div>
 
-      {/* No-matter onboarding banner */}
+      {/* No-matter onboarding */}
       {!data?.matter && (
         <div className="rounded-2xl bg-gradient-to-r from-[#0f2057] to-[#1a3476] text-white p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
@@ -174,15 +373,28 @@ export default function ClientDashboard() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-bold text-base">Set up your case to get started</div>
-            <div className="text-blue-200 text-sm mt-0.5">
-              Tell us what type of legal matter you need help with and your legal team will be ready to assist.
+            <div className="text-blue-200 text-sm mt-0.5">Tell us what type of legal matter you need help with and your legal team will be ready to assist.</div>
+          </div>
+          <button onClick={() => navigate('/my-case')}
+            className="flex items-center gap-2 bg-white text-[#0f2057] font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-blue-50 transition-colors whitespace-nowrap flex-shrink-0">
+            Get Started <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* Pending attorney acceptance notice */}
+      {pendingAccept && (
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 flex items-start gap-3">
+          <Clock size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">Waiting for Attorney Acceptance</div>
+            <div className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+              <strong>{matter.attorney_name || 'Your selected attorney'}</strong> has received your case request and will accept it shortly. You'll be notified once they accept.
             </div>
           </div>
-          <button
-            onClick={() => navigate('/my-case')}
-            className="flex items-center gap-2 bg-white text-[#0f2057] font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-blue-50 transition-colors whitespace-nowrap flex-shrink-0"
-          >
-            Get Started <ArrowRight size={15} />
+          <button onClick={() => navigate('/messages')}
+            className="text-xs bg-amber-100 dark:bg-amber-800 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-200 flex items-center gap-1 whitespace-nowrap">
+            <MessageSquare size={12} /> Message
           </button>
         </div>
       )}
@@ -190,84 +402,64 @@ export default function ClientDashboard() {
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {
-            label: 'Tasks',
-            value: displayTasks,
-            sub: checklistPending > 0
-              ? `${checklistPending} checklist pending · ${data?.overdueTasks ?? 0} overdue`
-              : `${data?.overdueTasks ?? 0} overdue`,
-            icon: CheckSquare,
-            color: 'text-blue-600 bg-blue-50',
-          },
-          {
-            label: 'Upcoming Appointments',
-            value: data?.upcomingAppts?.length ?? 0,
+          { label: 'Tasks', value: displayTasks,
+            sub: checklistPending > 0 ? `${checklistPending} checklist pending · ${data?.overdueTasks ?? 0} overdue` : `${data?.overdueTasks ?? 0} overdue`,
+            icon: CheckSquare, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
+          { label: 'Upcoming Appointments', value: data?.upcomingAppts?.length ?? 0,
             sub: nextApptDays != null ? `Next in ${nextApptDays} day${nextApptDays !== 1 ? 's' : ''}` : 'None scheduled',
-            icon: Calendar,
-            color: 'text-green-600 bg-green-50',
-          },
-          {
-            label: 'Required Documents',
-            value: data?.requiredDocsPending ?? 0,
-            sub: daysToCount !== null
-              ? `${docsUploaded} of ${docsTotal} uploaded · ${daysToCount < 0 ? 'Past due!' : `${daysToCount}d left`}`
-              : `${docsUploaded} of ${docsTotal} uploaded`,
-            icon: FileText,
-            color: daysToCount !== null && daysToCount < 14
-              ? 'text-orange-500 bg-orange-50'
-              : 'text-orange-600 bg-orange-50',
-          },
-          {
-            label: 'Guardian Readiness',
-            value: `${readiness}%`,
-            sub: readinessLabel,
-            icon: Shield,
-            color: 'text-purple-600 bg-purple-50',
-          },
+            icon: Calendar, color: 'text-green-600 bg-green-50 dark:bg-green-900/20' },
+          { label: 'Required Documents', value: data?.requiredDocsPending ?? 0,
+            sub: daysToCount !== null ? `${docsUploaded} of ${docsTotal} uploaded · ${daysToCount < 0 ? 'Past due!' : `${daysToCount}d left`}` : `${docsUploaded} of ${docsTotal} uploaded`,
+            icon: FileText, color: daysToCount !== null && daysToCount < 14 ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' },
+          { label: 'Guardian Readiness', value: `${readiness}%`, sub: readinessLabel,
+            icon: Shield, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="stat-card">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color}`}><Icon size={18} /></div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">{value}</div>
-            <div className="text-xs font-medium text-gray-700">{label}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</div>
+            <div className="text-xs font-medium text-gray-700 dark:text-gray-300">{label}</div>
             <div className="text-xs text-gray-400">{sub}</div>
           </div>
         ))}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
-        {/* Left: case status + tasks + documents */}
+        {/* Left column */}
         <div className="lg:col-span-2 space-y-5">
 
           {/* Case Status */}
           <div className="card p-5">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <div className="text-sm font-bold text-gray-800">
-                  {matter?.matter_type === 'guardianship'                        ? 'Guardianship'
-                   : matter?.matter_type === 'conservatorship'                   ? 'Conservatorship'
-                   : matter?.matter_type === 'guardianship_conservatorship'      ? 'Guardianship & Conservatorship'
-                   : matter?.matter_type === 'estate_administration'             ? 'Estate Administration'
+                <div className="text-sm font-bold text-gray-800 dark:text-white">
+                  {matter?.matter_type === 'guardianship'                   ? 'Guardianship'
+                   : matter?.matter_type === 'conservatorship'              ? 'Conservatorship'
+                   : matter?.matter_type === 'guardianship_conservatorship' ? 'Guardianship & Conservatorship'
+                   : matter?.matter_type === 'estate_administration'        ? 'Estate Administration'
                    : 'Case'} Status
                 </div>
                 {matter && (
                   <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                     {matter.description && <span>{matter.description} ·</span>}
                     {matter.attorney_name
-                      ? <span className="flex items-center gap-1"><UserCheck size={11} className="text-green-500" /> {matter.attorney_name}</span>
-                      : (
-                        <button
-                          onClick={openAttyPicker}
-                          className="text-amber-600 font-medium hover:text-amber-700 flex items-center gap-1 underline underline-offset-2"
-                        >
-                          Attorney not yet assigned â€” click to select
+                      ? (
+                        <span className="flex items-center gap-1">
+                          <UserCheck size={11} className={caseAccepted ? 'text-green-500' : 'text-amber-500'} />
+                          {matter.attorney_name}
+                          {caseAccepted
+                            ? <span className="text-green-600 font-medium ml-1">· Accepted</span>
+                            : <span className="text-amber-600 font-medium ml-1">· Pending acceptance</span>}
+                        </span>
+                      ) : (
+                        <button onClick={openAttyPicker}
+                          className="text-amber-600 font-medium hover:text-amber-700 flex items-center gap-1 underline underline-offset-2">
+                          Attorney not yet assigned — click to select
                         </button>
                       )}
                   </div>
                 )}
               </div>
-              {matter && (
-                <span className="badge badge-blue capitalize">{matter.stage?.replace(/_/g, ' ')}</span>
-              )}
+              {matter && <span className="badge badge-blue capitalize">{matter.stage?.replace(/_/g, ' ')}</span>}
             </div>
 
             <div className="overflow-x-auto">
@@ -282,7 +474,7 @@ export default function ClientDashboard() {
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
                           curr ? 'bg-[#0f2057] border-[#0f2057] text-white ring-2 ring-[#0f2057]/20 shadow-md' :
                           done ? 'bg-green-500 border-green-500 text-white shadow-sm' :
-                                 'bg-white border-gray-300 text-gray-400'
+                                 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-400'
                         }`}>
                           {done && !curr ? <Check size={12} strokeWidth={3} /> : i + 1}
                         </div>
@@ -292,7 +484,7 @@ export default function ClientDashboard() {
                       </div>
                       {!last && (
                         <div className={`w-8 h-0.5 mt-3.5 mx-0.5 flex-shrink-0 rounded-full transition-colors ${
-                          i < stageIdx ? 'bg-green-500' : 'bg-gray-200'
+                          i < stageIdx ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-600'
                         }`} />
                       )}
                     </li>
@@ -305,10 +497,8 @@ export default function ClientDashboard() {
               <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                 <span>
                   Next Court Event:{' '}
-                  <span className={`font-semibold ${courtUrgent ? 'text-orange-500' : 'text-gray-700'}`}>
-                    {courtDate
-                      ? courtDate.toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric' })
-                      : 'TBD'}
+                  <span className={`font-semibold ${courtUrgent ? 'text-orange-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                    {courtDate ? courtDate.toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD'}
                   </span>
                 </span>
                 {daysToCount !== null && (
@@ -321,32 +511,57 @@ export default function ClientDashboard() {
                 )}
               </div>
             )}
+
+            {/* Quick actions when attorney accepted */}
+            {caseAccepted && matter?.attorney_id && (
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center gap-2 flex-wrap">
+                <button onClick={() => navigate('/messages')}
+                  className="flex items-center gap-1.5 text-xs font-medium bg-[#0f2057] text-white px-3 py-1.5 rounded-lg hover:bg-[#1a3476] transition-colors">
+                  <MessageSquare size={13} /> Message Your Attorney
+                </button>
+                <button onClick={() => navigate('/appointments')}
+                  className="flex items-center gap-1.5 text-xs font-medium border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <Calendar size={13} /> Schedule Appointment
+                </button>
+                <button onClick={() => navigate('/checklist')}
+                  className="flex items-center gap-1.5 text-xs font-medium border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <CheckSquare size={13} /> View Checklist
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Your Next Actions */}
+          {/* Required Documents for Case Type */}
+          {matter?.matter_type && (
+            <RequiredDocsPanel
+              matterType={matter.matter_type}
+              uploadedDocs={data?.uploadedDocs}
+            />
+          )}
+
+          {/* Attorney-Reviewed Documents */}
+          {matter?.id && <ReviewedDocsPanel matterId={matter.id} />}
+
+          {/* Next Actions */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold text-gray-800 text-sm">Your Next Actions</div>
-              <button onClick={() => navigate('/open-tasks')} className="text-xs text-green-600 hover:text-green-700 font-medium">
-                View all tasks â†’
-              </button>
+              <div className="font-semibold text-gray-800 dark:text-white text-sm">Your Next Actions</div>
+              <button onClick={() => navigate('/open-tasks')} className="text-xs text-green-600 hover:text-green-700 font-medium">View all tasks →</button>
             </div>
             <div className="space-y-2">
               {(data?.tasks || []).slice(0, 5).map(task => (
-                <div key={task.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                <div key={task.id} className="flex items-center gap-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                     task.status === 'overdue' ? 'bg-orange-400' : task.status === 'completed' ? 'bg-green-400' : 'bg-amber-400'
                   }`} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-700 truncate">{task.title}</div>
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{task.title}</div>
                     <div className="text-xs text-gray-400 truncate">{task.description}</div>
                   </div>
                   <div className={`text-xs font-medium flex-shrink-0 ${statusColor(task.status)}`}>
-                    {task.status === 'overdue'
-                      ? 'Overdue'
-                      : task.due_date
-                        ? `Due in ${Math.max(0, Math.ceil((new Date(task.due_date) - new Date()) / 86400000))} days`
-                        : 'No due date'}
+                    {task.status === 'overdue' ? 'Overdue'
+                      : task.due_date ? `Due in ${Math.max(0, Math.ceil((new Date(task.due_date) - new Date()) / 86400000))} days`
+                      : 'No due date'}
                   </div>
                   {task.action_label && (() => {
                     const cfg = ACTION_CFG[task.action_label] || ACTION_CFG.Review;
@@ -359,7 +574,7 @@ export default function ClientDashboard() {
                 </div>
               ))}
               {(!data?.tasks || data.tasks.length === 0) && (
-                <div className="text-center py-6 text-gray-400 text-sm">No open tasks â€” you're all caught up!</div>
+                <div className="text-center py-6 text-gray-400 text-sm">No open tasks — you're all caught up!</div>
               )}
             </div>
           </div>
@@ -367,7 +582,7 @@ export default function ClientDashboard() {
           {/* Document Upload Center */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold text-gray-800 text-sm">Document Upload Center</div>
+              <div className="font-semibold text-gray-800 dark:text-white text-sm">Document Upload Center</div>
               {daysToCount !== null && (
                 <span className={`text-xs font-medium flex items-center gap-1 ${
                   daysToCount < 0 ? 'text-red-500' : daysToCount < 14 ? 'text-orange-500' : 'text-gray-500'
@@ -383,14 +598,11 @@ export default function ClientDashboard() {
                   <FileText size={14} className="text-gray-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium text-gray-700">{shortCat(category)}</span>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">{shortCat(category)}</span>
                       <span className="text-gray-400">{uploaded} / {total}</span>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-green-500 rounded-full"
-                        style={{ width: total ? `${(uploaded / total) * 100}%` : '0%' }}
-                      />
+                    <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full" style={{ width: total ? `${(uploaded / total) * 100}%` : '0%' }} />
                     </div>
                   </div>
                 </div>
@@ -399,14 +611,12 @@ export default function ClientDashboard() {
                 <div className="text-xs text-gray-400 text-center py-2">No documents on file yet</div>
               )}
             </div>
-            <div
-              className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-green-400 transition-colors cursor-pointer"
-              onClick={() => navigate('/documents')}
-            >
+            <div className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-xl p-4 text-center hover:border-green-400 transition-colors cursor-pointer"
+              onClick={() => navigate('/documents')}>
               <Upload size={20} className="mx-auto text-gray-400 mb-1" />
-              <div className="text-sm text-gray-500">Drag & drop files here</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Drag & drop files here</div>
               <div className="text-xs text-gray-400">PDF, JPG, PNG · Max 20 MB</div>
-              <button className="mt-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg font-medium">
+              <button className="mt-2 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-300 px-4 py-1.5 rounded-lg font-medium">
                 Choose Files
               </button>
             </div>
@@ -417,73 +627,90 @@ export default function ClientDashboard() {
         <div className="space-y-4">
           {/* Guardian Readiness gauge */}
           <div className="card p-4 text-center">
-            <div className="font-semibold text-gray-800 text-sm mb-3">Guardian Readiness</div>
+            <div className="font-semibold text-gray-800 dark:text-white text-sm mb-3">Guardian Readiness</div>
             <ReadinessGauge value={readiness} />
             <div className="mt-3 grid grid-cols-3 gap-1 text-center text-xs">
               <div>
-                <div className="font-bold text-gray-700">{docsUploaded}/{docsTotal}</div>
+                <div className="font-bold text-gray-700 dark:text-gray-300">{docsUploaded}/{docsTotal}</div>
                 <div className="text-gray-400">Docs</div>
               </div>
               <div>
-                <div className="font-bold text-gray-700">{data?.completedTasks ?? 0}/{data?.totalTasks ?? 0}</div>
+                <div className="font-bold text-gray-700 dark:text-gray-300">{data?.completedTasks ?? 0}/{data?.totalTasks ?? 0}</div>
                 <div className="text-gray-400">Tasks Done</div>
               </div>
               <div>
-                <div className={`font-bold ${(data?.overdueTasks ?? 0) > 0 ? 'text-orange-500' : 'text-gray-700'}`}>
+                <div className={`font-bold ${(data?.overdueTasks ?? 0) > 0 ? 'text-orange-500' : 'text-gray-700 dark:text-gray-300'}`}>
                   {data?.overdueTasks ?? 0}
                 </div>
                 <div className="text-gray-400">Overdue</div>
               </div>
             </div>
             {docsUploaded > 0 && (data?.checklistAccepted ?? 0) < docsUploaded && (
-              <div className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1.5">
+              <div className="mt-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-2 py-1.5">
                 {docsUploaded - (data?.checklistAccepted ?? 0)} doc{docsUploaded - (data?.checklistAccepted ?? 0) !== 1 ? 's' : ''} pending attorney review
               </div>
             )}
           </div>
 
-          {/* Attorney assignment â€” shown when no attorney assigned and matter exists */}
+          {/* Attorney selection & invite */}
           {matter && !matter.attorney_id && (
-            <div className="card p-4 border-2 border-amber-200 bg-amber-50/40">
-              <div className="font-semibold text-gray-800 text-sm mb-1 flex items-center gap-1.5">
+            <div className="card p-4 border-2 border-amber-200 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-900/10">
+              <div className="font-semibold text-gray-800 dark:text-white text-sm mb-1 flex items-center gap-1.5">
                 <UserCheck size={14} className="text-amber-600" /> Select Your Attorney
               </div>
-              <p className="text-xs text-gray-500 mb-3">
-                Choose an attorney from our team to handle your case and enable direct messaging.
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Choose a registered attorney or invite your own attorney to join the platform.
               </p>
-              <button
-                onClick={openAttyPicker}
-                className="w-full py-2 bg-[#0f2057] text-white text-sm font-semibold rounded-xl hover:bg-[#1a3476] transition-colors"
-              >
+              <button onClick={openAttyPicker}
+                className="w-full py-2 bg-[#0f2057] text-white text-sm font-semibold rounded-xl hover:bg-[#1a3476] transition-colors mb-2">
                 View Available Attorneys
               </button>
+              <button onClick={() => setShowInvite(true)}
+                className="w-full py-2 border border-[#0f2057] text-[#0f2057] dark:text-blue-400 dark:border-blue-500 text-sm font-medium rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center gap-2">
+                <Mail size={14} /> Invite My Attorney by Email
+              </button>
+            </div>
+          )}
+
+          {/* Attorney card when assigned */}
+          {matter?.attorney_id && (
+            <div className={`card p-4 ${caseAccepted ? 'border-green-200 dark:border-green-700' : 'border-amber-200 dark:border-amber-700'}`}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-[#0f2057] text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                  {matter.attorney_initials || matter.attorney_name?.split(' ').map(n => n[0]).join('') || 'AT'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800 dark:text-white">{matter.attorney_name || 'Your Attorney'}</div>
+                  <div className={`text-xs flex items-center gap-1 ${caseAccepted ? 'text-green-600' : 'text-amber-600'}`}>
+                    {caseAccepted ? <><Check size={10} /> Case Accepted</> : <><Clock size={10} /> Pending Acceptance</>}
+                  </div>
+                </div>
+              </div>
+              {caseAccepted && (
+                <button onClick={() => navigate('/messages')}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-[#0f2057] text-white text-xs font-semibold rounded-lg hover:bg-[#1a3476] transition-colors">
+                  <MessageSquare size={13} /> Send Message to Attorney
+                </button>
+              )}
             </div>
           )}
 
           {/* Upcoming appointment */}
           <div className="card p-4">
-            <div className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+            <div className="font-semibold text-gray-800 dark:text-white text-sm mb-3 flex items-center gap-2">
               <Calendar size={14} className="text-green-500" /> Upcoming Appointment
             </div>
             {(data?.upcomingAppts || []).slice(0, 1).map(appt => (
               <div key={appt.id} className="flex items-start gap-3">
-                <div className="bg-green-50 text-green-700 rounded-xl px-3 py-2 text-center flex-shrink-0">
-                  <div className="text-xs font-semibold">
-                    {new Date(appt.start_time).toLocaleDateString('en', { month: 'short' }).toUpperCase()}
-                  </div>
+                <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-xl px-3 py-2 text-center flex-shrink-0">
+                  <div className="text-xs font-semibold">{new Date(appt.start_time).toLocaleDateString('en', { month: 'short' }).toUpperCase()}</div>
                   <div className="text-2xl font-bold">{new Date(appt.start_time).getDate()}</div>
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-gray-800">{appt.title}</div>
-                  <div className="text-xs text-gray-500">
-                    {new Date(appt.start_time).toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })}
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {new Date(appt.start_time).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })} · {appt.location}
-                  </div>
-                  <button className="mt-2 text-xs bg-navy-900 text-white px-3 py-1 rounded-lg hover:bg-navy-800">
-                    Join Appointment
-                  </button>
+                  <div className="text-sm font-semibold text-gray-800 dark:text-white">{appt.title}</div>
+                  <div className="text-xs text-gray-500">{new Date(appt.start_time).toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+                  <div className="text-xs text-gray-400">{new Date(appt.start_time).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })} · {appt.location}</div>
+                  <button className="mt-2 text-xs bg-navy-900 text-white px-3 py-1 rounded-lg hover:bg-navy-800">Join Appointment</button>
                 </div>
               </div>
             ))}
@@ -494,18 +721,18 @@ export default function ClientDashboard() {
 
           {/* Important deadlines */}
           <div className="card p-4">
-            <div className="font-semibold text-gray-800 text-sm mb-3 flex items-center justify-between">
+            <div className="font-semibold text-gray-800 dark:text-white text-sm mb-3 flex items-center justify-between">
               Important Deadlines
               <button onClick={() => navigate('/care-tasks')} className="text-xs text-green-600">View all</button>
             </div>
             <div className="space-y-2.5">
               {(data?.deadlines || []).slice(0, 4).map((d, i) => (
                 <div key={i} className="flex items-start gap-2.5">
-                  <div className={`text-xs font-bold w-14 text-center flex-shrink-0 leading-tight ${d.urgent ? 'text-orange-500' : 'text-navy-900'}`}>
+                  <div className={`text-xs font-bold w-14 text-center flex-shrink-0 leading-tight ${d.urgent ? 'text-orange-500' : 'text-navy-900 dark:text-blue-400'}`}>
                     {new Date(d.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }).toUpperCase()}
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-gray-700 leading-snug">{d.title}</div>
+                    <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 leading-snug">{d.title}</div>
                     <div className="text-xs text-gray-400">{d.description}</div>
                     <div className={`text-xs font-medium mt-0.5 ${d.urgent ? 'text-orange-500' : 'text-gray-500'}`}>
                       In {d.days_left} day{d.days_left !== 1 ? 's' : ''}
@@ -521,7 +748,7 @@ export default function ClientDashboard() {
 
           {/* Messages from legal team */}
           <div className="card p-4">
-            <div className="font-semibold text-gray-800 text-sm mb-3 flex items-center justify-between">
+            <div className="font-semibold text-gray-800 dark:text-white text-sm mb-3 flex items-center justify-between">
               Messages from Your Legal Team
               <button onClick={() => navigate('/messages')} className="text-xs text-green-600">View all</button>
             </div>
@@ -533,12 +760,10 @@ export default function ClientDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between">
-                      <div className="text-xs font-semibold text-gray-700">{msg.from_name}</div>
-                      <div className="text-xs text-gray-400">
-                        {new Date(msg.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-                      </div>
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">{msg.from_name}</div>
+                      <div className="text-xs text-gray-400">{new Date(msg.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</div>
                     </div>
-                    <div className="text-xs text-gray-500 truncate">{msg.body}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{msg.body}</div>
                   </div>
                 </div>
               ))}
@@ -549,18 +774,16 @@ export default function ClientDashboard() {
           </div>
 
           {/* Help */}
-          <div className="card p-4 bg-gray-50">
-            <div className="font-semibold text-gray-800 text-sm mb-1">Need Help?</div>
-            <div className="text-xs text-gray-500 mb-3">We're here to support you every step of the way.</div>
+          <div className="card p-4 bg-gray-50 dark:bg-gray-700/30">
+            <div className="font-semibold text-gray-800 dark:text-white text-sm mb-1">Need Help?</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">We're here to support you every step of the way.</div>
             <div className="space-y-2">
-              <button className="w-full flex items-center gap-2 border border-gray-300 bg-white rounded-lg p-2 text-xs font-medium hover:bg-gray-50">
-                <Phone size={14} className="text-navy-900" /> Schedule a Call
+              <button className="w-full flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg p-2 text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-600 dark:text-gray-300">
+                <Phone size={14} className="text-navy-900 dark:text-blue-400" /> Schedule a Call
               </button>
-              <button
-                onClick={() => navigate('/messages')}
-                className="w-full flex items-center gap-2 border border-gray-300 bg-white rounded-lg p-2 text-xs font-medium hover:bg-gray-50"
-              >
-                <MessageSquare size={14} className="text-navy-900" /> Contact Support
+              <button onClick={() => navigate('/messages')}
+                className="w-full flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg p-2 text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-600 dark:text-gray-300">
+                <MessageSquare size={14} className="text-navy-900 dark:text-blue-400" /> Contact Support
               </button>
             </div>
             <div className="text-xs text-gray-400 mt-2 text-center">Call us: (855) 555-1212</div>
@@ -571,33 +794,40 @@ export default function ClientDashboard() {
       {/* Attorney Picker Modal */}
       {showAttyPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
               <div>
-                <div className="font-bold text-gray-900">Choose Your Attorney</div>
+                <div className="font-bold text-gray-900 dark:text-white">Choose Your Attorney</div>
                 <div className="text-xs text-gray-500">Select an attorney to handle your case</div>
               </div>
-              <button onClick={() => setShowAttyPicker(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={18} />
-              </button>
+              <button onClick={() => setShowAttyPicker(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {attysLoading ? (
                 <div className="flex justify-center py-8"><Spinner /></div>
               ) : attorneys.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">No attorneys available at this time</div>
+                <div className="text-center py-8 space-y-3">
+                  <div className="text-gray-400 text-sm">No attorneys available at this time</div>
+                  <button onClick={() => { setShowAttyPicker(false); setShowInvite(true); }}
+                    className="text-xs bg-[#0f2057] text-white px-4 py-2 rounded-lg hover:bg-[#1a3476]">
+                    Invite Your Attorney by Email
+                  </button>
+                </div>
               ) : attorneys.map(a => (
-                <AttorneyCard
-                  key={a.id}
-                  attorney={a}
-                  onAssign={handleAssignAttorney}
-                  assigning={assigning}
-                />
+                <AttorneyCard key={a.id} attorney={a} onAssign={handleAssignAttorney} assigning={assigning} />
               ))}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700">
+              <button onClick={() => { setShowAttyPicker(false); setShowInvite(true); }}
+                className="w-full text-xs text-[#0f2057] dark:text-blue-400 font-medium flex items-center justify-center gap-1 hover:underline">
+                <Mail size={12} /> My attorney isn't listed — invite them
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {showInvite && <InviteAttorneyModal onClose={() => setShowInvite(false)} />}
     </div>
   );
 }

@@ -97,6 +97,29 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res, 
   } catch (err) { next(err); }
 });
 
+// Documents pending attorney review — all docs from this attorney's clients with status='pending'
+router.get('/pending-review', requireAuth, requireRole('attorney', 'partner', 'itsupport'), async (req, res, next) => {
+  try {
+    const { all: dbAll } = require('../db');
+    const docs = await dbAll(
+      `SELECT d.*,
+              (u.first_name || ' ' || u.last_name) AS client_name,
+              u.email AS client_email,
+              u.avatar_initials AS client_initials,
+              m.case_number, m.matter_type
+       FROM documents d
+       LEFT JOIN users  u ON u.id = d.user_id
+       LEFT JOIN matters m ON m.id = d.matter_id
+       WHERE d.status = 'pending'
+         AND m.attorney_id = ?
+       ORDER BY d.created_at DESC
+       LIMIT 100`,
+      [req.user.id]
+    );
+    res.json({ documents: docs, count: docs.length });
+  } catch (err) { next(err); }
+});
+
 router.patch('/:id', requireAuth, async (req, res, next) => {
   try {
     const doc = await DocumentRepo.findById(req.params.id);
