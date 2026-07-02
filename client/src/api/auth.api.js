@@ -18,6 +18,7 @@ const authApi = {
   forgotPassword:     email => http.post('/auth/forgot-password', { email }),
   resetPassword:      d     => http.post('/auth/reset-password', d),
   googleStatus:       ()    => http.get('/auth/google/status'),
+  googleDisconnect:   ()    => http.post('/auth/google/disconnect'),
 };
 
 export default authApi;

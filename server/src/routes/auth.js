@@ -192,6 +192,7 @@ router.get('/google/callback', async (req, res) => {
       return res.redirect(`${config.client.url}/login?error=google_unverified`);
 
     const { run, one } = require('../db');
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     let isNew = false;
     let user = await UserRepo.findByEmail(gUser.email);
     if (!user) {
@@ -202,12 +203,25 @@ router.get('/google/callback', async (req, res) => {
       // regular client registration where isPro=false sets approvalStatus to null.
       // Without this the MySQL column default ('pending') blocks every new Google user.
       const r  = await run(
-        'INSERT INTO users (first_name, last_name, email, password_hash, role, avatar_initials, email_verified, approval_status) VALUES (?,?,?,?,?,?,1,NULL)',
-        [fn, ln, gUser.email.toLowerCase(), '', 'client', `${fn[0]}${(ln[0] || fn[1] || 'U')}`.toUpperCase()]
+        `INSERT INTO users
+           (first_name, last_name, email, password_hash, role, avatar_initials,
+            email_verified, approval_status, google_id, avatar_url, login_provider, last_login)
+         VALUES (?,?,?,?,?,?,1,NULL,?,?,?,?)`,
+        [fn, ln, gUser.email.toLowerCase(), '', 'client',
+         `${fn[0]}${(ln[0] || fn[1] || 'U')}`.toUpperCase(),
+         gUser.id, gUser.picture || null, 'google', now]
       );
       user = await one('SELECT * FROM users WHERE id = ?', [r.insertId]);
-    } else if (!user.email_verified) {
-      await UserRepo.markVerified(user.id);
+    } else {
+      // Update Google profile data and last login on every sign-in
+      await UserRepo.update(user.id, {
+        google_id:      gUser.id,
+        avatar_url:     gUser.picture || user.avatar_url || null,
+        login_provider: user.login_provider === 'email' && !user.google_id ? 'email' : 'google',
+        last_login:     now,
+        ...(user.email_verified ? {} : { email_verified: 1 }),
+      });
+      user = await one('SELECT * FROM users WHERE id = ?', [user.id]);
     }
 
     // Approval checks apply only to professional roles — consistent with the
@@ -218,6 +232,12 @@ router.get('/google/callback', async (req, res) => {
       if (user.approval_status === 'rejected')
         return res.redirect(`${config.client.url}/login?error=account_rejected`);
     }
+
+    AuditService.log({
+      userId: user.id, action: AuditService.ACTIONS.USER_LOGIN,
+      meta: { provider: 'google', isNew },
+      ip: req.ip,
+    });
 
     const callbackParams = new URLSearchParams({
       token:    AuthService.signToken(user.id),
@@ -300,6 +320,27 @@ router.post('/disable-2fa', requireAuth, async (req, res, next) => {
       action: 'user.2fa_disabled',
       ip: req.ip,
     });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Disconnect Google account — requires a password to be set first so the user
+// doesn't lock themselves out. Sets login_provider back to 'email'.
+router.post('/google/disconnect', requireAuth, async (req, res, next) => {
+  try {
+    const user = await require('../db').one(
+      'SELECT password_hash, google_id FROM users WHERE id = ?', [req.user.id]
+    );
+    if (!user?.google_id)
+      return res.status(400).json({ error: 'No Google account linked.' });
+    if (!user.password_hash)
+      return res.status(400).json({ error: 'Set a password before disconnecting Google.' });
+
+    await UserRepo.update(req.user.id, {
+      google_id: null, avatar_url: null, login_provider: 'email',
+    });
+    await invalidateUserCache(req.user.id);
+    AuditService.log({ userId: req.user.id, action: 'user.google_disconnected', ip: req.ip });
     res.json({ success: true });
   } catch (err) { next(err); }
 });

@@ -20,8 +20,10 @@ const MatterService = {
   },
 
   async create(body, userId) {
-    const { matterType, description, court, county, urgent, importantDate,
+    const { description, court, county, urgent, importantDate,
             hasDocuments, workedWithFirmBefore, additionalNotes, matterStatus } = body;
+    // Accept both camelCase (intake wizard / register flow) and snake_case (direct API calls)
+    const matterType = body.matterType || body.matter_type || null;
 
     const r = await MatterRepo.create({
       clientId: userId,
@@ -48,15 +50,18 @@ const MatterService = {
     }
 
     const fields = {};
-    if (attorney_id !== undefined)     fields.attorney_id      = attorney_id;
-    if (body.stage !== undefined)      fields.stage            = body.stage;
-    if (body.status !== undefined)     fields.status           = body.status;
-    if (body.description !== undefined)fields.description      = body.description;
-    if (body.court !== undefined)      fields.court            = body.court;
-    if (body.county !== undefined)     fields.county           = body.county;
-    if (body.urgent !== undefined)     fields.urgent           = body.urgent ? 1 : 0;
-    if (body.importantDate !== undefined) fields.important_date = body.importantDate;
+    if (attorney_id !== undefined)          fields.attorney_id      = attorney_id;
+    if (body.stage !== undefined)           fields.stage            = body.stage;
+    if (body.status !== undefined)          fields.status           = body.status;
+    if (body.description !== undefined)     fields.description      = body.description;
+    if (body.court !== undefined)           fields.court            = body.court;
+    if (body.county !== undefined)          fields.county           = body.county;
+    if (body.urgent !== undefined)          fields.urgent           = body.urgent ? 1 : 0;
+    if (body.importantDate !== undefined)   fields.important_date   = body.importantDate;
     if (body.additionalNotes !== undefined) fields.additional_notes = body.additionalNotes;
+    // Accept both snake_case (API/frontend) and camelCase for matter type updates
+    const newType = body.matter_type ?? body.matterType;
+    if (newType !== undefined)              fields.matter_type      = newType;
 
     await MatterRepo.update(id, fields);
   },

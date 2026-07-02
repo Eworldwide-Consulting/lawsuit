@@ -123,6 +123,33 @@ const EmailService = {
     });
   },
 
+  // Sent to attorney when a client assigns them — they must accept or decline in the portal
+  sendAttorneyCaseRequest(to, { attorneyName, clientName, caseNumber, matterType, dashboardUrl }) {
+    return send({
+      to,
+      subject: `New Case Request — ${clientName} is requesting your representation`,
+      html: tmplAttorneyCaseRequest({ attorneyName, clientName, caseNumber, matterType, dashboardUrl }),
+    });
+  },
+
+  // Sent to client after attorney accepts their case
+  sendClientCaseAccepted(to, { clientName, attorneyName, caseNumber, dashboardUrl }) {
+    return send({
+      to,
+      subject: `Your attorney has accepted your case — ${caseNumber}`,
+      html: tmplClientCaseAccepted({ clientName, attorneyName, caseNumber, dashboardUrl }),
+    });
+  },
+
+  // Sent to client after attorney declines their case
+  sendClientCaseDeclined(to, { clientName, attorneyName, caseNumber, reason, dashboardUrl }) {
+    return send({
+      to,
+      subject: `Case request update — ${caseNumber}`,
+      html: tmplClientCaseDeclined({ clientName, attorneyName, caseNumber, reason, dashboardUrl }),
+    });
+  },
+
   sendContactSales({ name, email, company, phone, plan, message }) {
     const salesTo = config.smtp.user || 'legal@trivanta.com';
     return send({
@@ -401,5 +428,55 @@ function tmplAttorneyInvite({ to, clientName, name, signupLink }) {
     ${btn(signupLink, 'Create Your Attorney Account')}
     ${p(`After registering, ${esc(clientName)} will be able to connect their case to your account directly.`)}
     <p style="color:#9ca3af;font-size:13px">If you did not expect this invitation, you can safely ignore this email.</p>
+  `);
+}
+
+function tmplAttorneyCaseRequest({ attorneyName, clientName, caseNumber, matterType, dashboardUrl }) {
+  const greeting  = attorneyName ? `Hi ${esc(attorneyName)},` : 'Hello,';
+  const typeLabel = (matterType || 'General').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return wrap(`
+    ${h2('You have a new case request')}
+    ${p(greeting)}
+    ${p(`A client on TriVanta has requested your legal representation. Please review the details below and accept or decline the case from your dashboard.`)}
+    <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px">
+      <tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:10px 0;color:#6b7280;width:40%">Client</td>
+        <td style="padding:10px 0;font-weight:600;color:#111827">${esc(clientName)}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:10px 0;color:#6b7280">Case Number</td>
+        <td style="padding:10px 0;font-weight:600;color:#111827">${esc(caseNumber)}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 0;color:#6b7280">Matter Type</td>
+        <td style="padding:10px 0;font-weight:600;color:#111827">${esc(typeLabel)}</td>
+      </tr>
+    </table>
+    ${p('Log in to your TriVanta dashboard to review the full case details, then accept or decline this request.')}
+    ${btn(dashboardUrl, 'Review Case Request')}
+    <p style="color:#9ca3af;font-size:13px">This request will remain pending until you take action. The client will be notified of your decision.</p>
+  `);
+}
+
+function tmplClientCaseAccepted({ clientName, attorneyName, caseNumber, dashboardUrl }) {
+  return wrap(`
+    ${h2('Your attorney has accepted your case')}
+    ${p(`Hi ${esc(clientName)},`)}
+    ${p(`Great news! <strong>${esc(attorneyName)}</strong> has accepted your case request for <strong>${esc(caseNumber)}</strong> and is now your attorney of record on TriVanta.`)}
+    ${p('You can now message your attorney directly, view your required document checklist, and track your case progress — all from your dashboard.')}
+    ${btn(dashboardUrl, 'Go to Your Dashboard')}
+    <p style="color:#9ca3af;font-size:13px">If you have questions, contact your attorney through the TriVanta messaging system.</p>
+  `);
+}
+
+function tmplClientCaseDeclined({ clientName, attorneyName, caseNumber, reason, dashboardUrl }) {
+  return wrap(`
+    ${h2('Case request update')}
+    ${p(`Hi ${esc(clientName)},`)}
+    ${p(`<strong>${esc(attorneyName)}</strong> is unable to take on your case (<strong>${esc(caseNumber)}</strong>) at this time.`)}
+    ${reason ? p(`<em>"${esc(reason)}"</em>`) : ''}
+    ${p('You can return to your dashboard to choose a different attorney or invite your own attorney to the platform.')}
+    ${btn(dashboardUrl, 'Choose Another Attorney')}
+    <p style="color:#9ca3af;font-size:13px">We're sorry for the inconvenience. Our support team is available if you need help finding representation.</p>
   `);
 }

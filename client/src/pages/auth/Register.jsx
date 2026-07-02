@@ -359,6 +359,31 @@ export default function Register() {
               >
                 Continue <ArrowRight size={18} />
               </button>
+
+              {/* Google sign-up shortcut — only shown for client role (Google users become clients) */}
+              {(role === 'client' || !role) && (
+                <>
+                  <div className="relative flex items-center gap-3 my-1">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-xs text-gray-400 font-medium">or</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { window.location.href = '/api/auth/google'; }}
+                    className="w-full flex items-center justify-center gap-3 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 48 48">
+                      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.5 2.3 30.1 0 24 0 14.7 0 6.6 5.5 2.8 13.5l7.8 6.1C12.5 13.1 17.8 9.5 24 9.5z"/>
+                      <path fill="#4285F4" d="M46.9 24.5c0-1.7-.1-3.3-.4-4.9H24v9.3h12.9c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.3-10.1 7.3-17.4z"/>
+                      <path fill="#FBBC05" d="M10.6 28.6A14.7 14.7 0 019.5 24c0-1.6.3-3.2.9-4.6L2.6 13.3A23.8 23.8 0 000 24c0 3.8.9 7.4 2.6 10.6l8-6z"/>
+                      <path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.4l-7.5-5.8c-2 1.4-4.6 2.2-7.5 2.2-6.2 0-11.5-3.6-13.5-9.4l-8 6.1C6.6 42.5 14.7 48 24 48z"/>
+                    </svg>
+                    Continue with Google
+                  </button>
+                </>
+              )}
+
               <p className="text-center text-sm text-gray-500">
                 Already have an account?{' '}
                 <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>

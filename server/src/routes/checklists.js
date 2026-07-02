@@ -52,9 +52,15 @@ async function ensureItems(matterId, matterType) {
   );
   if (existing.length > 0) return;
 
+  // 'guardianship_conservatorship' is the UI/API key;
+  // the seeded template uses 'joint_guardianship_conservatorship'
+  const templateType = matterType === 'guardianship_conservatorship'
+    ? 'joint_guardianship_conservatorship'
+    : matterType;
+
   const templates = await all(
     `SELECT * FROM checklist_templates WHERE matter_type = ? ORDER BY section_order, item_order`,
-    [matterType]
+    [templateType]
   );
 
   for (const t of templates) {

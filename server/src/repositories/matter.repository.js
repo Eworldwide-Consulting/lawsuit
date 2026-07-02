@@ -121,7 +121,7 @@ const MatterRepository = {
   },
 
   update(id, fields) {
-    const allowed = ['attorney_id', 'stage', 'status', 'description', 'court', 'county',
+    const allowed = ['attorney_id', 'stage', 'status', 'matter_type', 'description', 'court', 'county',
                      'urgent', 'important_date', 'additional_notes'];
     const sets = [];
     const vals = [];

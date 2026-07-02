@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api';
-import { User, Lock, Bell, Shield, Check, ShieldCheck, ShieldOff } from 'lucide-react';
+import { User, Lock, Bell, Shield, Check, ShieldCheck, ShieldOff, Link2, Unlink } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import TwoFASetupModal from '../components/ui/TwoFASetupModal';
 
@@ -15,6 +15,7 @@ export default function Settings() {
   const [error, setError] = useState('');
   const [show2FA, setShow2FA] = useState(false);
   const [disabling2FA, setDisabling2FA] = useState(false);
+  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
 
   async function disable2fa() {
     if (!window.confirm('Are you sure you want to disable two-factor authentication? Your account will be less secure.')) return;
@@ -56,9 +57,25 @@ export default function Settings() {
     } finally { setSaving(false); }
   }
 
+  async function disconnectGoogle() {
+    if (!window.confirm('Disconnect your Google account? You will need your password to log in.')) return;
+    setDisconnectingGoogle(true);
+    setError(''); setSaved('');
+    try {
+      await authApi.googleDisconnect();
+      updateUser({ has_google: false, login_provider: 'email' });
+      setSaved('Google account disconnected. You can now log in with email and password.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to disconnect Google. Please try again.');
+    } finally {
+      setDisconnectingGoogle(false);
+    }
+  }
+
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'security', label: 'Security', icon: Lock },
+    { id: 'connected', label: 'Connected Accounts', icon: Link2 },
     { id: 'notifications', label: 'Notifications', icon: Bell },
   ];
 
@@ -181,6 +198,66 @@ export default function Settings() {
             {!user?.two_fa_enabled && (
               <p className="mt-3 text-xs text-gray-400">
                 Works with Google Authenticator, Authy, or any TOTP-compatible app.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'connected' && (
+        <div className="space-y-4">
+          <div className="card p-6">
+            <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Link2 size={16} /> Connected Accounts
+            </h2>
+
+            {/* Google */}
+            <div className="flex items-center justify-between gap-4 py-4 border-b border-gray-100 last:border-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.5 2.3 30.1 0 24 0 14.7 0 6.6 5.5 2.8 13.5l7.8 6.1C12.5 13.1 17.8 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.9 24.5c0-1.7-.1-3.3-.4-4.9H24v9.3h12.9c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.3-10.1 7.3-17.4z"/>
+                    <path fill="#FBBC05" d="M10.6 28.6A14.7 14.7 0 019.5 24c0-1.6.3-3.2.9-4.6L2.6 13.3A23.8 23.8 0 000 24c0 3.8.9 7.4 2.6 10.6l8-6z"/>
+                    <path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.4l-7.5-5.8c-2 1.4-4.6 2.2-7.5 2.2-6.2 0-11.5-3.6-13.5-9.4l-8 6.1C6.6 42.5 14.7 48 24 48z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900 text-sm">Google</div>
+                  <div className="text-xs text-gray-500">
+                    {user?.has_google
+                      ? 'Your Google account is connected. You can sign in with Google.'
+                      : 'Connect your Google account for faster sign-in.'}
+                  </div>
+                </div>
+              </div>
+
+              {user?.has_google ? (
+                <div className="flex items-center gap-3">
+                  <span className="badge badge-green flex-shrink-0">Connected</span>
+                  <button
+                    onClick={disconnectGoogle}
+                    disabled={disconnectingGoogle}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    {disconnectingGoogle
+                      ? <Spinner size={4} color="text-red-500" />
+                      : <><Unlink size={13} /> Disconnect</>}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { window.location.href = '/api/auth/google'; }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <Link2 size={13} /> Connect
+                </button>
+              )}
+            </div>
+
+            {user?.has_google && !user?.login_provider?.includes('email') && (
+              <p className="mt-3 text-xs text-amber-600 bg-amber-50 p-3 rounded-lg">
+                You signed up with Google. To disconnect, first set a password via the Security tab so you don't lose access to your account.
               </p>
             )}
           </div>

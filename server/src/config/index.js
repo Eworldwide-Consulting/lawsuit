@@ -54,8 +54,10 @@ const config = {
   },
 
   stripe: {
-    secretKey:     optional('STRIPE_SECRET_KEY'),
-    webhookSecret: optional('STRIPE_WEBHOOK_SECRET'),
+    secretKey:          optional('STRIPE_SECRET_KEY'),
+    publishableKey:     optional('STRIPE_PUBLISHABLE_KEY'),
+    webhookSecret:      optional('STRIPE_WEBHOOK_SECRET'),
+    testWebhookSecret:  optional('STRIPE_TEST_WEBHOOK_SECRET'),
   },
 
   google: {
@@ -72,5 +74,45 @@ const config = {
     url: optional('SERVER_URL'),
   },
 };
+
+// ── Stripe mode safety check ─────────────────────────────────────────────────
+// Runs once at module load so every boot prints which Stripe mode is active.
+// Throws hard if NODE_ENV and key prefix are mismatched (e.g. sk_test_ in prod).
+(function validateStripeMode() {
+  const key = config.stripe.secretKey;
+  if (!key) return; // Stripe not configured — silent pass, routes return 501
+
+  const isTestKey = key.startsWith('sk_test_');
+  const isLiveKey = key.startsWith('sk_live_');
+
+  if (!isTestKey && !isLiveKey) {
+    throw new Error(
+      `[Stripe] Unrecognised key prefix in STRIPE_SECRET_KEY. ` +
+      `Expected sk_test_... (dev) or sk_live_... (prod).`
+    );
+  }
+
+  const mode = isTestKey ? 'TEST' : 'LIVE';
+  // eslint-disable-next-line no-console
+  console.log(`[Stripe] Running in ${mode} mode (${key.slice(0, 12)}...)`);
+
+  // Hard guard: live key in non-production → risk of accidental real charges
+  if (isLiveKey && !isProduction) {
+    throw new Error(
+      `[Stripe] DANGER: sk_live_ key detected but NODE_ENV="${config.env}". ` +
+      `Live keys must only be used in NODE_ENV=production. ` +
+      `Switch to a sk_test_ key for development/staging.`
+    );
+  }
+
+  // Hard guard: test key in production → payments will silently fail for real users
+  if (isTestKey && isProduction) {
+    throw new Error(
+      `[Stripe] DANGER: sk_test_ key detected in NODE_ENV="production". ` +
+      `Production deployments require a sk_live_ key. ` +
+      `Inject STRIPE_SECRET_KEY=sk_live_... via your secrets manager.`
+    );
+  }
+})();
 
 module.exports = config;

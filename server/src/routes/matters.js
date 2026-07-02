@@ -2,9 +2,12 @@ const router = require('express').Router();
 const { requireAuth, requireRole } = require('../middleware/auth');
 const MatterService       = require('../services/matter.service');
 const MatterRepo          = require('../repositories/matter.repository');
+const UserRepo            = require('../repositories/user.repository');
 const { parsePagination } = require('../lib/pagination');
 const NotificationService = require('../services/notification.service');
+const EmailService        = require('../services/email.service');
 const AuditService        = require('../services/audit.service');
+const config              = require('../config');
 const { ForbiddenError, NotFoundError, ValidationError } = require('../lib/errors');
 const { all, one, run }   = require('../db');
 
@@ -112,11 +115,26 @@ router.post('/:id/assign-attorney', requireAuth, async (req, res, next) => {
       ip: req.ip,
     });
 
-    // Notify the newly assigned attorney about the case request
+    // In-app notification to attorney
     NotificationService.matterUpdated(attorney_id, {
       caseNumber: matter.case_number,
       matterId:   Number(req.params.id),
     });
+
+    // Email notification to attorney — non-fatal if email is unconfigured
+    try {
+      const attorney = await UserRepo.findById(attorney_id);
+      const client   = await UserRepo.findById(req.user.id);
+      if (attorney?.email) {
+        EmailService.sendAttorneyCaseRequest(attorney.email, {
+          attorneyName: attorney.first_name,
+          clientName:   `${client?.first_name || ''} ${client?.last_name || ''}`.trim() || req.user.email,
+          caseNumber:   matter.case_number,
+          matterType:   matter.matter_type,
+          dashboardUrl: `${config.client.url}/dashboard`,
+        });
+      }
+    } catch { /* email failure must never block the response */ }
 
     res.json({ success: true });
   } catch (err) { next(err); }
@@ -135,16 +153,20 @@ router.post('/:id/accept', requireAuth, requireRole('attorney', 'partner'), asyn
       [now, req.params.id]
     );
 
-    // Auto-initialise the checklist for this matter type (lazy-create from template)
+    // Auto-initialise the checklist for this matter type (lazy-create from template).
+    // 'guardianship_conservatorship' maps to 'joint_guardianship_conservatorship' in templates.
     try {
       const { all: dbAll, run: dbRun } = require('../db');
       const existing = await dbAll(
         `SELECT id FROM matter_checklist_items WHERE matter_id = ? LIMIT 1`, [matter.id]
       );
       if (existing.length === 0 && matter.matter_type) {
+        const templateType = matter.matter_type === 'guardianship_conservatorship'
+          ? 'joint_guardianship_conservatorship'
+          : matter.matter_type;
         const templates = await dbAll(
           `SELECT * FROM checklist_templates WHERE matter_type = ? ORDER BY section_order, item_order`,
-          [matter.matter_type]
+          [templateType]
         );
         for (const t of templates) {
           await dbRun(
@@ -158,12 +180,23 @@ router.post('/:id/accept', requireAuth, requireRole('attorney', 'partner'), asyn
       }
     } catch { /* checklist init failure is non-fatal */ }
 
-    // Notify client that attorney accepted
+    // In-app notification + email to client
     if (matter.client_id) {
       NotificationService.matterUpdated(matter.client_id, {
         caseNumber: matter.case_number,
         matterId:   Number(req.params.id),
       });
+      try {
+        const client = await UserRepo.findById(matter.client_id);
+        if (client?.email) {
+          EmailService.sendClientCaseAccepted(client.email, {
+            clientName:   client.first_name,
+            attorneyName: `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim(),
+            caseNumber:   matter.case_number,
+            dashboardUrl: `${config.client.url}/dashboard`,
+          });
+        }
+      } catch { /* email failure is non-fatal */ }
     }
 
     AuditService.log({
@@ -190,12 +223,24 @@ router.post('/:id/decline', requireAuth, requireRole('attorney', 'partner'), asy
       [reason || null, req.params.id]
     );
 
-    // Notify client that request was declined
+    // In-app notification + email to client
     if (matter.client_id) {
       NotificationService.matterUpdated(matter.client_id, {
         caseNumber: matter.case_number,
         matterId:   Number(req.params.id),
       });
+      try {
+        const client = await UserRepo.findById(matter.client_id);
+        if (client?.email) {
+          EmailService.sendClientCaseDeclined(client.email, {
+            clientName:   client.first_name,
+            attorneyName: `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim(),
+            caseNumber:   matter.case_number,
+            reason:       reason || null,
+            dashboardUrl: `${config.client.url}/dashboard`,
+          });
+        }
+      } catch { /* email failure is non-fatal */ }
     }
 
     res.json({ success: true });

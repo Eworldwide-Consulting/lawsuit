@@ -5,7 +5,7 @@
 const USER_COLUMNS = `
   id, first_name, last_name, email, role, phone, avatar_initials,
   email_verified, approval_status, two_fa_enabled, two_fa_secret,
-  two_fa_prompt_shown, is_prime
+  two_fa_prompt_shown, is_prime, google_id, avatar_url, login_provider, last_login
 `.trim();
 
 // Extended column set used only at login — bcrypt.compare needs the hash.
@@ -30,13 +30,17 @@ function sanitizeUser(user) {
     last_name:            user.last_name,
     email:                user.email,
     role:                 user.role,
-    phone:                user.phone        ?? null,
-    avatar_initials:      user.avatar_initials ?? null,
-    email_verified:       user.email_verified  ?? 0,
-    approval_status:      user.approval_status ?? null,
-    two_fa_enabled:       user.two_fa_enabled  ?? 0,
+    phone:                user.phone           ?? null,
+    avatar_initials:      user.avatar_initials  ?? null,
+    avatar_url:           user.avatar_url       ?? null,
+    email_verified:       user.email_verified   ?? 0,
+    approval_status:      user.approval_status  ?? null,
+    two_fa_enabled:       user.two_fa_enabled   ?? 0,
     two_fa_prompt_shown:  user.two_fa_prompt_shown ?? 0,
-    is_prime:             user.is_prime ?? 0,
+    is_prime:             user.is_prime         ?? 0,
+    login_provider:       user.login_provider   ?? 'email',
+    has_google:           Boolean(user.google_id),
+    last_login:           user.last_login       ?? null,
   };
 }
 
