@@ -77,7 +77,13 @@ const config = {
 
 // ── Stripe mode safety check ─────────────────────────────────────────────────
 // Runs once at module load so every boot prints which Stripe mode is active.
-// Throws hard if NODE_ENV and key prefix are mismatched (e.g. sk_test_ in prod).
+//
+// IMPORTANT: a Stripe key/environment mismatch must never crash the whole
+// process. This module is required at the very top of index.js — throwing
+// here previously took down the ENTIRE platform (auth, documents, messaging,
+// everything) over a payments-only misconfiguration, causing production
+// deploys to crash-loop and fail health checks. Wrong-mode keys now disable
+// Stripe gracefully (routes return 501) instead of killing the server.
 (function validateStripeMode() {
   const key = config.stripe.secretKey;
   if (!key) return; // Stripe not configured — silent pass, routes return 501
@@ -86,17 +92,21 @@ const config = {
   const isLiveKey = key.startsWith('sk_live_');
 
   if (!isTestKey && !isLiveKey) {
-    throw new Error(
-      `[Stripe] Unrecognised key prefix in STRIPE_SECRET_KEY. ` +
-      `Expected sk_test_... (dev) or sk_live_... (prod).`
+    console.error(
+      `[Stripe] CRITICAL: Unrecognised key prefix in STRIPE_SECRET_KEY. ` +
+      `Expected sk_test_... (dev) or sk_live_... (prod). Disabling Stripe.`
     );
+    config.stripe.secretKey = '';
+    return;
   }
 
   const mode = isTestKey ? 'TEST' : 'LIVE';
   // eslint-disable-next-line no-console
   console.log(`[Stripe] Running in ${mode} mode (${key.slice(0, 12)}...)`);
 
-  // Hard guard: live key in non-production → risk of accidental real charges
+  // Live key in non-production → risk of accidental real charges against a
+  // dev/staging box. Blast radius here is a single non-prod process, so a
+  // hard crash is the right signal to force an immediate fix.
   if (isLiveKey && !isProduction) {
     throw new Error(
       `[Stripe] DANGER: sk_live_ key detected but NODE_ENV="${config.env}". ` +
@@ -105,13 +115,18 @@ const config = {
     );
   }
 
-  // Hard guard: test key in production → payments will silently fail for real users
+  // Test key in production → payments would silently fail for real users if
+  // Stripe were left enabled. Disable Stripe (routes return 501) rather than
+  // crashing the whole platform; log loudly so ops fixes the secret and
+  // redeploys.
   if (isTestKey && isProduction) {
-    throw new Error(
-      `[Stripe] DANGER: sk_test_ key detected in NODE_ENV="production". ` +
-      `Production deployments require a sk_live_ key. ` +
-      `Inject STRIPE_SECRET_KEY=sk_live_... via your secrets manager.`
+    console.error(
+      `[Stripe] CRITICAL: sk_test_ key detected in NODE_ENV="production". ` +
+      `Production requires a sk_live_ key — inject STRIPE_SECRET_KEY=sk_live_... ` +
+      `via your secrets manager. Stripe is DISABLED for this boot; all other ` +
+      `platform features remain online.`
     );
+    config.stripe.secretKey = '';
   }
 })();
 
