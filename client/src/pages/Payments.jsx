@@ -64,6 +64,13 @@ export default function Payments() {
 
   const isStaff = user?.role === 'attorney' || user?.role === 'partner' || user?.role === 'itsupport';
 
+  // Auto-dismiss success banner after 5 seconds
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(''), 5000);
+    return () => clearTimeout(t);
+  }, [successMsg]);
+
   // Handle Stripe redirect back
   useEffect(() => {
     const sessionId      = searchParams.get('session_id');
@@ -75,7 +82,9 @@ export default function Payments() {
 
     if (primeSuccess) {
       setSuccessMsg('Welcome to TriVanta Prime! Your account has been upgraded.');
+      // Fetch plan status AND reload invoices so the Prime transaction appears
       paymentsApi.planStatus().then(r => setIsPrime(r.data.is_prime)).catch(() => {});
+      load();
       return;
     }
 

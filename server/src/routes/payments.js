@@ -428,14 +428,37 @@ router.post('/webhook', async (req, res) => {
             meta: { paymentIntent: s.payment_intent, amount: s.amount_total },
           });
         }
-        // Prime subscription
+        // Prime subscription — activate membership AND record invoice + transaction
         if (s.mode === 'subscription' && s.metadata?.plan === 'prime' && s.metadata?.userId) {
           const uid = Number(s.metadata.userId);
           await UserRepo.update(uid, { is_prime: 1 });
-          ws.emitToUser(uid, 'prime:activated', {});
+
+          // Create a paid invoice so the transaction appears in Billing history
+          const primeInv = await InvoiceRepo.create({
+            clientId:    uid,
+            matterId:    null,
+            createdBy:   uid,
+            amount:      PRIME_PLAN.amount / 100,        // cents → dollars (repo multiplies by 100)
+            description: 'TriVanta Prime — Monthly Subscription',
+            serviceType: 'prime_subscription',
+            dueDate:     null,
+          });
+          // Mark paid with the Stripe payment_intent from the checkout session
+          await InvoiceRepo.markPaid(primeInv.id, s.payment_intent || s.id);
+
+          ws.emitToUser(uid, 'prime:activated', { invoiceId: primeInv.id });
+          NotificationService.create({
+            userId:     uid,
+            type:       'invoice_paid',
+            title:      'TriVanta Prime activated',
+            body:       `Your Prime membership is active. Receipt available for invoice #${primeInv.id}.`,
+            entityType: 'invoice',
+            entityId:   primeInv.id,
+          });
           AuditService.log({
             userId: uid, action: 'user.prime_activated',
-            meta: { subscriptionId: s.subscription },
+            entity: 'invoice', entityId: primeInv.id,
+            meta: { subscriptionId: s.subscription, amount: PRIME_PLAN.amount },
           });
         }
         break;
