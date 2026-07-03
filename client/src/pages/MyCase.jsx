@@ -28,7 +28,7 @@ const STAGE_STORY = {
   court_review:        'Your case is under court review. Your attorney will update you following the hearing.',
 };
 
-function SetupModal({ onComplete }) {
+function SetupModal({ onComplete, onClose }) {
   const [step, setStep]               = useState(1);
   const [matterType, setMatterType]   = useState('');
   const [description, setDescription] = useState('');
@@ -49,10 +49,23 @@ function SetupModal({ onComplete }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}
+    >
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden relative">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#0f2057] to-[#1a3476] px-6 py-5 text-white">
+        <div className="bg-gradient-to-r from-[#0f2057] to-[#1a3476] px-6 py-5 text-white relative">
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              title="Close — you can finish this later"
+              className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/10 rounded-lg p-1 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          )}
           <div className="flex items-center gap-3 mb-1">
             <Briefcase size={20} />
             <span className="font-bold text-lg">Welcome to TriVanta Legal</span>
@@ -184,7 +197,7 @@ export default function MyCase() {
 
   return (
     <>
-      {showSetup && <SetupModal onComplete={handleSetupComplete} />}
+      {showSetup && <SetupModal onComplete={handleSetupComplete} onClose={() => setShowSetup(false)} />}
 
       <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-5">
         {/* Header */}

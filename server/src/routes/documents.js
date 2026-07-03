@@ -74,11 +74,9 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res, 
   try {
     const { matterId, category, docType } = req.body;
 
-    let matter = null;
-    if (matterId) {
-      matter = await MatterRepo.findById(matterId);
-      if (req.user.role === 'client' && (!matter || matter.client_id !== req.user.id))
-        throw new ForbiddenError();
+    if (matterId && req.user.role === 'client') {
+      const matter = await MatterRepo.findById(matterId);
+      if (!matter || matter.client_id !== req.user.id) throw new ForbiddenError();
     }
 
     const inserted = await Promise.all(
@@ -96,42 +94,67 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res, 
       ip: req.ip,
     });
 
-    // Notify the matter's attorney when a client uploads documents
-    if (req.user.role === 'client' && matter?.attorney_id) {
-      const { one: dbOne } = require('../db');
-      const attorney = await dbOne(
-        'SELECT id, first_name, last_name, email FROM users WHERE id = ?',
-        [matter.attorney_id]
-      );
-      const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
-      const docNames     = req.files.map(f => f.originalname);
-      const reviewUrl    = `${require('../config').client.url}/documents`;
+    // Uploads land as status='uploaded' — not yet visible to the attorney.
+    // The client must explicitly submit via POST /:id/submit-review below.
+    res.status(201).json(inserted);
+  } catch (err) { next(err); }
+});
 
-      if (attorney) {
-        // In-app notification
-        NotificationService.create({
-          userId:     attorney.id,
-          type:       'document_uploaded',
-          title:      'New document uploaded',
-          body:       `${uploaderName} uploaded ${docNames.length > 1 ? `${docNames.length} documents` : `"${docNames[0]}"`} to case ${matter.case_number || matterId} — review required.`,
-          entityType: 'document',
-          entityId:   inserted[0]?.id,
+// Client explicitly submits an uploaded document for attorney review/approval.
+// Moves status 'uploaded' → 'pending', which surfaces it in /pending-review
+// and the attorney's Document Review (approval) panel.
+router.post('/:id/submit-review', requireAuth, async (req, res, next) => {
+  try {
+    const doc = await DocumentRepo.findById(req.params.id);
+    if (!doc) throw new NotFoundError('Document');
+    if (doc.user_id !== req.user.id) throw new ForbiddenError();
+    if (doc.status !== 'uploaded')
+      return res.status(400).json({ error: 'Only newly uploaded documents can be sent for review.' });
+    if (!doc.matter_id)
+      return res.status(400).json({ error: 'This document is not linked to a case, so it cannot be sent for attorney review.' });
+
+    const matter = await MatterRepo.findById(doc.matter_id);
+    if (!matter?.attorney_id)
+      return res.status(400).json({ error: 'Your case does not have an attorney assigned yet. Please contact support.' });
+
+    await DocumentRepo.updateStatus(doc.id, 'pending');
+
+    const { one: dbOne } = require('../db');
+    const attorney = await dbOne(
+      'SELECT id, first_name, last_name, email FROM users WHERE id = ?',
+      [matter.attorney_id]
+    );
+    const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
+
+    if (attorney) {
+      NotificationService.create({
+        userId:     attorney.id,
+        type:       'document_uploaded',
+        title:      'Document submitted for review',
+        body:       `${uploaderName} submitted "${doc.name}" for review on case ${matter.case_number || `#${doc.matter_id}`} — approval required.`,
+        entityType: 'document',
+        entityId:   doc.id,
+      });
+
+      try {
+        EmailService.sendDocumentUploaded(attorney.email, {
+          attorneyName: attorney.first_name,
+          clientName:   uploaderName,
+          caseNumber:   matter.case_number || `Matter #${doc.matter_id}`,
+          docNames:     [doc.name],
+          reviewUrl:    `${require('../config').client.url}/dashboard`,
         });
-
-        // Email the attorney (non-fatal)
-        try {
-          EmailService.sendDocumentUploaded(attorney.email, {
-            attorneyName: attorney.first_name,
-            clientName:   uploaderName,
-            caseNumber:   matter.case_number || `Matter #${matterId}`,
-            docNames,
-            reviewUrl,
-          });
-        } catch { /* non-fatal */ }
-      }
+      } catch { /* non-fatal */ }
     }
 
-    res.status(201).json(inserted);
+    AuditService.log({
+      userId: req.user.id, action: 'document.submitted_for_review',
+      entity: 'document', entityId: doc.id,
+      meta: { docName: doc.name, matterId: doc.matter_id },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, status: 'pending' });
   } catch (err) { next(err); }
 });
 

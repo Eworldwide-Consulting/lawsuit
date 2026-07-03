@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { documentsApi } from '../api';
-import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X } from 'lucide-react';
+import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X, Send } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import Badge, { statusVariant } from '../components/ui/Badge';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 const fmtSize = (bytes) =>
   bytes > 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
@@ -23,12 +24,14 @@ const CATEGORIES = [
 
 export default function Documents() {
   const toast = useToast();
+  const { user } = useAuth();
 
   const [docs, setDocs]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [uploading, setUploading] = useState(false);
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState('all');
+  const [submitting, setSubmitting] = useState({});
 
   // Confirm-delete state
   const [confirmId, setConfirmId]       = useState(null);
@@ -61,6 +64,19 @@ export default function Documents() {
       toast.error('Upload failed. Please try again.');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function sendForReview(doc) {
+    setSubmitting(s => ({ ...s, [doc.id]: true }));
+    try {
+      await documentsApi.submitForReview(doc.id);
+      setDocs(d => d.map(x => x.id === doc.id ? { ...x, status: 'pending' } : x));
+      toast.success('Sent to your attorney for review');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not send for review. Please try again.');
+    } finally {
+      setSubmitting(s => ({ ...s, [doc.id]: false }));
     }
   }
 
@@ -247,6 +263,18 @@ export default function Documents() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
+                        {doc.status === 'uploaded' && doc.user_id === user?.id && (
+                          <button
+                            onClick={() => sendForReview(doc)}
+                            disabled={submitting[doc.id]}
+                            aria-label={`Send ${doc.name} for review`}
+                            title="Send to attorney for review"
+                            className="flex items-center gap-1 px-2 py-1 mr-1 text-xs font-semibold text-white bg-[#0f2057] hover:bg-[#1a3476] rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {submitting[doc.id] ? <Spinner size={3} color="text-white" /> : <Send size={12} />}
+                            Send for Review
+                          </button>
+                        )}
                         {doc.file_path && (
                           <a
                             href={documentsApi.viewUrl(doc.id)}
