@@ -399,14 +399,14 @@ router.post('/webhook', async (req, res) => {
         const s = event.data.object;
         if (s.metadata?.invoiceId) {
           await InvoiceRepo.markPaid(s.metadata.invoiceId, s.payment_intent);
-          const inv = await InvoiceRepo.findById(s.metadata.invoiceId);
+          const inv = await InvoiceRepo.findWithDetails(s.metadata.invoiceId);
           if (inv?.client_id) {
             ws.emitToUser(inv.client_id, 'invoice:paid', { invoiceId: inv.id });
             NotificationService.create({
               userId: inv.client_id,
               type: 'invoice_paid',
               title: 'Payment received',
-              body: `Invoice #${inv.id} has been paid successfully.`,
+              body: `Invoice #${inv.id} ($${(inv.amount / 100).toFixed(2)}) has been paid. Receipt available.`,
               entityType: 'invoice',
               entityId: inv.id,
             });
@@ -416,11 +416,25 @@ router.post('/webhook', async (req, res) => {
                 userId: inv.created_by,
                 type: 'invoice_paid',
                 title: 'Client payment received',
-                body: `Invoice #${inv.id} ($${(inv.amount / 100).toFixed(2)}) has been paid.`,
+                body: `Invoice #${inv.id} ($${(inv.amount / 100).toFixed(2)}) has been paid by ${inv.client_first || ''} ${inv.client_last || ''}.`.trim(),
                 entityType: 'invoice',
                 entityId: inv.id,
               });
             }
+            // Payment confirmation email to client
+            try {
+              if (inv.client_email) {
+                EmailService.sendPaymentConfirmed(inv.client_email, {
+                  clientName:    `${inv.client_first || ''} ${inv.client_last || ''}`.trim(),
+                  amount:        inv.amount,
+                  description:   inv.description,
+                  invoiceId:     inv.id,
+                  paidAt:        inv.paid_at || new Date().toISOString(),
+                  transactionId: s.payment_intent,
+                  isPrime:       false,
+                });
+              }
+            } catch { /* non-fatal */ }
           }
           AuditService.log({
             userId: inv?.client_id || null, action: AuditService.ACTIONS.INVOICE_PAID,
@@ -455,6 +469,23 @@ router.post('/webhook', async (req, res) => {
             entityType: 'invoice',
             entityId:   primeInv.id,
           });
+
+          // Prime payment confirmation email
+          try {
+            const primeUser = await UserRepo.findById(uid);
+            if (primeUser?.email) {
+              EmailService.sendPaymentConfirmed(primeUser.email, {
+                clientName:    `${primeUser.first_name || ''} ${primeUser.last_name || ''}`.trim(),
+                amount:        PRIME_PLAN.amount,
+                description:   'TriVanta Prime — Monthly Subscription',
+                invoiceId:     primeInv.id,
+                paidAt:        new Date().toISOString(),
+                transactionId: s.payment_intent || s.id,
+                isPrime:       true,
+              });
+            }
+          } catch { /* non-fatal */ }
+
           AuditService.log({
             userId: uid, action: 'user.prime_activated',
             entity: 'invoice', entityId: primeInv.id,

@@ -20,6 +20,8 @@ const JOB = {
   MATTER_STATUS_CHANGED: 'matter_status_changed',
   ATTORNEY_PENDING:      'attorney_pending',
   ATTORNEY_DECISION:     'attorney_decision',
+  PAYMENT_CONFIRMED:     'payment_confirmed',
+  DOCUMENT_UPLOADED:     'document_uploaded',
 };
 
 // ── Transport ─────────────────────────────────────────────────────────────────
@@ -150,6 +152,16 @@ const EmailService = {
     });
   },
 
+  // Sent to client after a payment succeeds (invoice or Prime)
+  sendPaymentConfirmed(to, { clientName, amount, description, invoiceId, paidAt, transactionId, isPrime }) {
+    return queue(JOB.PAYMENT_CONFIRMED, { to, clientName, amount, description, invoiceId, paidAt, transactionId, isPrime });
+  },
+
+  // Sent to the matter's attorney when a client uploads documents
+  sendDocumentUploaded(to, { attorneyName, clientName, caseNumber, docNames, reviewUrl }) {
+    return queue(JOB.DOCUMENT_UPLOADED, { to, attorneyName, clientName, caseNumber, docNames, reviewUrl });
+  },
+
   sendContactSales({ name, email, company, phone, plan, message }) {
     const salesTo = config.smtp.user || 'legal@trivanta.com';
     return send({
@@ -240,6 +252,22 @@ const EmailService = {
             ? 'Your TriVanta account has been approved'
             : 'Update on your TriVanta application',
           html: tmplAttorneyDecision(data),
+        };
+        break;
+      case JOB.PAYMENT_CONFIRMED:
+        mail = {
+          to: data.to,
+          subject: data.isPrime
+            ? 'TriVanta Prime — Payment Confirmed'
+            : `Payment Confirmed — Invoice #${data.invoiceId}`,
+          html: tmplPaymentConfirmed(data),
+        };
+        break;
+      case JOB.DOCUMENT_UPLOADED:
+        mail = {
+          to: data.to,
+          subject: `Action Required: New document uploaded — ${esc(data.caseNumber || 'your case')}`,
+          html: tmplDocumentUploaded(data),
         };
         break;
       default:
@@ -478,5 +506,60 @@ function tmplClientCaseDeclined({ clientName, attorneyName, caseNumber, reason, 
     ${p('You can return to your dashboard to choose a different attorney or invite your own attorney to the platform.')}
     ${btn(dashboardUrl, 'Choose Another Attorney')}
     <p style="color:#9ca3af;font-size:13px">We're sorry for the inconvenience. Our support team is available if you need help finding representation.</p>
+  `);
+}
+
+function tmplPaymentConfirmed({ clientName, amount, description, invoiceId, paidAt, transactionId, isPrime }) {
+  const dollars  = typeof amount === 'number' ? (amount / 100).toFixed(2) : amount;
+  const dateStr  = paidAt ? new Date(paidAt).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }) : new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  const greeting = clientName ? `Hi ${esc(clientName)},` : 'Hi there,';
+  return wrap(`
+    ${h2(isPrime ? 'TriVanta Prime — Payment Confirmed' : 'Payment Confirmed')}
+    ${p(greeting)}
+    ${p(`Your payment of <strong>$${esc(dollars)}</strong> has been successfully processed. Here is a summary of your transaction:`)}
+    <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+      <tr style="background:#f9fafb">
+        <td style="padding:12px 16px;color:#6b7280;font-weight:500;border-bottom:1px solid #e5e7eb">Description</td>
+        <td style="padding:12px 16px;font-weight:600;color:#111827;border-bottom:1px solid #e5e7eb">${esc(description)}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;color:#6b7280;font-weight:500;border-bottom:1px solid #e5e7eb">Amount Paid</td>
+        <td style="padding:12px 16px;font-weight:700;color:#059669;border-bottom:1px solid #e5e7eb">$${esc(dollars)} USD</td>
+      </tr>
+      <tr style="background:#f9fafb">
+        <td style="padding:12px 16px;color:#6b7280;font-weight:500;border-bottom:1px solid #e5e7eb">Payment Date</td>
+        <td style="padding:12px 16px;font-weight:600;color:#111827;border-bottom:1px solid #e5e7eb">${esc(dateStr)}</td>
+      </tr>
+      ${invoiceId ? `<tr>
+        <td style="padding:12px 16px;color:#6b7280;font-weight:500;border-bottom:1px solid #e5e7eb">Invoice #</td>
+        <td style="padding:12px 16px;font-weight:600;color:#111827;border-bottom:1px solid #e5e7eb">${esc(String(invoiceId))}</td>
+      </tr>` : ''}
+      ${transactionId ? `<tr style="background:#f9fafb">
+        <td style="padding:12px 16px;color:#6b7280;font-weight:500">Transaction ID</td>
+        <td style="padding:12px 16px;font-size:12px;color:#6b7280;word-break:break-all">${esc(transactionId)}</td>
+      </tr>` : ''}
+    </table>
+    ${isPrime ? p('Your <strong>TriVanta Prime</strong> membership is now active. Enjoy priority attorney access, unlimited document storage, and your monthly strategy call.') : ''}
+    ${btn(`${config.client.url}/payments`, isPrime ? 'View Your Membership' : 'View Your Billing')}
+    <p style="color:#9ca3af;font-size:13px">A receipt is available in your Billing portal. If you have questions about this charge, please contact support.</p>
+  `);
+}
+
+function tmplDocumentUploaded({ attorneyName, clientName, caseNumber, docNames, reviewUrl }) {
+  const greeting  = attorneyName ? `Hi ${esc(attorneyName)},` : 'Hello,';
+  const docList   = Array.isArray(docNames) && docNames.length > 0
+    ? `<ul style="margin:12px 0 20px;padding-left:20px">${docNames.map(n => `<li style="color:#374151;font-size:14px;padding:3px 0">${esc(n)}</li>`).join('')}</ul>`
+    : '';
+  return wrap(`
+    ${h2('Action Required: Document Uploaded for Review')}
+    ${p(greeting)}
+    ${p(`Your client <strong>${esc(clientName)}</strong> has uploaded ${docNames?.length > 1 ? `<strong>${docNames.length} documents</strong>` : 'a <strong>new document</strong>'} to case <strong>${esc(caseNumber || 'your case')}</strong> that require${docNames?.length > 1 ? '' : 's'} your review.`)}
+    ${docList}
+    <div style="background:#fef3c7;border-left:4px solid #d97706;padding:14px 18px;border-radius:6px;margin:0 0 20px">
+      <p style="color:#92400e;font-size:14px;font-weight:600;margin:0 0 4px">Review Required</p>
+      <p style="color:#92400e;font-size:13px;margin:0">Please review and mark the document(s) as accepted or request revisions from your client.</p>
+    </div>
+    ${btn(reviewUrl || `${config.client.url}/documents`, 'Review Documents Now')}
+    <p style="color:#9ca3af;font-size:13px">You can accept, reject, or request changes from your TriVanta document dashboard. Your client will be notified of your decision.</p>
   `);
 }

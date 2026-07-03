@@ -11,6 +11,7 @@ const { isStaff } = require('../domain/user');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../lib/errors');
 const NotificationService = require('../services/notification.service');
 const AuditService        = require('../services/audit.service');
+const EmailService        = require('../services/email.service');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../../../uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -73,9 +74,11 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res, 
   try {
     const { matterId, category, docType } = req.body;
 
-    if (matterId && req.user.role === 'client') {
-      const matter = await MatterRepo.findById(matterId);
-      if (!matter || matter.client_id !== req.user.id) throw new ForbiddenError();
+    let matter = null;
+    if (matterId) {
+      matter = await MatterRepo.findById(matterId);
+      if (req.user.role === 'client' && (!matter || matter.client_id !== req.user.id))
+        throw new ForbiddenError();
     }
 
     const inserted = await Promise.all(
@@ -92,6 +95,41 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res, 
       meta: { count: inserted.length, matterId: matterId || null },
       ip: req.ip,
     });
+
+    // Notify the matter's attorney when a client uploads documents
+    if (req.user.role === 'client' && matter?.attorney_id) {
+      const { one: dbOne } = require('../db');
+      const attorney = await dbOne(
+        'SELECT id, first_name, last_name, email FROM users WHERE id = ?',
+        [matter.attorney_id]
+      );
+      const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
+      const docNames     = req.files.map(f => f.originalname);
+      const reviewUrl    = `${require('../config').client.url}/documents`;
+
+      if (attorney) {
+        // In-app notification
+        NotificationService.create({
+          userId:     attorney.id,
+          type:       'document_uploaded',
+          title:      'New document uploaded',
+          body:       `${uploaderName} uploaded ${docNames.length > 1 ? `${docNames.length} documents` : `"${docNames[0]}"`} to case ${matter.case_number || matterId} — review required.`,
+          entityType: 'document',
+          entityId:   inserted[0]?.id,
+        });
+
+        // Email the attorney (non-fatal)
+        try {
+          EmailService.sendDocumentUploaded(attorney.email, {
+            attorneyName: attorney.first_name,
+            clientName:   uploaderName,
+            caseNumber:   matter.case_number || `Matter #${matterId}`,
+            docNames,
+            reviewUrl,
+          });
+        } catch { /* non-fatal */ }
+      }
+    }
 
     res.status(201).json(inserted);
   } catch (err) { next(err); }

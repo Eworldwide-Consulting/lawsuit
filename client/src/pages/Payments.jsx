@@ -28,12 +28,31 @@ const STATUS_CFG = {
 };
 
 const SERVICE_TYPES = [
-  { value: 'consultation',  label: 'Initial Consultation',   price: 25000 },
-  { value: 'retainer',      label: 'Monthly Retainer',        price: 50000 },
-  { value: 'filing',        label: 'Document Filing Fee',     price: 15000 },
-  { value: 'annual_return', label: 'Annual Return Filing',    price: 30000 },
-  { value: 'general',       label: 'Custom Amount',           price: 0 },
+  { value: 'consultation',      label: 'Initial Consultation',   price: 25000 },
+  { value: 'retainer',          label: 'Monthly Retainer',        price: 50000 },
+  { value: 'filing',            label: 'Document Filing Fee',     price: 15000 },
+  { value: 'annual_return',     label: 'Annual Return Filing',    price: 30000 },
+  { value: 'prime_subscription',label: 'Prime Subscription',      price: 29900 },
+  { value: 'general',           label: 'Custom Amount',           price: 0 },
 ];
+
+const SERVICE_LABEL = {
+  consultation:       'Consultation',
+  retainer:           'Retainer',
+  filing:             'Filing Fee',
+  annual_return:      'Annual Return',
+  prime_subscription: 'Prime',
+  general:            'General',
+};
+
+const SERVICE_COLOR = {
+  consultation:       'text-blue-600 bg-blue-50',
+  retainer:           'text-purple-600 bg-purple-50',
+  filing:             'text-indigo-600 bg-indigo-50',
+  annual_return:      'text-teal-600 bg-teal-50',
+  prime_subscription: 'text-yellow-700 bg-yellow-50',
+  general:            'text-gray-600 bg-gray-100',
+};
 
 const STATUS_TABS = ['all', 'pending', 'paid', 'refunded', 'failed'];
 
@@ -82,7 +101,9 @@ export default function Payments() {
 
     if (primeSuccess) {
       setSuccessMsg('Welcome to TriVanta Prime! Your account has been upgraded.');
-      // Fetch plan status AND reload invoices so the Prime transaction appears
+      // Set immediately so the card flips to ACTIVE without waiting for the webhook
+      setIsPrime(true);
+      // Background verify + reload invoices so the Prime transaction row appears
       paymentsApi.planStatus().then(r => setIsPrime(r.data.is_prime)).catch(() => {});
       load();
       return;
@@ -371,16 +392,27 @@ export default function Payments() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900 text-sm">{inv.description}</span>
                     <span className={cfg.cls}><cfg.Icon size={10} className="mr-0.5" />{cfg.label}</span>
+                    {inv.service_type && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${SERVICE_COLOR[inv.service_type] || SERVICE_COLOR.general}`}>
+                        {SERVICE_LABEL[inv.service_type] || inv.service_type}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
                     {inv.case_number && <span>Case #{inv.case_number}</span>}
                     {isStaff && inv.client_name && <span>· {inv.client_name}</span>}
-                    {inv.due_date  && <span>· Due {fmtDate(inv.due_date)}</span>}
-                    {inv.paid_at   && <span>· Paid {fmtDate(inv.paid_at)}</span>}
+                    {inv.due_date    && inv.status === 'pending' && <span>· Due {fmtDate(inv.due_date)}</span>}
+                    {inv.paid_at     && <span>· Paid {fmtDate(inv.paid_at)}</span>}
                     {inv.refunded_at && <span>· Refunded {fmtDate(inv.refunded_at)}</span>}
                     {inv.failure_reason && <span className="text-red-500">· {inv.failure_reason}</span>}
-                    <span>· {fmtDate(inv.created_at)}</span>
+                    {!inv.paid_at && !inv.refunded_at && <span>· Created {fmtDate(inv.created_at)}</span>}
                   </div>
+                  {/* Transaction ID for paid invoices */}
+                  {inv.stripe_payment_intent_id && (isPaid || isRefund) && (
+                    <p className="text-xs text-gray-400 mt-0.5 font-mono truncate max-w-xs">
+                      Txn: {inv.stripe_payment_intent_id}
+                    </p>
+                  )}
                   {isRefund && inv.refund_amount > 0 && (
                     <p className="text-xs text-orange-600 mt-0.5 font-medium">
                       Refunded {fmt(inv.refund_amount)}{inv.refund_reason ? ` — ${inv.refund_reason}` : ''}
