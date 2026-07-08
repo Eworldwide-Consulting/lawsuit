@@ -266,9 +266,8 @@ export default function Login() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => { window.location.href = '/api/auth/google'; }}
+          <a
+            href="/api/auth/google"
             className="btn-secondary"
           >
             <svg width="18" height="18" viewBox="0 0 48 48">
@@ -278,7 +277,7 @@ export default function Login() {
               <path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.4l-7.5-5.8c-2 1.4-4.6 2.2-7.5 2.2-6.2 0-11.5-3.6-13.5-9.4l-8 6.1C6.6 42.5 14.7 48 24 48z"/>
             </svg>
             Continue with Google
-          </button>
+          </a>
 
           <button
             type="button"
