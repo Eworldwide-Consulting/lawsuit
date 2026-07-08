@@ -26,6 +26,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Full-page navigations (OAuth start/callback, downloads, etc.) under /api/
+        // must reach the server, not fall back to the cached SPA shell.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https?.*\/api\//,
