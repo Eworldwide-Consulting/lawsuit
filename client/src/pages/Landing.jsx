@@ -390,7 +390,7 @@ export default function Landing() {
 
               <p className="text-blue-200/90 text-lg leading-relaxed mb-10 max-w-lg">
                 All-in-one legal platform for encrypted storage, AI-assisted document review,
-                and seamless attorney consultation — built for privacy-first legal compliance.
+                and seamless attorney consultation  built for privacy-first legal compliance.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
@@ -905,7 +905,7 @@ export default function Landing() {
                 </h2>
                 <p className="text-blue-200 text-lg leading-relaxed mb-8">
                   We employ federal-grade security protocols to ensure your most sensitive legal
-                  documents remain private — accessible only to you and authorised parties.
+                  documents remain private  accessible only to you and authorised parties.
                 </p>
 
                 <div className="space-y-3">
