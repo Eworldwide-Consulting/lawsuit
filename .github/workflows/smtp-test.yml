@@ -1,0 +1,37 @@
+# Manual SMTP diagnostic — verifies the SMTP_USER/SMTP_PASS secrets actually
+# authenticate against Gmail and can send. Run from Actions -> SMTP Diagnostic
+# -> Run workflow. Sends a test email to SMTP_USER itself.
+name: SMTP Diagnostic
+
+on: workflow_dispatch
+
+jobs:
+  smtp-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Test Gmail SMTP auth and send
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        run: |
+          echo "SMTP_USER set: $([ -n "$SMTP_USER" ] && echo yes || echo NO — MISSING)"
+          echo "SMTP_PASS length: ${#SMTP_PASS}  (Gmail app password = 16 chars; 19 means spaces were pasted in)"
+          case "$SMTP_PASS" in *' '*) echo "WARNING: SMTP_PASS contains spaces — remove them";; esac
+
+          printf 'From: %s\nTo: %s\nSubject: TriVanta SMTP diagnostic\n\nSMTP diagnostic send OK at %s\n' \
+            "$SMTP_USER" "$SMTP_USER" "$(date -u)" > /tmp/mail.txt
+
+          set +e
+          curl -sS -v --url 'smtp://smtp.gmail.com:587' --ssl-reqd \
+            --user "${SMTP_USER}:${SMTP_PASS}" \
+            --mail-from "$SMTP_USER" --mail-rcpt "$SMTP_USER" \
+            -T /tmp/mail.txt 2>&1 | grep -Ei '^(< |> RCPT|> MAIL|curl:)' | head -40
+          RC=$?
+
+          echo ""
+          if [ $RC -eq 0 ]; then
+            echo "RESULT: SMTP AUTH + SEND OK — a test email was sent to $SMTP_USER"
+          else
+            echo "RESULT: SMTP FAILED (curl exit $RC; 67 = username/password rejected — regenerate the Gmail App Password)"
+          fi
