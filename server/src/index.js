@@ -10,7 +10,11 @@ process.on('unhandledRejection', (reason) => {
 });
 console.log('[BOOT] index.js top reached, Node', process.version);
 
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+// override: true — hPanel injects its own (possibly stale) env vars into the
+// process before boot; without override, dotenv silently keeps those and the
+// CI-deployed .env is ignored. The .env written by the deploy workflow is the
+// single source of truth.
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env'), override: true });
 console.log('[BOOT] dotenv loaded, NODE_ENV=' + process.env.NODE_ENV);
 
 // ── Breadcrumb logs: pinpoint which require() fails if node_modules is missing ─
