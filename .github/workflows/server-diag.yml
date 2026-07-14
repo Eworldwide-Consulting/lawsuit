@@ -1,0 +1,40 @@
+# Manual server diagnostic — inspects what is actually on disk and which
+# directory the running node process serves from. Run from Actions.
+name: Server Diagnostic
+
+on: workflow_dispatch
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
+
+      - name: Inspect deploy path and running process
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh \
+            -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c '
+              D=\"${{ secrets.DEPLOY_PATH }}\"
+              echo \"=== deploy path ===\"; echo \"\$D\"
+              echo \"=== client/dist on disk ===\"
+              ls -la \"\$D/client/dist/index.html\" 2>/dev/null || echo \"(missing)\"
+              grep -oE \"assets/index-[A-Za-z0-9_-]+\\.js\" \"\$D/client/dist/index.html\" 2>/dev/null | head -1
+              echo \"=== newest asset in dist ===\"
+              ls -lat \"\$D/client/dist/assets\" 2>/dev/null | head -4
+              echo \"=== pm2 process details ===\"
+              pm2 describe trivanta 2>/dev/null | grep -E \"script path|exec cwd|status|uptime\" || echo \"(no pm2 trivanta)\"
+              echo \"=== all node processes and their cwd ===\"
+              for P in \$(pgrep -f \"index.js\" 2>/dev/null); do
+                echo \"pid \$P: \$(readlink /proc/\$P/cwd 2>/dev/null) — \$(tr \"\\0\" \" \" < /proc/\$P/cmdline 2>/dev/null | cut -c1-140)\"
+              done
+              echo \"=== other copies of the app on the account ===\"
+              find /home/${{ secrets.SSH_USER }} -maxdepth 4 -name \"index.html\" -path \"*client/dist*\" 2>/dev/null | head -10
+            '"
