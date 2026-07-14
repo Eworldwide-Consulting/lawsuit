@@ -166,6 +166,7 @@ async function initMysqlSchema(pool) {
       storage_key TEXT,
       required TINYINT DEFAULT 0,
       status VARCHAR(50) DEFAULT 'pending',
+      review_note TEXT, reviewed_by BIGINT, reviewed_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (matter_id) REFERENCES matters(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -354,6 +355,9 @@ function initSqliteSchema(d) {
       storage_key TEXT,
       status    TEXT DEFAULT 'pending',
       required  INTEGER DEFAULT 0,
+      review_note TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -552,6 +556,9 @@ async function initPostgresSchema(pool) {
       storage_key TEXT,
       status    TEXT DEFAULT 'pending',
       required  INTEGER DEFAULT 0,
+      review_note TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 

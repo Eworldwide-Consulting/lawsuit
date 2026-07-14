@@ -90,6 +90,27 @@ const DocumentRepository = {
     return run('UPDATE documents SET status = ? WHERE id = ?', [status, id]);
   },
 
+  // Attorney review verdict — stores who reviewed, when, and the note the
+  // client sees (rejection reason). Note is cleared on approval.
+  setReviewStatus(id, { status, note = null, reviewedBy = null }) {
+    return run(
+      'UPDATE documents SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [status, note, reviewedBy, id]
+    );
+  },
+
+  // Client re-upload after rejection — swaps the file and puts the document
+  // straight back into the attorney's review queue with review fields reset.
+  replaceFile(id, { filename, size, name }) {
+    return run(
+      `UPDATE documents
+       SET file_path = ?, file_size = ?, name = ?,
+           status = 'pending', review_note = NULL, reviewed_by = NULL, reviewed_at = NULL
+       WHERE id = ?`,
+      [filename, size, name, id]
+    );
+  },
+
   delete(id) {
     return run('DELETE FROM documents WHERE id = ?', [id]);
   },
