@@ -278,19 +278,23 @@ jobs:
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c '
               cd ${{ secrets.DEPLOY_PATH }}
+              # Kill any node process serving the app, including orphans that
+              # PM2 does not manage (an orphan kept serving a stale .env across
+              # two deploys). ENTRY is built without the .js suffix so this
+              # script own command line never contains the final pattern and
+              # pkill cannot kill the shell it is running in (exit 255).
+              ENTRY=server/src/index
+              pkill -f \"\${ENTRY}.js\" && echo \"Killed running node process\" || echo \"No stray node process found\"
               if command -v pm2 &>/dev/null; then
-                pm2 restart trivanta 2>/dev/null \
+                # --update-env: without it PM2 restarts with the env cached at
+                # first start and never picks up the freshly deployed .env
+                pm2 restart trivanta --update-env 2>/dev/null \
                   || (pm2 start ecosystem.config.js --env production && pm2 save)
-                echo \"Restarted via PM2\"
+                echo \"Restarted via PM2 (env refreshed)\"
               fi
               # LiteSpeed/Passenger restart trigger (hPanel Node.js apps)
               mkdir -p tmp && touch tmp/restart.txt
-              touch server/src/index.js
-              # Touch triggers alone do not reliably recycle the lsnode process,
-              # so the old process keeps serving with a stale .env. Kill it —
-              # LiteSpeed respawns it on the next request (the health check).
-              # [s] bracket keeps pkill -f from matching this shell own cmdline.
-              pkill -f \"[s]erver/src/index.js\" && echo \"Killed old node process\" || echo \"No running node process matched\"
+              touch \"\${ENTRY}.js\"
               echo \"Restart triggers applied\"
             '"
 
