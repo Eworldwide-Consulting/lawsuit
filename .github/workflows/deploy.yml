@@ -282,10 +282,16 @@ jobs:
                 pm2 restart trivanta 2>/dev/null \
                   || (pm2 start ecosystem.config.js --env production && pm2 save)
                 echo \"Restarted via PM2\"
-              else
-                touch server/src/index.js
-                echo \"Restarted via hPanel touch trigger\"
               fi
+              # LiteSpeed/Passenger restart trigger (hPanel Node.js apps)
+              mkdir -p tmp && touch tmp/restart.txt
+              touch server/src/index.js
+              # Touch triggers alone do not reliably recycle the lsnode process,
+              # so the old process keeps serving with a stale .env. Kill it —
+              # LiteSpeed respawns it on the next request (the health check).
+              # [s] bracket keeps pkill -f from matching this shell own cmdline.
+              pkill -f \"[s]erver/src/index.js\" && echo \"Killed old node process\" || echo \"No running node process matched\"
+              echo \"Restart triggers applied\"
             '"
 
       # -- 9. Health check - retry loop (up to 120 s) ------------------------
