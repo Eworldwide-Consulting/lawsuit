@@ -65,7 +65,9 @@ router.post('/resend-verification', async (req, res, next) => {
 router.post('/login', validate(schemas.login), async (req, res, next) => {
   try {
     const result = await AuthService.login(req.body);
-    if (!result.twoFaRequired) {
+    // Only a completed login is audited — 2FA/OTP-gated logins are logged
+    // when the code is verified.
+    if (!result.twoFaRequired && !result.otpRequired) {
       AuditService.log({
         userId: result.user?.id, action: AuditService.ACTIONS.USER_LOGIN, ip: req.ip,
       });
@@ -90,6 +92,23 @@ router.post('/login', validate(schemas.login), async (req, res, next) => {
 router.post('/verify-2fa', async (req, res, next) => {
   try {
     res.json(await AuthService.verify2fa(req.body));
+  } catch (err) { next(err); }
+});
+
+// Email one-time code sent on every password login — verify to get the real JWT.
+router.post('/verify-login-code', async (req, res, next) => {
+  try {
+    const result = await AuthService.verifyLoginOtp(req.body);
+    AuditService.log({
+      userId: result.user?.id, action: AuditService.ACTIONS.USER_LOGIN, ip: req.ip,
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/resend-login-code', async (req, res, next) => {
+  try {
+    res.json(await AuthService.resendLoginOtp(req.body));
   } catch (err) { next(err); }
 });
 
@@ -349,7 +368,8 @@ router.post('/google/disconnect', requireAuth, async (req, res, next) => {
 // Google doesn't supply: phone, DOB, address, and initial matter type.
 router.put('/complete-profile', requireAuth, async (req, res, next) => {
   try {
-    const { phone, dob, street, city, state, zip, matterType, workedBefore } = req.body;
+    const { phone, dob, street, city, state, zip, matterType, workedBefore,
+            caseState, caseCounty, caseDescription } = req.body;
 
     await UserRepo.update(req.user.id, {
       ...(phone  ? { phone }  : {}),
@@ -366,10 +386,20 @@ router.put('/complete-profile', requireAuth, async (req, res, next) => {
       const existing = await dbOne('SELECT id FROM matters WHERE client_id = ? LIMIT 1', [req.user.id]);
       if (!existing) {
         const mr = await dbRun(
-          'INSERT INTO matters (client_id, matter_type, stage, status, worked_with_firm_before) VALUES (?,?,?,?,?)',
-          [req.user.id, matterType, 'intake', 'active', workedBefore === 'yes' ? 1 : 0]
+          `INSERT INTO matters
+             (client_id, matter_type, stage, status, worked_with_firm_before, state, county, description)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [req.user.id, matterType, 'intake', 'active', workedBefore === 'yes' ? 1 : 0,
+           caseState || null, caseCounty || null, caseDescription?.trim() || null]
         );
         await dbRun('UPDATE matters SET case_number = ? WHERE id = ?', [buildCaseNumber(mr.insertId), mr.insertId]);
+      } else if (caseState || caseCounty) {
+        // Popup re-submitted (or matter created earlier without location) —
+        // fill in the case location without overwriting values already set.
+        await dbRun(
+          'UPDATE matters SET state = COALESCE(state, ?), county = COALESCE(county, ?) WHERE id = ?',
+          [caseState || null, caseCounty || null, existing.id]
+        );
       }
     }
 

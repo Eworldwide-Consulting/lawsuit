@@ -257,6 +257,19 @@
           return;
         }
 
+        if (data.otpRequired) {
+          // Email verification code sent — finish sign-in on the main app's
+          // verify page (mode/email passed via URL: sessionStorage does not
+          // cross the admin subdomain origin).
+          const params = new URLSearchParams({
+            adminTempToken: data.tempToken,
+            mode:  'email',
+            email: data.maskedEmail || '',
+          });
+          window.location.href = `${MAIN_APP}/verify?${params}`;
+          return;
+        }
+
         // Confirm the logged-in user is actually an admin
         if (data.user && data.user.role !== 'itsupport') {
           showError('This account does not have admin access. Please use the main portal at gkasevault.io.');

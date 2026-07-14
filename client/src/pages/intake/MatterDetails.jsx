@@ -5,6 +5,7 @@ import AuthLayout from '../../components/layout/AuthLayout';
 import StepIndicator from '../../components/ui/StepIndicator';
 import Spinner from '../../components/ui/Spinner';
 import { mattersApi } from '../../api';
+import { US_STATES, COUNTIES_BY_STATE } from '../../data/usCounties';
 
 const STEPS = ['Start Here', 'Your Information', 'Matter Details', 'Required Documents', 'Review & Submit'];
 
@@ -29,6 +30,7 @@ export default function MatterDetails() {
     urgent: '',
     importantDate: '',
     hasDocuments: '',
+    state: '',
     county: '',
     additionalNotes: '',
   });
@@ -45,6 +47,7 @@ export default function MatterDetails() {
         matterType: form.matterType || preState.matterType,
         matterStatus,
         description: form.description,
+        state: form.state,
         county: form.county,
         urgent: form.urgent === 'yes',
         importantDate: form.importantDate || null,
@@ -167,9 +170,26 @@ export default function MatterDetails() {
         </div>
       </div>
 
-      <div className="mb-4">
-        <label className="form-label">Preferred county or location <span className="text-gray-400 font-normal">(optional)</span></label>
-        <input value={form.county} onChange={set('county')} placeholder="Enter county or location" className="form-input" />
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="form-label">State where the case was launched</label>
+          <select value={form.state}
+            onChange={e => setForm(f => ({ ...f, state: e.target.value, county: '' }))}
+            className="form-input">
+            <option value="">— select state —</option>
+            {US_STATES.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="form-label">County</label>
+          <select value={form.county} onChange={set('county')}
+            disabled={!form.state} className="form-input disabled:opacity-50">
+            <option value="">{form.state ? '— select county —' : 'Select a state first'}</option>
+            {(COUNTIES_BY_STATE[form.state] || []).map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="mb-5">

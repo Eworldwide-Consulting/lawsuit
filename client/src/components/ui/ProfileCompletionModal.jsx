@@ -2,15 +2,8 @@ import { useState } from 'react';
 import { authApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import Spinner from './Spinner';
-import { User, MapPin, Scale, ChevronRight, Check } from 'lucide-react';
-
-const US_STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
-  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
-  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
-  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC',
-];
+import { User, MapPin, Scale, Landmark, ChevronRight, Check } from 'lucide-react';
+import { US_STATES, COUNTIES_BY_STATE } from '../../data/usCounties';
 
 const MATTER_TYPES = [
   { id: 'guardianship',        label: 'Guardianship' },
@@ -27,9 +20,10 @@ const MATTER_TYPES = [
 ];
 
 const STEPS = [
-  { icon: User,   title: 'Contact Info',    sub: 'How can we reach you?' },
-  { icon: MapPin, title: 'Your Address',    sub: 'Where are you located?' },
-  { icon: Scale,  title: 'Your Legal Need', sub: 'Tell us about your matter.' },
+  { icon: User,     title: 'Contact Info',    sub: 'How can we reach you?' },
+  { icon: MapPin,   title: 'Your Address',    sub: 'Where are you located?' },
+  { icon: Scale,    title: 'Your Legal Need', sub: 'Tell us about your matter.' },
+  { icon: Landmark, title: 'Case Details',    sub: 'Where was your case launched?' },
 ];
 
 export default function ProfileCompletionModal({ onClose }) {
@@ -41,9 +35,13 @@ export default function ProfileCompletionModal({ onClose }) {
     phone: '', dob: '',
     street: '', city: '', state: '', zip: '',
     matterType: '', workedBefore: 'no',
+    caseState: '', caseCounty: '', caseDescription: '',
   });
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  // Changing the case state invalidates the previously chosen county
+  const setCaseState = e =>
+    setForm(f => ({ ...f, caseState: e.target.value, caseCounty: '' }));
 
   async function save() {
     setSaving(true);
@@ -144,7 +142,7 @@ export default function ProfileCompletionModal({ onClose }) {
                   <label className="form-label">State</label>
                   <select value={form.state} onChange={set('state')} className="form-input">
                     <option value="">— select —</option>
-                    {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {US_STATES.map(s => <option key={s.code} value={s.code}>{s.code}</option>)}
                   </select>
                 </div>
               </div>
@@ -188,6 +186,41 @@ export default function ProfileCompletionModal({ onClose }) {
                     </label>
                   ))}
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* Step 4 — Case details: where the case was launched */}
+          {step === 3 && (
+            <>
+              <p className="text-sm text-gray-500 -mt-1 pb-1">
+                Tell us where your case was launched so we can route it to the
+                right team. This appears on your case dashboard.
+              </p>
+              <div>
+                <label className="form-label">State where the case was launched</label>
+                <select value={form.caseState} onChange={setCaseState} className="form-input">
+                  <option value="">— select state —</option>
+                  {US_STATES.map(s => (
+                    <option key={s.code} value={s.code}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">County</label>
+                <select value={form.caseCounty} onChange={set('caseCounty')}
+                  disabled={!form.caseState} className="form-input disabled:opacity-50">
+                  <option value="">{form.caseState ? '— select county —' : 'Select a state first'}</option>
+                  {(COUNTIES_BY_STATE[form.caseState] || []).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Brief case description <span className="text-gray-400 font-normal">(optional)</span></label>
+                <textarea value={form.caseDescription} onChange={set('caseDescription')}
+                  rows={2} className="form-input resize-none"
+                  placeholder="What is the case about?" />
               </div>
             </>
           )}

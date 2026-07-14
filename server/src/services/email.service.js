@@ -93,6 +93,17 @@ const EmailService = {
     return send({ to, subject: 'Reset your TriVanta password', html: tmplPasswordReset(link) });
   },
 
+  // Direct send — the login flow is blocked until this code arrives, so it
+  // must not sit in the in-memory queue behind other jobs.
+  sendLoginCode(to, { firstName, code }) {
+    return send({
+      to,
+      subject: `${code} is your TriVanta verification code`,
+      html: tmplLoginCode({ firstName, code }),
+      text: `Your TriVanta verification code is ${code}. It expires in 10 minutes.`,
+    });
+  },
+
   sendNewMessage(to, { senderName, subject, preview }) {
     return queue(JOB.NEW_MESSAGE, { to, senderName, subject, preview });
   },
@@ -380,6 +391,17 @@ function tmplMatterStatus({ caseNumber, newStatus }) {
     ${h2('Matter status updated')}
     ${p(`Case <strong>${esc(caseNumber)}</strong> has moved to <strong>${esc(newStatus)}</strong>.`)}
     ${btn(`${config.client.url}/matters`, 'View Matter')}
+  `);
+}
+
+function tmplLoginCode({ firstName, code }) {
+  return wrap(`
+    ${h2('Your verification code')}
+    ${p(`Hi ${esc(firstName || 'there')}, use this code to finish signing in to your TriVanta dashboard:`)}
+    <div style="text-align:center;margin:24px 0">
+      <span style="display:inline-block;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:16px 32px;font-size:32px;font-weight:800;letter-spacing:10px;color:#0f2057;font-family:monospace">${esc(code)}</span>
+    </div>
+    <p style="color:#9ca3af;font-size:13px">This code expires in <strong>10 minutes</strong>. If you did not try to sign in, change your password immediately.</p>
   `);
 }
 

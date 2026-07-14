@@ -20,14 +20,14 @@ const MatterService = {
   },
 
   async create(body, userId) {
-    const { description, court, county, urgent, importantDate,
+    const { description, court, county, state, urgent, importantDate,
             hasDocuments, workedWithFirmBefore, additionalNotes, matterStatus } = body;
     // Accept both camelCase (intake wizard / register flow) and snake_case (direct API calls)
     const matterType = body.matterType || body.matter_type || null;
 
     const r = await MatterRepo.create({
       clientId: userId,
-      matterType, description, court, county, urgent,
+      matterType, description, court, county, state, urgent,
       importantDate, hasDocuments, workedWithFirmBefore,
       additionalNotes, status: matterStatus,
     });
@@ -56,6 +56,7 @@ const MatterService = {
     if (body.description !== undefined)     fields.description      = body.description;
     if (body.court !== undefined)           fields.court            = body.court;
     if (body.county !== undefined)          fields.county           = body.county;
+    if (body.state !== undefined)           fields.state            = body.state;
     if (body.urgent !== undefined)          fields.urgent           = body.urgent ? 1 : 0;
     if (body.importantDate !== undefined)   fields.important_date   = body.importantDate;
     if (body.additionalNotes !== undefined) fields.additional_notes = body.additionalNotes;

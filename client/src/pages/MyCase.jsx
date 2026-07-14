@@ -269,12 +269,16 @@ export default function MyCase() {
                     </div>
                   </div>
                 </div>
-                {matter.court && (
+                {(matter.court || matter.county || matter.state) && (
                   <div className="flex items-start gap-2.5">
                     <MapPin size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     <div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wide">Court</div>
-                      <div className="font-medium text-gray-800">{matter.court}{matter.county ? ` · ${matter.county}` : ''}</div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wide">
+                        {matter.court ? 'Court' : 'Case Location'}
+                      </div>
+                      <div className="font-medium text-gray-800">
+                        {[matter.court, matter.county, matter.state].filter(Boolean).join(' · ')}
+                      </div>
                     </div>
                   </div>
                 )}

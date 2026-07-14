@@ -98,17 +98,17 @@ const MatterRepository = {
     );
   },
 
-  async create({ clientId, matterType, description, court, county, urgent,
+  async create({ clientId, matterType, description, court, county, state, urgent,
                  importantDate, hasDocuments, workedWithFirmBefore, additionalNotes, status }) {
     return run(
       `INSERT INTO matters
-         (client_id, matter_type, stage, description, court, county,
+         (client_id, matter_type, stage, description, court, county, state,
           urgent, important_date, has_documents, worked_with_firm_before,
           additional_notes, status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         clientId, matterType || null, 'intake',
-        description || null, court || null, county || null,
+        description || null, court || null, county || null, state || null,
         urgent ? 1 : 0, importantDate || null,
         hasDocuments ? 1 : 0, workedWithFirmBefore ? 1 : 0,
         additionalNotes || null, status || 'active',

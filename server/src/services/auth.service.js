@@ -26,6 +26,13 @@ const DEMO_EMAILS = new Set([
 // 2FA window: allow ±1 step (30 s each) for clock drift.
 const TOTP_WINDOW = 1;
 
+// "gangadhar@firm.com" → "g***@firm.com" — shown on the verify screen without
+// leaking the full address to someone who only has the password.
+function maskEmail(email) {
+  const [local, domain] = String(email).split('@');
+  return `${local.slice(0, 1)}***@${domain || ''}`;
+}
+
 const AuthService = {
   signToken(userId) {
     return jwt.sign({ userId }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
@@ -134,7 +141,60 @@ const AuthService = {
       return { twoFaRequired: true, tempToken: tmp };
     }
 
+    // Every password login is gated behind an emailed one-time code before the
+    // dashboard is issued. Demo accounts are exempt (no real inboxes), and
+    // TOTP users above already have a stronger second factor.
+    if (!DEMO_EMAILS.has(user.email)) {
+      await AuthService.issueLoginOtp(user);
+      const tmp = jwt.sign({ userId: user.id, otpPending: true }, config.jwt.secret, { expiresIn: '10m' });
+      return { otpRequired: true, tempToken: tmp, maskedEmail: maskEmail(user.email), role: user.role };
+    }
+
     return { token: AuthService.signToken(user.id), user: sanitizeUser(user) };
+  },
+
+  // Generate + store a 6-digit login code and email it. Stored as
+  // "sha256(code):expiryEpochMs" so the plain code never touches the DB and
+  // expiry needs no DATETIME timezone handling.
+  async issueLoginOtp(user) {
+    const code    = String(crypto.randomInt(100000, 1000000));
+    const hash    = crypto.createHash('sha256').update(code).digest('hex');
+    const expires = Date.now() + 10 * 60 * 1000;
+    await UserRepo.update(user.id, { login_otp: `${hash}:${expires}` });
+    await EmailService.sendLoginCode(user.email, { firstName: user.first_name, code });
+  },
+
+  async verifyLoginOtp({ tempToken, code }) {
+    let payload;
+    try { payload = jwt.verify(tempToken, config.jwt.secret); }
+    catch { throw new UnauthorizedError('Session expired. Please sign in again.'); }
+    if (!payload.otpPending) throw new ValidationError('Invalid token');
+
+    const user = await UserRepo.findById(payload.userId);
+    if (!user?.login_otp) throw new UnauthorizedError('No active code. Please sign in again.');
+
+    const [hash, expires] = user.login_otp.split(':');
+    if (Date.now() > Number(expires)) {
+      await UserRepo.update(user.id, { login_otp: null });
+      throw new UnauthorizedError('Code expired. Please request a new one.');
+    }
+    const given = crypto.createHash('sha256').update(String(code || '').trim()).digest('hex');
+    if (given !== hash) throw new UnauthorizedError('Invalid code');
+
+    await UserRepo.update(user.id, { login_otp: null });
+    return { token: AuthService.signToken(user.id), user: sanitizeUser(user) };
+  },
+
+  async resendLoginOtp({ tempToken }) {
+    let payload;
+    try { payload = jwt.verify(tempToken, config.jwt.secret); }
+    catch { throw new UnauthorizedError('Session expired. Please sign in again.'); }
+    if (!payload.otpPending) throw new ValidationError('Invalid token');
+
+    const user = await UserRepo.findById(payload.userId);
+    if (!user) throw new UnauthorizedError('User not found');
+    await AuthService.issueLoginOtp(user);
+    return { success: true, maskedEmail: maskEmail(user.email) };
   },
 
   async verify2fa({ tempToken, code }) {

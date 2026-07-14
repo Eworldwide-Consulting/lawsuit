@@ -93,6 +93,14 @@ export default function Login() {
       const res = await authApi.login({ ...form, portal: activeRole });
       if (res.data.twoFaRequired) {
         sessionStorage.setItem('lp_temp_token', res.data.tempToken);
+        sessionStorage.setItem('lp_otp_mode', 'totp');
+        navigate('/verify');
+      } else if (res.data.otpRequired) {
+        // Email verification code sent — finish sign-in on the verify screen.
+        sessionStorage.setItem('lp_temp_token', res.data.tempToken);
+        sessionStorage.setItem('lp_otp_mode', 'email');
+        sessionStorage.setItem('lp_otp_email', res.data.maskedEmail || '');
+        if (fromPath) sessionStorage.setItem('lp_from_path', fromPath);
         navigate('/verify');
       } else {
         if (res.data.user.role !== activeRole) {

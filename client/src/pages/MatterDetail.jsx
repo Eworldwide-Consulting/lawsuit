@@ -46,6 +46,7 @@ export default function MatterDetail() {
             { label: 'Client', value: matter.client_name || '—' },
             { label: 'Attorney', value: matter.attorney_name || '—' },
             { label: 'Court', value: matter.court || '—' },
+            { label: 'State', value: matter.state || '—' },
             { label: 'County', value: matter.county || '—' },
             { label: 'Important Date', value: matter.important_date ? new Date(matter.important_date).toLocaleDateString() : '—' },
           ].map(({ label, value }) => (
@@ -76,6 +77,7 @@ export default function MatterDetail() {
           <div className="font-semibold text-gray-700 text-sm mb-2 flex items-center gap-2"><MapPin size={14} /> Location</div>
           <div className="space-y-1.5 text-sm">
             <div><span className="text-gray-400">Court:</span> <span className="text-gray-700">{matter.court || '—'}</span></div>
+            <div><span className="text-gray-400">State:</span> <span className="text-gray-700">{matter.state || '—'}</span></div>
             <div><span className="text-gray-400">County:</span> <span className="text-gray-700">{matter.county || '—'}</span></div>
           </div>
         </div>
