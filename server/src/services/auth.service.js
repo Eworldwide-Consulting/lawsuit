@@ -10,7 +10,7 @@ const EmailService = require('./email.service');
 const { sanitizeUser }  = require('../domain/user');
 const { buildCaseNumber } = require('../domain/matter');
 const { in24Hours }     = require('../lib/dates');
-const { ConflictError, UnauthorizedError, ValidationError, ForbiddenError } = require('../lib/errors');
+const { AppError, ConflictError, UnauthorizedError, ValidationError, ForbiddenError } = require('../lib/errors');
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -169,7 +169,17 @@ const AuthService = {
     const hash    = crypto.createHash('sha256').update(code).digest('hex');
     const expires = Date.now() + 10 * 60 * 1000;
     await UserRepo.update(user.id, { login_otp: `${hash}:${expires}` });
-    await EmailService.sendLoginCode(user.email, { firstName: user.first_name, code });
+    const delivery = await EmailService.sendLoginCode(user.email, { firstName: user.first_name, code });
+    // If the email cannot be delivered, the verify screen is a dead end —
+    // fail the login honestly instead of leaving the user waiting for a
+    // code that will never arrive (e.g. revoked Gmail app password).
+    if (delivery && delivery.delivered === false) {
+      await UserRepo.update(user.id, { login_otp: null });
+      throw new AppError(
+        'We could not send your verification code right now. Please try again shortly, or sign in with Google.',
+        503, 'EMAIL_DELIVERY_FAILED'
+      );
+    }
   },
 
   async verifyLoginOtp({ tempToken, code }) {
