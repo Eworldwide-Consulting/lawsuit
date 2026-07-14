@@ -1,5 +1,5 @@
-# Manual server diagnostic — inspects what is actually on disk and which
-# directory the running node process serves from. Run from Actions.
+# Manual server diagnostic — inspects what is actually on disk and runs the
+# deploy rsync as a verbose dry-run to reveal why client/dist is not updated.
 name: Server Diagnostic
 
 on: workflow_dispatch
@@ -7,34 +7,63 @@ on: workflow_dispatch
 jobs:
   diag:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build client (same as deploy)
+        run: |
+          npm install --prefix client
+          npm run build --prefix client
+          echo "--- runner build output ---"
+          ls -la client/dist/index.html
+          grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' client/dist/index.html | head -1
+
       - name: Install sshpass
         run: sudo apt-get install -y sshpass
 
-      - name: Inspect deploy path and running process
+      - name: Inspect server filesystem
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -e ssh \
             -p ${{ secrets.SSH_PORT }} \
-            -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=30 \
+            -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -l -c '
               D=\"${{ secrets.DEPLOY_PATH }}\"
-              echo \"=== deploy path ===\"; echo \"\$D\"
-              echo \"=== client/dist on disk ===\"
-              ls -la \"\$D/client/dist/index.html\" 2>/dev/null || echo \"(missing)\"
-              grep -oE \"assets/index-[A-Za-z0-9_-]+\\.js\" \"\$D/client/dist/index.html\" 2>/dev/null | head -1
-              echo \"=== newest asset in dist ===\"
-              ls -lat \"\$D/client/dist/assets\" 2>/dev/null | head -4
-              echo \"=== pm2 process details ===\"
-              pm2 describe trivanta 2>/dev/null | grep -E \"script path|exec cwd|status|uptime\" || echo \"(no pm2 trivanta)\"
-              echo \"=== all node processes and their cwd ===\"
-              for P in \$(pgrep -f \"index.js\" 2>/dev/null); do
-                echo \"pid \$P: \$(readlink /proc/\$P/cwd 2>/dev/null) — \$(tr \"\\0\" \" \" < /proc/\$P/cmdline 2>/dev/null | cut -c1-140)\"
-              done
-              echo \"=== other copies of the app on the account ===\"
-              find /home/${{ secrets.SSH_USER }} -maxdepth 4 -name \"index.html\" -path \"*client/dist*\" 2>/dev/null | head -10
+              echo \"=== client dir listing (is dist a symlink? owner?) ===\"
+              ls -la \"\$D/client/\" | head -10
+              echo \"=== server/src freshness (rsync works for server?) ===\"
+              ls -la \"\$D/server/src/index.js\"
+              echo \"=== dist writable? ===\"
+              touch \"\$D/client/dist/.rsync_write_test\" && echo writable && rm -f \"\$D/client/dist/.rsync_write_test\" || echo NOT-WRITABLE
             '"
+
+      - name: Deploy rsync DRY-RUN (verbose, client only)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e rsync -az --delete --dry-run --itemize-changes \
+            --exclude 'node_modules/'        \
+            --exclude 'server/node_modules/' \
+            --exclude 'client/node_modules/' \
+            --exclude 'client/src/'          \
+            --exclude '.env'                 \
+            --exclude '*.db'                 \
+            --exclude '*.db-shm'             \
+            --exclude '*.db-wal'             \
+            --exclude 'uploads/'             \
+            --exclude 'logs/'                \
+            --exclude '_backup/'             \
+            --exclude '.git/'                \
+            -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/ \
+            2>&1 | grep -E 'client/dist' | head -20
+          echo "--- exit: $? (dry-run) ---"
