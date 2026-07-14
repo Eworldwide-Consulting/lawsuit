@@ -113,6 +113,8 @@ function DocumentReviewPanel({ onRefresh }) {
   const [loading, setLoading]   = useState(true);
   const [busy, setBusy]         = useState({});
   const [expanded, setExpanded] = useState(null);
+  const [denyId, setDenyId]     = useState(null);
+  const [denyNote, setDenyNote] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -124,11 +126,13 @@ function DocumentReviewPanel({ onRefresh }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function reviewDoc(id, status) {
+  async function reviewDoc(id, status, note) {
     setBusy(b => ({ ...b, [id]: true }));
     try {
-      await documentsApi.updateStatus(id, status);
+      await documentsApi.updateStatus(id, status, note);
       setDocs(prev => prev.filter(d => d.id !== id));
+      setDenyId(null);
+      setDenyNote('');
       onRefresh?.();
     } catch (e) {
       console.error(e);
@@ -217,20 +221,47 @@ function DocumentReviewPanel({ onRefresh }) {
             )}
 
             {/* Action footer */}
-            <div className="flex gap-2 p-3 border-t border-gray-100 dark:border-gray-700">
-              <button
-                onClick={() => reviewDoc(doc.id, 'accepted')}
-                disabled={busy[doc.id]}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors">
-                {busy[doc.id] ? <Spinner size={3} /> : <ThumbsUp size={12} />} Approve
-              </button>
-              <button
-                onClick={() => reviewDoc(doc.id, 'rejected')}
-                disabled={busy[doc.id]}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors">
-                {busy[doc.id] ? <Spinner size={3} /> : <ThumbsDown size={12} />} Deny
-              </button>
-            </div>
+            {denyId === doc.id ? (
+              <div className="p-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                <textarea
+                  value={denyNote}
+                  onChange={e => setDenyNote(e.target.value)}
+                  rows={2}
+                  autoFocus
+                  placeholder="Reason for rejection — the client sees this before re-uploading"
+                  className="w-full text-xs border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 resize-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => reviewDoc(doc.id, 'rejected', denyNote.trim())}
+                    disabled={busy[doc.id] || !denyNote.trim()}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors">
+                    {busy[doc.id] ? <Spinner size={3} /> : <ThumbsDown size={12} />} Confirm Deny
+                  </button>
+                  <button
+                    onClick={() => { setDenyId(null); setDenyNote(''); }}
+                    disabled={busy[doc.id]}
+                    className="flex-1 py-1.5 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 p-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  onClick={() => reviewDoc(doc.id, 'approved')}
+                  disabled={busy[doc.id]}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors">
+                  {busy[doc.id] ? <Spinner size={3} /> : <ThumbsUp size={12} />} Approve
+                </button>
+                <button
+                  onClick={() => { setDenyId(doc.id); setDenyNote(''); }}
+                  disabled={busy[doc.id]}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors">
+                  <ThumbsDown size={12} /> Deny
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -60,12 +60,12 @@ const NotificationService = {
     });
   },
 
-  documentReviewed(toUserId, { docName, status, matterId }) {
+  documentReviewed(toUserId, { docName, status, matterId, note }) {
     return create({
       userId:     toUserId,
       type:       TYPES.DOCUMENT_REVIEWED,
       title:      `Document ${status}`,
-      body:       docName,
+      body:       note ? `${docName} — ${note}` : docName,
       entityType: 'matter',
       entityId:   matterId,
     });

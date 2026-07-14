@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { documentsApi } from '../api';
-import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X, Send } from 'lucide-react';
+import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X, Send, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import Badge, { statusVariant } from '../components/ui/Badge';
@@ -42,7 +42,20 @@ export default function Documents() {
   const [editForm, setEditForm]       = useState({ name: '', category: '' });
   const [editLoading, setEditLoading] = useState(false);
 
-  const fileRef = useRef();
+  // Attorney review state
+  const [reviewing, setReviewing]       = useState({});
+  const [rejectDoc, setRejectDoc]       = useState(null);
+  const [rejectNote, setRejectNote]     = useState('');
+  const [rejectLoading, setRejectLoading] = useState(false);
+
+  // Client re-upload state (for rejected documents)
+  const [reuploadTarget, setReuploadTarget] = useState(null);
+  const [reuploading, setReuploading]       = useState({});
+
+  const fileRef     = useRef();
+  const reuploadRef = useRef();
+
+  const isStaff = ['attorney', 'partner', 'itsupport'].includes(user?.role);
 
   const load = () =>
     documentsApi.list().then(r => setDocs(r.data)).finally(() => setLoading(false));
@@ -77,6 +90,59 @@ export default function Documents() {
       toast.error(err.response?.data?.error || 'Could not send for review. Please try again.');
     } finally {
       setSubmitting(s => ({ ...s, [doc.id]: false }));
+    }
+  }
+
+  async function approveDoc(doc) {
+    setReviewing(s => ({ ...s, [doc.id]: true }));
+    try {
+      await documentsApi.updateStatus(doc.id, 'approved');
+      setDocs(d => d.map(x => x.id === doc.id ? { ...x, status: 'approved', review_note: null } : x));
+      toast.success(`"${doc.name}" approved`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not approve document.');
+    } finally {
+      setReviewing(s => ({ ...s, [doc.id]: false }));
+    }
+  }
+
+  async function confirmReject() {
+    if (!rejectDoc || !rejectNote.trim()) return;
+    setRejectLoading(true);
+    try {
+      await documentsApi.updateStatus(rejectDoc.id, 'rejected', rejectNote.trim());
+      setDocs(d => d.map(x => x.id === rejectDoc.id ? { ...x, status: 'rejected', review_note: rejectNote.trim() } : x));
+      toast.success(`"${rejectDoc.name}" rejected — the client can now re-upload`);
+      setRejectDoc(null);
+      setRejectNote('');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not reject document.');
+    } finally {
+      setRejectLoading(false);
+    }
+  }
+
+  function startReupload(doc) {
+    setReuploadTarget(doc);
+    reuploadRef.current?.click();
+  }
+
+  async function handleReupload(file) {
+    const doc = reuploadTarget;
+    if (!doc || !file) return;
+    setReuploading(s => ({ ...s, [doc.id]: true }));
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await documentsApi.reupload(doc.id, fd);
+      setDocs(d => d.map(x => x.id === doc.id ? { ...x, ...res.data } : x));
+      toast.success('Document re-uploaded and sent back to your attorney for review');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Re-upload failed. Please try again.');
+    } finally {
+      setReuploading(s => ({ ...s, [doc.id]: false }));
+      setReuploadTarget(null);
+      if (reuploadRef.current) reuploadRef.current.value = '';
     }
   }
 
@@ -152,6 +218,14 @@ export default function Documents() {
           className="sr-only"
           aria-label="File input"
           onChange={e => handleUpload(e.target.files)}
+        />
+        <input
+          ref={reuploadRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+          className="sr-only"
+          aria-label="Re-upload file input"
+          onChange={e => handleReupload(e.target.files?.[0])}
         />
       </div>
 
@@ -245,6 +319,11 @@ export default function Documents() {
                           {doc.doc_type && (
                             <div className="text-xs text-gray-400">{doc.doc_type.replace(/_/g, ' ')}</div>
                           )}
+                          {doc.status === 'rejected' && doc.review_note && (
+                            <div className="text-xs text-red-600 mt-0.5 max-w-[240px]" title={doc.review_note}>
+                              Rejected: {doc.review_note}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -263,6 +342,42 @@ export default function Documents() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
+                        {isStaff && doc.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => approveDoc(doc)}
+                              disabled={reviewing[doc.id]}
+                              aria-label={`Approve ${doc.name}`}
+                              title="Approve document"
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {reviewing[doc.id] ? <Spinner size={3} color="text-white" /> : <CheckCircle size={12} />}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => { setRejectDoc(doc); setRejectNote(''); }}
+                              disabled={reviewing[doc.id]}
+                              aria-label={`Reject ${doc.name}`}
+                              title="Reject document"
+                              className="flex items-center gap-1 px-2 py-1 mr-1 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <XCircle size={12} />
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {!isStaff && doc.status === 'rejected' && doc.user_id === user?.id && (
+                          <button
+                            onClick={() => startReupload(doc)}
+                            disabled={reuploading[doc.id]}
+                            aria-label={`Re-upload ${doc.name}`}
+                            title="Upload a corrected file — it goes back to your attorney for review"
+                            className="flex items-center gap-1 px-2 py-1 mr-1 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {reuploading[doc.id] ? <Spinner size={3} color="text-white" /> : <RotateCcw size={12} />}
+                            Re-upload
+                          </button>
+                        )}
                         {doc.status === 'uploaded' && doc.user_id === user?.id && (
                           <button
                             onClick={() => sendForReview(doc)}
@@ -335,6 +450,56 @@ export default function Documents() {
         onCancel={() => setConfirmId(null)}
         loading={deleteLoading}
       />
+
+      {/* Reject modal — reason is required so the client knows what to fix */}
+      {rejectDoc && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-800">Reject Document</h2>
+              <button
+                onClick={() => { setRejectDoc(null); setRejectNote(''); }}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600">
+                Rejecting <span className="font-semibold text-gray-800">{rejectDoc.name}</span>.
+                The client will be notified and can upload a corrected file.
+              </p>
+              <div>
+                <label className="form-label">Reason for rejection <span className="text-red-500">*</span></label>
+                <textarea
+                  value={rejectNote}
+                  onChange={e => setRejectNote(e.target.value)}
+                  rows={3}
+                  className="form-input resize-none"
+                  placeholder="e.g. Document is illegible — please upload a clearer scan."
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-6">
+              <button
+                onClick={() => { setRejectDoc(null); setRejectNote(''); }}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmReject}
+                disabled={rejectLoading || !rejectNote.trim()}
+                className="px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {rejectLoading ? 'Rejecting…' : 'Reject Document'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit modal */}
       {editDoc && (

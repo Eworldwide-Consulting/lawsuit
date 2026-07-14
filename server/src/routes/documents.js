@@ -196,29 +196,92 @@ router.patch('/:id', requireAuth, async (req, res, next) => {
 
 router.put('/:id/status', requireAuth, requireRole('attorney', 'partner', 'itsupport'), async (req, res, next) => {
   try {
-    if (!DOCUMENT_STATUSES.includes(req.body.status))
+    const { status } = req.body;
+    const note = req.body.note?.trim() || null;
+
+    if (!DOCUMENT_STATUSES.includes(status))
       throw new ValidationError(`status must be one of: ${DOCUMENT_STATUSES.join(', ')}`);
+    // A rejection without a reason leaves the client guessing what to fix
+    // before re-uploading — require one.
+    if (status === 'rejected' && !note)
+      throw new ValidationError('A rejection reason is required so the client knows what to correct.');
+
     const doc = await DocumentRepo.findById(req.params.id);
     if (!doc) throw new NotFoundError('Document');
-    await DocumentRepo.updateStatus(req.params.id, req.body.status);
+
+    await DocumentRepo.setReviewStatus(req.params.id, {
+      status,
+      note: status === 'rejected' ? note : null,
+      reviewedBy: req.user.id,
+    });
 
     // Notify the document owner (may be the client)
     if (doc.user_id && doc.user_id !== req.user.id) {
       NotificationService.documentReviewed(doc.user_id, {
         docName: doc.name,
-        status:  req.body.status,
+        status,
         matterId: doc.matter_id,
+        note: status === 'rejected' ? note : null,
       });
     }
 
     AuditService.log({
       userId: req.user.id, action: AuditService.ACTIONS.DOCUMENT_STATUS_CHANGED,
       entity: 'document', entityId: req.params.id,
-      meta: { status: req.body.status, docName: doc.name },
+      meta: { status, docName: doc.name, ...(note ? { note } : {}) },
       ip: req.ip,
     });
 
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Client re-uploads a corrected file for a rejected document. The new file
+// replaces the old one and the document goes straight back to 'pending' so
+// it reappears in the attorney's review queue.
+router.post('/:id/reupload', requireAuth, upload.single('file'), async (req, res, next) => {
+  try {
+    const doc = await DocumentRepo.findById(req.params.id);
+    if (!doc) throw new NotFoundError('Document');
+    if (doc.user_id !== req.user.id) throw new ForbiddenError();
+    if (doc.status !== 'rejected')
+      return res.status(400).json({ error: 'Only rejected documents can be re-uploaded.' });
+    if (!req.file) throw new ValidationError('file required');
+
+    if (doc.file_path) {
+      const fp = path.join(UPLOAD_DIR, path.basename(doc.file_path));
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    }
+
+    await DocumentRepo.replaceFile(doc.id, {
+      filename: req.file.filename,
+      size:     req.file.size,
+      name:     req.file.originalname,
+    });
+
+    if (doc.matter_id) {
+      const matter = await MatterRepo.findById(doc.matter_id);
+      if (matter?.attorney_id) {
+        const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
+        NotificationService.create({
+          userId:     matter.attorney_id,
+          type:       'document_uploaded',
+          title:      'Document re-uploaded after rejection',
+          body:       `${uploaderName} re-uploaded "${req.file.originalname}" for case ${matter.case_number || `#${doc.matter_id}`} — review required.`,
+          entityType: 'document',
+          entityId:   doc.id,
+        });
+      }
+    }
+
+    AuditService.log({
+      userId: req.user.id, action: 'document.reuploaded',
+      entity: 'document', entityId: doc.id,
+      meta: { docName: req.file.originalname, previousName: doc.name, matterId: doc.matter_id },
+      ip: req.ip,
+    });
+
+    res.json(await DocumentRepo.findById(doc.id));
   } catch (err) { next(err); }
 });
 
