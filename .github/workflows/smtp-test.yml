@@ -16,6 +16,9 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
         run: |
           echo "SMTP_USER set: $([ -n "$SMTP_USER" ] && echo yes || echo NO — MISSING)"
+          # Partial hint only — enough to identify WHICH account the app
+          # password must be generated on, without exposing the address.
+          echo "SMTP_USER hint: ${SMTP_USER:0:3}***@${SMTP_USER#*@}"
           echo "SMTP_PASS length: ${#SMTP_PASS}  (Gmail app password = 16 chars; 19 means spaces were pasted in)"
           case "$SMTP_PASS" in *' '*) echo "WARNING: SMTP_PASS contains spaces — remove them";; esac
 
