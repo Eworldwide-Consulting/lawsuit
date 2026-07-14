@@ -1,17 +1,38 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mattersApi } from '../api';
-import { ArrowLeft, Calendar, FileText, MapPin } from 'lucide-react';
+import { mattersApi, formsApi } from '../api';
+import { ArrowLeft, Calendar, FileText, MapPin, Shield } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
+import Badge from '../components/ui/Badge';
+
+// Labels for the client-submitted Guardian Information form fields
+const GUARDIAN_FORM_LABELS = {
+  guardian_name:          'Guardian Name',
+  guardian_relationship:  'Relationship',
+  guardian_dob:           'Guardian DOB',
+  guardian_phone:         'Guardian Phone',
+  guardian_email:         'Guardian Email',
+  guardian_address:       'Guardian Address',
+  ward_name:              'Protected Person',
+  ward_dob:               'Protected Person DOB',
+  ward_residence:         'Current Residence',
+  ward_medical_conditions:'Medical Conditions',
+  ward_care_needs:        'Care Needs',
+  ward_current_caregiver: 'Current Caregiver',
+};
 
 export default function MatterDetail() {
   const { id } = useParams();
   const [matter, setMatter] = useState(null);
+  const [guardianForm, setGuardianForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     mattersApi.get(id).then(r => setMatter(r.data)).finally(() => setLoading(false));
+    formsApi.getGuardianship(id)
+      .then(r => setGuardianForm(r.data?.form || null))
+      .catch(() => setGuardianForm(null));
   }, [id]);
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size={8} /></div>;
@@ -64,6 +85,28 @@ export default function MatterDetail() {
           </div>
         )}
       </div>
+
+      {/* Client-submitted Guardian Information form */}
+      {guardianForm && (
+        <div className="card p-5 mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-semibold text-gray-700 text-sm flex items-center gap-2">
+              <Shield size={14} /> Guardian Information Form
+            </div>
+            <Badge variant={guardianForm.status === 'submitted' ? 'success' : 'warning'}>
+              {guardianForm.status === 'submitted' ? 'Submitted' : 'Draft'}
+            </Badge>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+            {Object.entries(GUARDIAN_FORM_LABELS).map(([key, label]) => (
+              <div key={key} className="flex flex-col">
+                <span className="text-xs text-gray-400 uppercase tracking-wide">{label}</span>
+                <span className="font-medium text-gray-800 mt-0.5 whitespace-pre-wrap">{guardianForm[key] || '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="card p-4">

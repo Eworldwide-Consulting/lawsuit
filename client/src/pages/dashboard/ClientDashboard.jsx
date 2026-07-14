@@ -400,6 +400,12 @@ export default function ClientDashboard() {
                    : matter?.matter_type === 'estate_administration'        ? 'Estate Administration'
                    : 'Case'} Status
                 </div>
+                {matter?.case_number && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Client Number:{' '}
+                    <span className="font-mono font-semibold text-[#0f2057] dark:text-blue-400">{matter.case_number}</span>
+                  </div>
+                )}
                 {matter && (
                   <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                     {matter.description && <span>{matter.description} ·</span>}

@@ -15,5 +15,7 @@ export { default as paymentsApi } from './payments.api';
 export { default as adminApi } from './admin.api';
 export { default as notificationsApi } from './notifications.api';
 export { default as checklistApi }     from './checklist.api';
+export { default as formsApi }         from './forms.api';
+export { default as reportsApi }       from './reports.api';
 
 export { default } from './http';

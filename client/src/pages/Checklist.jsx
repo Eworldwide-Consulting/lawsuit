@@ -99,6 +99,12 @@ export default function Checklist() {
             <p className="text-sm text-gray-500 mt-1">
               Upload what you have. Answer what you know. Your legal team will help identify anything missing.
             </p>
+            {currentMatter?.case_number && (
+              <div className="text-xs text-gray-500 mt-1.5">
+                Legal Case Number:{' '}
+                <span className="font-mono font-semibold text-[#0f2057]">{currentMatter.case_number}</span>
+              </div>
+            )}
           </div>
           <Button
             variant="ghost"

@@ -118,8 +118,16 @@ const AuthService = {
       ? await bcrypt.compare(password, user.password_hash || '')
       : await bcrypt.compare(password, '$2b$12$invalidhashfortimingprotection000');
 
-    if (!user || !validPassword)
+    if (!user || !validPassword) {
+      // Google-created accounts have no password until one is set via the
+      // reset flow — tell the user how to proceed instead of a dead-end 401.
+      if (user && !user.password_hash && user.google_id)
+        throw new UnauthorizedError(
+          "This account was created with Google Sign-In. Use \"Continue with Google\", " +
+          "or set a password first via \"Forgot password?\" — then you can sign in with email too."
+        );
       throw new UnauthorizedError('Invalid credentials');
+    }
 
     if (portal && portal !== user.role)
       throw new ForbiddenError(`This email is registered as ${user.role}. Please sign in using the ${user.role} portal.`);

@@ -40,6 +40,7 @@ const ChecklistReview  = lazy(() => import('./pages/ChecklistReview'));
 const MyCase           = lazy(() => import('./pages/MyCase'));
 const Reports          = lazy(() => import('./pages/Reports'));
 const LegalForms       = lazy(() => import('./pages/LegalForms'));
+const GuardianForm     = lazy(() => import('./pages/GuardianForm'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -108,6 +109,7 @@ export default function App() {
         <Route path="/payments" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />
         <Route path="/payments/success" element={<RequireAuth><DashboardLayout><Payments /></DashboardLayout></RequireAuth>} />
         <Route path="/checklist" element={<RequireAuth><DashboardLayout><Checklist /></DashboardLayout></RequireAuth>} />
+        <Route path="/guardian-form" element={<RequireAuth><DashboardLayout><GuardianForm /></DashboardLayout></RequireAuth>} />
         <Route path="/checklist-review" element={<RequireAuth><DashboardLayout><ChecklistReview /></DashboardLayout></RequireAuth>} />
 
         {/* Enterprise pages — attorney, partner, itsupport */}

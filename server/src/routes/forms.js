@@ -104,6 +104,87 @@ const TEMPLATES = [
   },
 ];
 
+// ── Guardian Information Collection form ─────────────────────────────────────
+// Client fills guardian + protected person details for their matter; the
+// legal team reads it from the matter view. One row per matter (upsert).
+
+const GUARDIAN_FIELDS = [
+  'guardian_name', 'guardian_relationship', 'guardian_dob',
+  'guardian_phone', 'guardian_email', 'guardian_address',
+  'ward_name', 'ward_dob', 'ward_residence',
+  'ward_medical_conditions', 'ward_care_needs', 'ward_current_caregiver',
+];
+
+async function assertMatterAccess(matterId, user) {
+  const MatterRepo = require('../repositories/matter.repository');
+  const matter = await MatterRepo.findById(matterId);
+  if (!matter) return { error: 'Matter not found', status: 404 };
+  const staff = ['attorney', 'partner', 'itsupport'].includes(user.role);
+  if (!staff && matter.client_id !== user.id) return { error: 'Forbidden', status: 403 };
+  return { matter };
+}
+
+router.get('/guardianship', requireAuth, async (req, res, next) => {
+  try {
+    const { matterId } = req.query;
+    if (!matterId) return res.status(400).json({ error: 'matterId required' });
+
+    const access = await assertMatterAccess(matterId, req.user);
+    if (access.error) return res.status(access.status).json({ error: access.error });
+
+    const form = await one('SELECT * FROM guardianship_forms WHERE matter_id = ?', [matterId]);
+    res.json({ form: form || null });
+  } catch (err) { next(err); }
+});
+
+router.put('/guardianship', requireAuth, async (req, res, next) => {
+  try {
+    const { matterId, submit } = req.body;
+    if (!matterId) return res.status(400).json({ error: 'matterId required' });
+
+    const access = await assertMatterAccess(matterId, req.user);
+    if (access.error) return res.status(access.status).json({ error: access.error });
+
+    const vals   = GUARDIAN_FIELDS.map(f => String(req.body[f] ?? '').trim().slice(0, 2000) || null);
+    const status = submit ? 'submitted' : 'draft';
+    const now    = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    const existing = await one('SELECT id, status FROM guardianship_forms WHERE matter_id = ?', [matterId]);
+    if (existing) {
+      await run(
+        `UPDATE guardianship_forms
+         SET ${GUARDIAN_FIELDS.map(f => `${f} = ?`).join(', ')}, status = ?, updated_at = ?
+         WHERE id = ?`,
+        [...vals, status, now, existing.id]
+      );
+    } else {
+      await run(
+        `INSERT INTO guardianship_forms (matter_id, client_id, ${GUARDIAN_FIELDS.join(', ')}, status, updated_at)
+         VALUES (?,?,${GUARDIAN_FIELDS.map(() => '?').join(',')},?,?)`,
+        [matterId, access.matter.client_id || req.user.id, ...vals, status, now]
+      );
+    }
+
+    // First submission notifies the assigned attorney
+    if (submit && existing?.status !== 'submitted' && access.matter.attorney_id) {
+      try {
+        const NotificationService = require('../services/notification.service');
+        await NotificationService.create({
+          userId:     access.matter.attorney_id,
+          type:       'form_request',
+          title:      'Guardian Information form submitted',
+          body:       `${req.user.first_name} ${req.user.last_name} completed the Guardian Information form for case ${access.matter.case_number || `#${matterId}`}.`,
+          entityType: 'matter',
+          entityId:   Number(matterId),
+        });
+      } catch { /* non-critical */ }
+    }
+
+    const form = await one('SELECT * FROM guardianship_forms WHERE matter_id = ?', [matterId]);
+    res.json({ form });
+  } catch (err) { next(err); }
+});
+
 router.get('/templates', requireAuth, (req, res) => {
   const { category } = req.query;
   const list = category
