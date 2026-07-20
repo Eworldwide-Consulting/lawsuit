@@ -1,6 +1,6 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ArrowLeft, Shield } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, Shield, Info, Clock } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
 import Spinner from '../../components/ui/Spinner';
 import { authApi } from '../../api';
@@ -129,7 +129,7 @@ export default function TwoFactor() {
         </h1>
         <p className="text-gray-500 text-sm mt-2">Enter the 6-digit verification code to access your dashboard.</p>
         <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500 bg-gray-50 py-2 px-4 rounded-lg">
-          <span>â„¹ï¸</span>
+          <Info size={14} />
           {otpMode === 'email'
             ? <span>We sent a code to <strong>{maskedEmail || 'your email'}</strong></span>
             : <span>Enter the code from your authenticator app</span>}
@@ -150,7 +150,7 @@ export default function TwoFactor() {
 
       <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
         <span className="flex items-center gap-1">
-          <span>â±</span>
+          <Clock size={14} />
           Code expires in <span className={`font-mono font-bold ${timeLeft < 30 ? 'text-red-500' : 'text-gray-700'}`}>{fmt(timeLeft)}</span>
         </span>
         {otpMode === 'email' && (

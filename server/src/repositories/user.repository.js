@@ -9,6 +9,13 @@ const UserRepository = {
     return one(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`, [id]);
   },
 
+  // login_otp is deliberately excluded from USER_COLUMNS (it's cached across every
+  // authenticated request by the auth middleware) — fetched separately here, only
+  // where it's actually needed to verify the emailed one-time code.
+  findByIdWithLoginOtp(id) {
+    return one(`SELECT ${USER_COLUMNS}, login_otp FROM users WHERE id = ?`, [id]);
+  },
+
   findByEmail(email) {
     // LOGIN_COLUMNS includes password_hash — only needed at login for bcrypt.compare
     return one(`SELECT ${LOGIN_COLUMNS} FROM users WHERE email = ?`, [email.toLowerCase()]);

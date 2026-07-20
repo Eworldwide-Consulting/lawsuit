@@ -188,7 +188,7 @@ const AuthService = {
     catch { throw new UnauthorizedError('Session expired. Please sign in again.'); }
     if (!payload.otpPending) throw new ValidationError('Invalid token');
 
-    const user = await UserRepo.findById(payload.userId);
+    const user = await UserRepo.findByIdWithLoginOtp(payload.userId);
     if (!user?.login_otp) throw new UnauthorizedError('No active code. Please sign in again.');
 
     const [hash, expires] = user.login_otp.split(':');
