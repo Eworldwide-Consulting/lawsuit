@@ -11,7 +11,7 @@ const clientNav = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/my-case',     icon: Briefcase,       label: 'My Case' },
   { to: '/checklist',   icon: ClipboardList,   label: 'Checklist' },
-  { to: '/guardian-form', icon: Scale,         label: 'Guardian Form' },
+  { to: '/intake-form',  icon: Scale,          label: 'Case Form' },
   { to: '/open-tasks',  icon: CheckSquare,     label: 'Tasks' },
   { to: '/documents',   icon: Folder,          label: 'Documents' },
   { to: '/appointments',icon: Calendar,        label: 'Appointments' },

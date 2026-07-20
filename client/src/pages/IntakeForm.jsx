@@ -6,29 +6,7 @@ import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
 import { Shield, User, HeartHandshake, Upload, Check, Save, FileText } from 'lucide-react';
 
-// Field definitions drive both the form layout and the payload keys —
-// they must match GUARDIAN_FIELDS on the server.
-const GUARDIAN_SECTION = [
-  { key: 'guardian_name',         label: 'Full Name',                      type: 'text',  placeholder: 'Guardian full legal name' },
-  { key: 'guardian_relationship', label: 'Relationship to Protected Person', type: 'text', placeholder: 'e.g. Parent, Sibling, Family Friend' },
-  { key: 'guardian_dob',          label: 'Date of Birth',                  type: 'date' },
-  { key: 'guardian_phone',        label: 'Phone Number',                   type: 'tel',   placeholder: '(555) 123-4567' },
-  { key: 'guardian_email',        label: 'Email Address',                  type: 'email', placeholder: 'guardian@email.com' },
-  { key: 'guardian_address',      label: 'Home Address',                   type: 'textarea', placeholder: 'Street, city, state, ZIP' },
-];
-
-const WARD_SECTION = [
-  { key: 'ward_name',               label: 'Full Name',            type: 'text',     placeholder: 'Protected person full legal name' },
-  { key: 'ward_dob',                label: 'Date of Birth',        type: 'date' },
-  { key: 'ward_residence',          label: 'Current Residence',    type: 'textarea', placeholder: 'Where do they currently live? (home, facility, etc.)' },
-  { key: 'ward_medical_conditions', label: 'Medical Conditions',   type: 'textarea', placeholder: 'Diagnoses, conditions, or incapacities relevant to the case' },
-  { key: 'ward_care_needs',         label: 'Care Needs',           type: 'textarea', placeholder: 'Daily assistance, medical care, financial management needs…' },
-  { key: 'ward_current_caregiver',  label: 'Current Caregiver',    type: 'text',     placeholder: 'Who currently provides care?' },
-];
-
-const EMPTY_FORM = Object.fromEntries(
-  [...GUARDIAN_SECTION, ...WARD_SECTION].map(f => [f.key, ''])
-);
+const UPLOAD_CATEGORY = 'Intake Form';
 
 function Field({ def, value, onChange, disabled }) {
   const common = {
@@ -48,16 +26,17 @@ function Field({ def, value, onChange, disabled }) {
   );
 }
 
-export default function GuardianForm() {
+export default function IntakeForm() {
   const toast = useToast();
   const fileRef = useRef();
 
-  const [matters, setMatters]   = useState([]);
-  const [matterId, setMatterId] = useState(null);
-  const [form, setForm]         = useState(EMPTY_FORM);
-  const [status, setStatus]     = useState(null);   // null | 'draft' | 'submitted'
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
+  const [matters, setMatters]     = useState([]);
+  const [matterId, setMatterId]   = useState(null);
+  const [schema, setSchema]       = useState(null);
+  const [form, setForm]           = useState({});
+  const [status, setStatus]       = useState(null);   // null | 'draft' | 'submitted'
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState([]);
 
@@ -76,20 +55,20 @@ export default function GuardianForm() {
     if (!matterId) return;
     setLoading(true);
     Promise.all([
-      formsApi.getGuardianship(matterId),
+      formsApi.getIntake(matterId),
       documentsApi.list({ matterId }),
     ])
       .then(([formRes, docsRes]) => {
-        const f = formRes.data?.form;
-        if (f) {
-          setForm(Object.fromEntries(Object.keys(EMPTY_FORM).map(k => [k, f[k] || ''])));
-          setStatus(f.status);
-        } else {
-          setForm(EMPTY_FORM);
-          setStatus(null);
-        }
+        const s = formRes.data?.schema || null;
+        setSchema(s);
+        const emptyForm = s
+          ? Object.fromEntries([...s.petitionerFields, ...s.subjectFields].map(f => [f.key, '']))
+          : {};
+        setForm({ ...emptyForm, ...(formRes.data?.data || {}) });
+        setStatus(formRes.data?.status || null);
+
         const docs = Array.isArray(docsRes.data) ? docsRes.data : [];
-        setUploadedDocs(docs.filter(d => d.category === 'Guardianship'));
+        setUploadedDocs(docs.filter(d => d.category === UPLOAD_CATEGORY));
       })
       .catch(() => toast.error('Could not load the form. Please try again.'))
       .finally(() => setLoading(false));
@@ -98,15 +77,17 @@ export default function GuardianForm() {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   async function save(submit) {
-    if (!matterId) return;
-    if (submit && (!form.guardian_name.trim() || !form.ward_name.trim())) {
-      toast.error('Guardian name and protected person name are required to submit.');
+    if (!matterId || !schema) return;
+    const petitionerNameKey = schema.petitionerFields[0]?.key;
+    const subjectNameKey    = schema.subjectFields[0]?.key;
+    if (submit && (!form[petitionerNameKey]?.trim() || !form[subjectNameKey]?.trim())) {
+      toast.error('Both names are required to submit.');
       return;
     }
     setSaving(true);
     try {
-      const res = await formsApi.saveGuardianship({ matterId, submit, ...form });
-      setStatus(res.data?.form?.status || (submit ? 'submitted' : 'draft'));
+      const res = await formsApi.saveIntake(matterId, { submit, ...form });
+      setStatus(res.data?.status || (submit ? 'submitted' : 'draft'));
       toast.success(submit
         ? 'Form submitted — your legal team has been notified'
         : 'Draft saved');
@@ -124,7 +105,7 @@ export default function GuardianForm() {
       const fd = new FormData();
       Array.from(files).forEach(f => fd.append('files', f));
       fd.append('matterId', matterId);
-      fd.append('category', 'Guardianship');
+      fd.append('category', UPLOAD_CATEGORY);
       const res = await documentsApi.upload(fd);
       const newDocs = Array.isArray(res.data) ? res.data : [];
       setUploadedDocs(prev => [...newDocs, ...prev]);
@@ -148,7 +129,7 @@ export default function GuardianForm() {
           <EmptyState
             icon={Shield}
             title="No case yet"
-            description="Start your case first — then fill out the Guardian Information form here."
+            description="Start your case first — then fill out the intake form here."
           />
         </div>
       </div>
@@ -165,10 +146,10 @@ export default function GuardianForm() {
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Shield size={22} className="text-[#0f2057]" aria-hidden="true" />
-            Guardian Information Form
+            Case Intake Form
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Tell us about the proposed guardian and the person needing protection.
+            Tell us about the people involved in this case.
             Your legal team uses this to prepare the case.
           </p>
           {currentMatter?.case_number && (
@@ -187,8 +168,8 @@ export default function GuardianForm() {
 
       {matters.length > 1 && (
         <div className="mb-5">
-          <label htmlFor="gf-matter" className="form-label">Case</label>
-          <select id="gf-matter" value={matterId || ''} onChange={e => setMatterId(Number(e.target.value))}
+          <label htmlFor="if-matter" className="form-label">Case</label>
+          <select id="if-matter" value={matterId || ''} onChange={e => setMatterId(Number(e.target.value))}
             className="form-input w-auto text-sm">
             {matters.map(m => (
               <option key={m.id} value={m.id}>{m.case_number} — {m.matter_type?.replace(/_/g, ' ')}</option>
@@ -204,29 +185,37 @@ export default function GuardianForm() {
         </div>
       )}
 
-      {/* Guardian section */}
-      <div className="card p-5 mb-5">
-        <div className="font-semibold text-gray-800 text-sm mb-4 flex items-center gap-2">
-          <User size={15} className="text-[#0f2057]" /> Guardian Information
+      {!schema ? (
+        <div className="card p-5 mb-5 text-sm text-gray-500">
+          No intake form is defined for this case type yet.
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {GUARDIAN_SECTION.map(def => (
-            <Field key={def.key} def={def} value={form[def.key]} onChange={set(def.key)} disabled={saving} />
-          ))}
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* Petitioner section */}
+          <div className="card p-5 mb-5">
+            <div className="font-semibold text-gray-800 text-sm mb-4 flex items-center gap-2">
+              <User size={15} className="text-[#0f2057]" /> {schema.petitionerLabel}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {schema.petitionerFields.map(def => (
+                <Field key={def.key} def={def} value={form[def.key]} onChange={set(def.key)} disabled={saving} />
+              ))}
+            </div>
+          </div>
 
-      {/* Protected person section */}
-      <div className="card p-5 mb-5">
-        <div className="font-semibold text-gray-800 text-sm mb-4 flex items-center gap-2">
-          <HeartHandshake size={15} className="text-[#0f2057]" /> Protected Person Information
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {WARD_SECTION.map(def => (
-            <Field key={def.key} def={def} value={form[def.key]} onChange={set(def.key)} disabled={saving} />
-          ))}
-        </div>
-      </div>
+          {/* Subject section */}
+          <div className="card p-5 mb-5">
+            <div className="font-semibold text-gray-800 text-sm mb-4 flex items-center gap-2">
+              <HeartHandshake size={15} className="text-[#0f2057]" /> {schema.subjectLabel}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {schema.subjectFields.map(def => (
+                <Field key={def.key} def={def} value={form[def.key]} onChange={set(def.key)} disabled={saving} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Supporting documents */}
       <div className="card p-5 mb-5">
@@ -270,11 +259,11 @@ export default function GuardianForm() {
 
       {/* Actions */}
       <div className="flex gap-3">
-        <button onClick={() => save(false)} disabled={saving}
+        <button onClick={() => save(false)} disabled={saving || !schema}
           className="btn-secondary w-auto px-5 flex items-center gap-2">
           {saving ? <Spinner size={4} /> : <Save size={15} />} Save Draft
         </button>
-        <button onClick={() => save(true)} disabled={saving}
+        <button onClick={() => save(true)} disabled={saving || !schema}
           className="btn-primary flex items-center gap-2">
           {saving ? <Spinner size={4} color="text-white" /> : <Check size={15} />}
           {submitted ? 'Update Submission' : 'Submit to Legal Team'}

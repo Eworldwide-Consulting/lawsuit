@@ -1,17 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mattersApi } from '../api';
-import { Plus, Search, Filter } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Plus, Search, Filter, ExternalLink } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
 const stageLabel = s => s?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—';
+const STAFF_ROLES = new Set(['attorney', 'partner', 'itsupport']);
 
 export default function Matters() {
   const [matters, setMatters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [caseLookup, setCaseLookup] = useState(null);
+  const [lookingUp, setLookingUp] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     mattersApi.list().then(r => setMatters(r.data)).finally(() => setLoading(false));
@@ -23,6 +28,24 @@ export default function Matters() {
     const matchFilter = filter === 'all' || m.status === filter || m.matter_type === filter;
     return matchSearch && matchFilter;
   }), [matters, search, filter]);
+
+  // Fallback: if the loaded list has no match, ask the backend directly —
+  // catches cases not in this page's already-fetched list (e.g. someone
+  // else's matter). Staff-only, matches the /matters/by-case-number ACL.
+  useEffect(() => {
+    setCaseLookup(null);
+    const q = search.trim();
+    if (!q || filtered.length > 0 || !user || !STAFF_ROLES.has(user.role)) return;
+
+    const timer = setTimeout(() => {
+      setLookingUp(true);
+      mattersApi.byCaseNumber(q)
+        .then(r => setCaseLookup(r.data))
+        .catch(() => setCaseLookup(null))
+        .finally(() => setLookingUp(false));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search, filtered.length, user]);
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
@@ -55,10 +78,28 @@ export default function Matters() {
 
       {loading ? (
         <div className="flex justify-center py-16"><Spinner size={8} /></div>
+      ) : filtered.length === 0 && caseLookup ? (
+        <div className="card p-5">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Found via case lookup</div>
+          <div
+            className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-green-300 hover:bg-gray-50 cursor-pointer transition-colors"
+            onClick={() => navigate(`/matters/${caseLookup.matter.id}`)}
+          >
+            <div>
+              <div className="font-mono text-sm font-semibold text-navy-900">{caseLookup.matter.case_number}</div>
+              <div className="text-sm text-gray-700">{caseLookup.matter.client_name || '—'} · {caseLookup.matter.description || caseLookup.matter.matter_type?.replace(/_/g, ' ')}</div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Checklist: {caseLookup.checklist.accepted}/{caseLookup.checklist.neededNow} accepted
+                {caseLookup.intakeForm.status ? ` · Intake form: ${caseLookup.intakeForm.status}` : ' · No intake form yet'}
+              </div>
+            </div>
+            <ExternalLink size={16} className="text-gray-400 flex-shrink-0" />
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="text-4xl mb-3">📁</div>
-          <div className="text-gray-600 font-medium">No matters found</div>
+          <div className="text-gray-600 font-medium">{lookingUp ? 'Searching…' : 'No matters found'}</div>
           <div className="text-gray-400 text-sm mt-1">Try adjusting your search or filters</div>
         </div>
       ) : (

@@ -104,16 +104,12 @@ const TEMPLATES = [
   },
 ];
 
-// ── Guardian Information Collection form ─────────────────────────────────────
-// Client fills guardian + protected person details for their matter; the
-// legal team reads it from the matter view. One row per matter (upsert).
+// ── Intake form (petitioner + subject details) ───────────────────────────────
+// Client fills case-type-specific details for their matter; the legal team
+// reads it from the matter view. One row per matter (upsert). Field set is
+// derived from the matter's type — see domain/intakeFormSchema.js.
 
-const GUARDIAN_FIELDS = [
-  'guardian_name', 'guardian_relationship', 'guardian_dob',
-  'guardian_phone', 'guardian_email', 'guardian_address',
-  'ward_name', 'ward_dob', 'ward_residence',
-  'ward_medical_conditions', 'ward_care_needs', 'ward_current_caregiver',
-];
+const { getSchema, getFieldKeys, normalizeMatterType } = require('../domain/intakeFormSchema');
 
 async function assertMatterAccess(matterId, user) {
   const MatterRepo = require('../repositories/matter.repository');
@@ -124,44 +120,60 @@ async function assertMatterAccess(matterId, user) {
   return { matter };
 }
 
-router.get('/guardianship', requireAuth, async (req, res, next) => {
+router.get('/intake/:matterId', requireAuth, async (req, res, next) => {
   try {
-    const { matterId } = req.query;
-    if (!matterId) return res.status(400).json({ error: 'matterId required' });
-
+    const { matterId } = req.params;
     const access = await assertMatterAccess(matterId, req.user);
     if (access.error) return res.status(access.status).json({ error: access.error });
 
-    const form = await one('SELECT * FROM guardianship_forms WHERE matter_id = ?', [matterId]);
-    res.json({ form: form || null });
+    const schema = getSchema(access.matter.matter_type);
+    if (!schema) return res.status(400).json({ error: 'No intake form defined for this case type' });
+
+    const row = await one('SELECT * FROM intake_forms WHERE matter_id = ?', [matterId]);
+    const data = row?.form_data ? JSON.parse(row.form_data) : {};
+
+    res.json({
+      matterType: normalizeMatterType(access.matter.matter_type),
+      schema,
+      data,
+      status: row?.status || null,
+    });
   } catch (err) { next(err); }
 });
 
-router.put('/guardianship', requireAuth, async (req, res, next) => {
+router.put('/intake/:matterId', requireAuth, async (req, res, next) => {
   try {
-    const { matterId, submit } = req.body;
-    if (!matterId) return res.status(400).json({ error: 'matterId required' });
+    const { matterId } = req.params;
+    const { submit } = req.body;
 
     const access = await assertMatterAccess(matterId, req.user);
     if (access.error) return res.status(access.status).json({ error: access.error });
 
-    const vals   = GUARDIAN_FIELDS.map(f => String(req.body[f] ?? '').trim().slice(0, 2000) || null);
+    const allowedKeys = getFieldKeys(access.matter.matter_type);
+    if (!allowedKeys.length) return res.status(400).json({ error: 'No intake form defined for this case type' });
+
+    // Whitelist to known field keys for this matter type — never trust raw body keys.
+    const formData = {};
+    for (const key of allowedKeys) {
+      const val = String(req.body[key] ?? '').trim().slice(0, 2000);
+      if (val) formData[key] = val;
+    }
+
     const status = submit ? 'submitted' : 'draft';
     const now    = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    const existing = await one('SELECT id, status FROM guardianship_forms WHERE matter_id = ?', [matterId]);
+    const existing = await one('SELECT id, status FROM intake_forms WHERE matter_id = ?', [matterId]);
     if (existing) {
       await run(
-        `UPDATE guardianship_forms
-         SET ${GUARDIAN_FIELDS.map(f => `${f} = ?`).join(', ')}, status = ?, updated_at = ?
-         WHERE id = ?`,
-        [...vals, status, now, existing.id]
+        `UPDATE intake_forms SET form_data = ?, status = ?, updated_at = ? WHERE id = ?`,
+        [JSON.stringify(formData), status, now, existing.id]
       );
     } else {
       await run(
-        `INSERT INTO guardianship_forms (matter_id, client_id, ${GUARDIAN_FIELDS.join(', ')}, status, updated_at)
-         VALUES (?,?,${GUARDIAN_FIELDS.map(() => '?').join(',')},?,?)`,
-        [matterId, access.matter.client_id || req.user.id, ...vals, status, now]
+        `INSERT INTO intake_forms (matter_id, client_id, matter_type, form_data, status, updated_at)
+         VALUES (?,?,?,?,?,?)`,
+        [matterId, access.matter.client_id || req.user.id,
+         normalizeMatterType(access.matter.matter_type), JSON.stringify(formData), status, now]
       );
     }
 
@@ -172,16 +184,16 @@ router.put('/guardianship', requireAuth, async (req, res, next) => {
         await NotificationService.create({
           userId:     access.matter.attorney_id,
           type:       'form_request',
-          title:      'Guardian Information form submitted',
-          body:       `${req.user.first_name} ${req.user.last_name} completed the Guardian Information form for case ${access.matter.case_number || `#${matterId}`}.`,
+          title:      'Intake form submitted',
+          body:       `${req.user.first_name} ${req.user.last_name} completed the intake form for case ${access.matter.case_number || `#${matterId}`}.`,
           entityType: 'matter',
           entityId:   Number(matterId),
         });
       } catch { /* non-critical */ }
     }
 
-    const form = await one('SELECT * FROM guardianship_forms WHERE matter_id = ?', [matterId]);
-    res.json({ form });
+    const schema = getSchema(access.matter.matter_type);
+    res.json({ matterType: normalizeMatterType(access.matter.matter_type), schema, data: formData, status });
   } catch (err) { next(err); }
 });
 

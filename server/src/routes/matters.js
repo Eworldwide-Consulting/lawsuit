@@ -43,6 +43,51 @@ router.get('/pending-requests', requireAuth, requireRole('attorney', 'partner'),
   } catch (err) { next(err); }
 });
 
+// Staff lookup: resolve a client-facing case number (e.g. "26-0004") to the
+// matter, client contact info, intake form data, and document checklist
+// progress in one payload.
+router.get('/by-case-number/:caseNumber', requireAuth, requireRole('attorney', 'partner', 'itsupport'), async (req, res, next) => {
+  try {
+    const matter = await one(
+      `SELECT m.*,
+              c.first_name || ' ' || c.last_name AS client_name,
+              c.email AS client_email,
+              c.phone AS client_phone,
+              a.first_name || ' ' || a.last_name AS attorney_name
+       FROM matters m
+       LEFT JOIN users c ON m.client_id   = c.id
+       LEFT JOIN users a ON m.attorney_id = a.id
+       WHERE m.case_number = ?`,
+      [req.params.caseNumber]
+    );
+    if (!matter) throw new NotFoundError('No case found with that case number');
+
+    const { getSchema, normalizeMatterType } = require('../domain/intakeFormSchema');
+    const formRow = await one('SELECT * FROM intake_forms WHERE matter_id = ?', [matter.id]);
+    const intakeForm = {
+      matterType: normalizeMatterType(matter.matter_type),
+      schema:     getSchema(matter.matter_type),
+      data:       formRow?.form_data ? JSON.parse(formRow.form_data) : {},
+      status:     formRow?.status || null,
+    };
+
+    const checklistItems = await all(
+      `SELECT default_status, status FROM matter_checklist_items WHERE matter_id = ?`,
+      [matter.id]
+    );
+    const neededNow = checklistItems.filter(i => i.default_status === 'needed_now');
+    const accepted  = neededNow.filter(i => i.status === 'accepted');
+    const checklist = {
+      totalItems: checklistItems.length,
+      neededNow:  neededNow.length,
+      accepted:   accepted.length,
+      progress:   neededNow.length > 0 ? Math.round((accepted.length / neededNow.length) * 100) : 0,
+    };
+
+    res.json({ matter, intakeForm, checklist });
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     res.json(await MatterService.getById(req.params.id, req.user));

@@ -13,6 +13,7 @@ const mattersApi = {
   decline:         (id, reason)   => http.post(`/matters/${id}/decline`, { reason }),
   updateStage:     (id, stage)    => http.put(`/matters/${id}`, { stage }),
   updateType:      (id, matterType) => http.put(`/matters/${id}`, { matter_type: matterType }),
+  byCaseNumber:    caseNumber       => http.get(`/matters/by-case-number/${caseNumber}`),
 };
 
 export default mattersApi;

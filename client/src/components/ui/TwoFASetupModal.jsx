@@ -233,7 +233,7 @@ export default function TwoFASetupModal({ onClose, mandatory = false }) {
                     value={digit}
                     onChange={e => handleChange(i, e)}
                     onKeyDown={e => handleKeyDown(i, e)}
-                    className={`w-10 h-12 text-center text-lg font-bold border-2 rounded-xl focus:outline-none transition-colors
+                    className={`w-10 h-12 text-center text-lg font-bold border-2 rounded-xl bg-white text-gray-900 focus:outline-none transition-colors
                       ${digit ? 'border-[#0f2057] bg-blue-50' : 'border-gray-300 focus:border-[#0f2057]'}`}
                   />
                 ))}
