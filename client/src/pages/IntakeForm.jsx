@@ -154,7 +154,7 @@ export default function IntakeForm() {
           </p>
           {currentMatter?.case_number && (
             <div className="text-xs text-gray-500 mt-1.5">
-              Legal Case Number:{' '}
+              Client Number:{' '}
               <span className="font-mono font-semibold text-[#0f2057]">{currentMatter.case_number}</span>
             </div>
           )}
