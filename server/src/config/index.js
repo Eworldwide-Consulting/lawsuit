@@ -66,9 +66,13 @@ const config = {
   },
 
   sms: {
-    accountSid: optional('TWILIO_ACCOUNT_SID'),
-    authToken:  optional('TWILIO_AUTH_TOKEN'),
-    fromNumber: optional('TWILIO_FROM_NUMBER'),
+    accountSid:         optional('TWILIO_ACCOUNT_SID'),
+    authToken:          optional('TWILIO_AUTH_TOKEN'),
+    // Twilio requires exactly one of these two as the sender — prefer the
+    // Messaging Service (handles number pooling / A2P 10DLC compliance) if
+    // set, otherwise fall back to a single purchased number.
+    messagingServiceSid: optional('TWILIO_MESSAGING_SERVICE_SID'),
+    fromNumber:          optional('TWILIO_FROM_NUMBER'),
   },
 
   uploads: {

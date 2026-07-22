@@ -32,6 +32,22 @@ router.post('/register', validate(schemas.register), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Admin-portal signup (admin.gkasevault.io) — deliberately separate from
+// /register above so the public client/attorney/partner form can never be
+// used to create an itsupport account. See AuthService.registerAdmin for the
+// security note on why this is an open (no-approval) signup.
+router.post('/register/admin', async (req, res, next) => {
+  try {
+    const result = await AuthService.registerAdmin(req.body);
+    AuditService.log({
+      action: AuditService.ACTIONS.USER_REGISTERED,
+      meta: { email: req.body.email?.toLowerCase(), role: 'itsupport' },
+      ip: req.ip,
+    });
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+});
+
 router.get('/verify-email', async (req, res, next) => {
   try {
     const { token } = req.query;

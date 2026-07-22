@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tasksApi, mattersApi, checklistApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { CheckSquare, AlertTriangle, Check, Upload, ClipboardList } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
@@ -37,17 +38,20 @@ const STATUS_BORDER = {
 export default function CareTasks() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
+  const toast      = useToast();
   const [tasks, setTasks]           = useState([]);
   const [checklistTasks, setChecklistTasks] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [filter, setFilter]         = useState('all');
   const [matters, setMatters]       = useState([]);
-  const [creating, setCreating]     = useState(false);
+  const [showForm, setShowForm]     = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [title, setTitle]           = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate]       = useState('');
   const [priority, setPriority]     = useState('normal');
   const [matterId, setMatterId]     = useState('');
+  const [assignTo, setAssignTo]     = useState('self'); // 'self' | 'other'
 
   const load        = () => tasksApi.list().then(r => setTasks(r.data)).finally(() => setLoading(false));
   const loadMatters = () => mattersApi.list().then(r => {
@@ -110,12 +114,17 @@ export default function CareTasks() {
     completed: allTasks.filter(t => getTaskStatus(t) === 'completed').length,
   };
 
+  const isStaffUser = user?.role === 'attorney' || user?.role === 'partner';
   const selectedMatter = matters.find(m => String(m.id) === String(matterId));
-  const assignedTo = user?.role === 'attorney' ? selectedMatter?.client_id : user?.id;
+  // The "other party" for a task on this matter — the client if I'm staff,
+  // the attorney if I'm the client. Only resolvable once a matter is picked.
+  const otherPartyId    = isStaffUser ? selectedMatter?.client_id : selectedMatter?.attorney_id;
+  const otherPartyLabel = isStaffUser ? 'Client' : 'My Attorney';
+  const assignedTo = assignTo === 'other' && otherPartyId ? otherPartyId : user?.id;
 
   const createTask = async () => {
     if (!title.trim()) return;
-    setCreating(true);
+    setSaving(true);
     try {
       const created = await tasksApi.create({
         matterId: matterId || null,
@@ -132,10 +141,13 @@ export default function CareTasks() {
       setDueDate('');
       setPriority('normal');
       setMatterId('');
-      setCreating(false);
+      setAssignTo('self');
+      setShowForm(false);
+      toast.success('Task created');
     } catch (err) {
-      setCreating(false);
-      console.error(err);
+      toast.error(err.response?.data?.error || 'Could not create the task. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -146,13 +158,13 @@ export default function CareTasks() {
           <h1 className="text-xl font-bold text-gray-900">Tasks</h1>
           <p className="text-gray-500 text-sm">Track and complete your required actions</p>
         </div>
-        <button onClick={() => setCreating(prev => !prev)}
+        <button onClick={() => setShowForm(prev => !prev)}
           className="inline-flex items-center justify-center rounded-lg bg-navy-900 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800">
           Create Task
         </button>
       </div>
 
-      {creating && (
+      {showForm && (
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="mb-4 text-sm font-semibold text-gray-800">Add a new task</div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -187,16 +199,25 @@ export default function CareTasks() {
                 </select>
               </label>
             )}
+            <label className="block text-sm text-gray-700 sm:col-span-2">
+              Assign to
+              <select value={assignTo} onChange={e => setAssignTo(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+                <option value="self">Myself</option>
+                <option value="other" disabled={!otherPartyId}>
+                  {otherPartyLabel}{!otherPartyId ? ' (select a matter first)' : ''}
+                </option>
+              </select>
+            </label>
           </div>
           <div className="mt-4 flex items-center gap-3">
-            <button onClick={createTask} disabled={!title.trim() || creating}
+            <button onClick={createTask} disabled={!title.trim() || saving}
               className="rounded-lg bg-navy-900 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50">
-              {creating ? 'Saving...' : 'Save Task'}
+              {saving ? 'Saving...' : 'Save Task'}
             </button>
-            <button onClick={() => setCreating(false)} className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+            <button onClick={() => setShowForm(false)} className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
           </div>
-          {user?.role === 'attorney' && selectedMatter && (
-            <div className="mt-3 text-xs text-gray-500">This task will be assigned to the client for the selected matter.</div>
+          {assignTo === 'other' && otherPartyId && (
+            <div className="mt-3 text-xs text-gray-500">This task will be assigned to {otherPartyLabel.toLowerCase()}.</div>
           )}
         </div>
       )}

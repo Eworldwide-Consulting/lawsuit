@@ -15,12 +15,13 @@ const { AppError, ConflictError, UnauthorizedError, ValidationError, ForbiddenEr
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 // Seeded demo accounts exempt from email-verification enforcement.
-// L4: all four demo accounts listed — itsupport was previously missing.
+// L6: itsupport@gkasevault.io removed — it's a real admin login now and must
+// go through mail OTP like any other account; the other three remain seeded
+// demo accounts with no real inbox behind them.
 const DEMO_EMAILS = new Set([
   'partner@trivanta.com',
   'attorney@trivanta.com',
   'client@trivanta.com',
-  'itsupport@gkasevault.io',
 ]);
 
 // 2FA window: allow ±1 step (30 s each) for clock drift.
@@ -93,6 +94,42 @@ const AuthService = {
     sendVerificationEmail(email.toLowerCase(), verToken);
 
     return { requiresVerification: true, requiresApproval: isPro, email: email.toLowerCase(), role: userRole };
+  },
+
+  // Admin-portal signup (admin.gkasevault.io). Deliberately separate from
+  // register() above — kept on its own endpoint/method so the public
+  // client/attorney/partner signup form can never be tricked into producing
+  // an itsupport account.
+  //
+  // SECURITY NOTE: this is an intentionally open signup with no approval
+  // gate — a confirmed product decision, not an oversight. Anyone who
+  // submits this form gets a working itsupport (admin) account once they
+  // click the emailed verification link (the same UserRepo.create() used
+  // here still forces email_verified=0 until then, same as every other
+  // registration path). If this becomes a problem, the cheapest mitigation
+  // is a shared invite-code check here, without reintroducing a human
+  // approval step.
+  async registerAdmin({ firstName, lastName, email, password }) {
+    if (!firstName || !lastName) throw new ValidationError('First and last name are required');
+    if (!email) throw new ValidationError('Email is required');
+    if (!password || password.length < 8) throw new ValidationError('Password must be at least 8 characters');
+
+    const existing = await UserRepo.findByEmail(email);
+    if (existing) throw new ConflictError('Email already registered');
+
+    const hash     = await bcrypt.hash(password, 12);
+    const initials = `${firstName[0]}${lastName[0]}`.toUpperCase();
+    const verToken = crypto.randomBytes(32).toString('hex');
+    const verExp   = in24Hours();
+
+    const result = await UserRepo.create({
+      firstName, lastName, email, hash, role: 'itsupport',
+      initials, verToken, verExp, approvalStatus: null,
+    });
+
+    EmailService.sendVerification(email.toLowerCase(), verToken);
+
+    return { requiresVerification: true, email: email.toLowerCase(), role: 'itsupport', id: result.insertId };
   },
 
   async verifyEmail(token) {

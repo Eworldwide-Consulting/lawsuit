@@ -9,13 +9,21 @@ const client = (config.sms.accountSid && config.sms.authToken)
   ? require('twilio')(config.sms.accountSid, config.sms.authToken)
   : null;
 
+// Twilio accepts exactly one of messagingServiceSid / from — never both.
+function senderParams() {
+  if (config.sms.messagingServiceSid) return { messagingServiceSid: config.sms.messagingServiceSid };
+  if (config.sms.fromNumber)          return { from: config.sms.fromNumber };
+  return null;
+}
+
 async function sendResetCode(phone, code) {
-  if (!client) return { delivered: false, reason: 'SMS not configured' };
+  const sender = senderParams();
+  if (!client || !sender) return { delivered: false, reason: 'SMS not configured' };
   try {
     await client.messages.create({
       body: `Your TriVanta password reset code is ${code}. It expires in 10 minutes.`,
-      from: config.sms.fromNumber,
       to:   phone,
+      ...sender,
     });
     return { delivered: true };
   } catch (err) {
@@ -25,5 +33,5 @@ async function sendResetCode(phone, code) {
 
 module.exports = {
   sendResetCode,
-  isConfigured: () => Boolean(client),
+  isConfigured: () => Boolean(client && senderParams()),
 };
