@@ -7,6 +7,7 @@ const adminApi = {
   approve:     id           => http.put(`/admin/users/${id}/approve`),
   reject:      (id, notes)  => http.put(`/admin/users/${id}/reject`, { notes }),
   changeRole:  (id, role)   => http.put(`/admin/users/${id}/role`, { role }),
+  resetPassword: (id, newPassword) => http.put(`/admin/users/${id}/reset-password`, { newPassword }),
   forceVerify: id           => http.post(`/admin/users/${id}/force-verify`),
   resendInvite: id          => http.post(`/admin/users/${id}/resend-verification`),
   activity:    ()           => http.get('/admin/activity'),

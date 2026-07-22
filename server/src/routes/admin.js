@@ -1,9 +1,11 @@
 const router = require('express').Router();
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { one, all, run }   = require('../db');
 const { requireAuth, requireRole, invalidateUserCache } = require('../middleware/auth');
 const UserRepo        = require('../repositories/user.repository');
 const EmailService    = require('../services/email.service');
+const NotificationService = require('../services/notification.service');
 const { in24Hours }   = require('../lib/dates');
 const { parsePagination } = require('../lib/pagination');
 const config          = require('../config');
@@ -226,6 +228,41 @@ router.post('/users/:id/resend-verification', ...guard, async (req, res, next) =
       meta: { targetEmail: user.email },
       ip: req.ip,
     });
+    res.json({ success: true, email: user.email });
+  } catch (err) { next(err); }
+});
+
+// Master/admin action: directly set a new password for any user, bypassing
+// the normal forgot-password token flow — the admin sets the value here
+// rather than the account holder proving control of their own inbox/phone.
+router.put('/users/:id/reset-password', ...guard, async (req, res, next) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8)
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+    const user = await one('SELECT id, email, first_name FROM users WHERE id = ?', [req.params.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    await run('UPDATE users SET password_hash = ? WHERE id = ?', [await bcrypt.hash(newPassword, 12), req.params.id]);
+    await invalidateUserCache(req.params.id);
+
+    NotificationService.create({
+      userId:     user.id,
+      type:       'account_updated',
+      title:      'Password reset by administrator',
+      body:       'Your password was reset by a system administrator. If you did not expect this, contact support immediately.',
+      entityType: 'user',
+      entityId:   user.id,
+    });
+
+    AuditService.log({
+      userId: req.user.id, action: 'admin.reset_password',
+      entity: 'user', entityId: req.params.id,
+      meta: { targetEmail: user.email },
+      ip: req.ip,
+    });
+
     res.json({ success: true, email: user.email });
   } catch (err) { next(err); }
 });

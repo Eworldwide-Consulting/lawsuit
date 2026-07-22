@@ -3,7 +3,7 @@ import { adminApi } from '../../api';
 import {
   Users, CheckCircle, XCircle, Clock, AlertTriangle, Database,
   Activity, Server, Mail, CreditCard, Shield, RefreshCw, Loader2,
-  ChevronDown, ChevronUp, Check, X, MoreHorizontal,
+  ChevronDown, ChevronUp, Check, X, MoreHorizontal, KeyRound,
 } from 'lucide-react';
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -108,6 +108,10 @@ export default function ITSupportDashboard() {
   const [rejectNotes, setRejectNotes] = useState('');
   const [roleModal, setRoleModal] = useState(null); // { id, name, current }
   const [usersSearch, setUsersSearch] = useState('');
+  const [resetPwModal, setResetPwModal] = useState(null); // { id, name }
+  const [newPw, setNewPw]           = useState('');
+  const [confirmPw, setConfirmPw]   = useState('');
+  const [resetPwError, setResetPwError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,6 +165,19 @@ export default function ITSupportDashboard() {
 
   const handleForceVerify = id =>
     withLoading(`verify_${id}`, () => adminApi.forceVerify(id));
+
+  const handleResetPasswordSubmit = async () => {
+    if (!resetPwModal) return;
+    setResetPwError('');
+    if (newPw.length < 8) { setResetPwError('Password must be at least 8 characters.'); return; }
+    if (newPw !== confirmPw) { setResetPwError('Passwords do not match.'); return; }
+    // withLoading alerts and swallows failures (same convention as reject/role-change
+    // above) — matches existing behavior rather than introducing a new error path.
+    await withLoading(`resetpw_${resetPwModal.id}`, () => adminApi.resetPassword(resetPwModal.id, newPw));
+    setResetPwModal(null);
+    setNewPw('');
+    setConfirmPw('');
+  };
 
   // ── Filtered users ────────────────────────────────────────────────────────────
 
@@ -407,12 +424,19 @@ export default function ITSupportDashboard() {
                           onChange={e => {
                             if (e.target.value !== u.role) handleRoleChange(u.id, e.target.value);
                           }}
-                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
                           {['client', 'attorney', 'partner', 'itsupport'].map(r => (
                             <option key={r} value={r}>{r}</option>
                           ))}
                         </select>
+                        <button
+                          onClick={() => { setResetPwModal({ id: u.id, name: `${u.first_name} ${u.last_name}` }); setNewPw(''); setConfirmPw(''); setResetPwError(''); }}
+                          title="Reset password"
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600"
+                        >
+                          <KeyRound size={12} /> Reset Password
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -481,6 +505,57 @@ export default function ITSupportDashboard() {
                   ? <Loader2 size={14} className="animate-spin" />
                   : null}
                 Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reset password modal ── */}
+      {resetPwModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-gray-900 mb-1">Reset Password</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Set a new password for <strong>{resetPwModal.name}</strong>. They'll be notified this happened.
+            </p>
+            {resetPwError && (
+              <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+                {resetPwError}
+              </div>
+            )}
+            <div className="space-y-3">
+              <input
+                type="password"
+                value={newPw}
+                onChange={e => setNewPw(e.target.value)}
+                placeholder="New password (min. 8 characters)"
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <input
+                type="password"
+                value={confirmPw}
+                onChange={e => setConfirmPw(e.target.value)}
+                placeholder="Confirm new password"
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => { setResetPwModal(null); setNewPw(''); setConfirmPw(''); setResetPwError(''); }}
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetPasswordSubmit}
+                disabled={!!actionLoading[`resetpw_${resetPwModal.id}`]}
+                className="flex-1 py-2.5 bg-navy-900 text-white rounded-xl text-sm font-semibold hover:bg-navy-800 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {actionLoading[`resetpw_${resetPwModal.id}`]
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : null}
+                Reset Password
               </button>
             </div>
           </div>
