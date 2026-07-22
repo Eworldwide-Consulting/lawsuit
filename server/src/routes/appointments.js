@@ -57,4 +57,37 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Helper: verify the current user can act on the given appointment ────────
+async function assertApptAccess(apptId, user) {
+  const appt = await AppointmentRepo.findById(apptId);
+  if (!appt) throw new NotFoundError('Appointment');
+  if (!isStaff(user.role)) {
+    const matter = appt.matter_id ? await MatterRepo.findById(appt.matter_id) : null;
+    if (!matter || matter.client_id !== user.id) throw new ForbiddenError();
+  }
+  return appt;
+}
+
+// Mark a past appointment as missed — surfaces the Reschedule action client-side.
+router.put('/:id/status', requireAuth, async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (status !== 'no_show') throw new ValidationError('status must be "no_show"');
+    await assertApptAccess(req.params.id, req.user);
+    await AppointmentRepo.updateStatus(req.params.id, status);
+    res.json(await AppointmentRepo.findById(req.params.id));
+  } catch (err) { next(err); }
+});
+
+// Reschedule: creates a new appointment at the new time, marks the original 'rescheduled'.
+router.post('/:id/reschedule', requireAuth, async (req, res, next) => {
+  try {
+    const { startTime, endTime } = req.body;
+    if (!startTime) throw new ValidationError('startTime required');
+    await assertApptAccess(req.params.id, req.user);
+    const rescheduled = await AppointmentRepo.reschedule(req.params.id, { startTime, endTime });
+    res.status(201).json(rescheduled);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

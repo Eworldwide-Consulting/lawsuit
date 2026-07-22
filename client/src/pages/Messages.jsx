@@ -91,6 +91,9 @@ export default function Messages() {
     if (!msg.read_at) {
       await messagesApi.markRead(msg.id);
       setInbox(m => m.map(x => x.id === msg.id ? { ...x, read_at: new Date().toISOString() } : x));
+      // Tell DashboardLayout's sidebar/mobile-nav badge (a sibling component,
+      // not a parent/child of this page) to re-sync its unread count.
+      window.dispatchEvent(new Event('lp:messages-read'));
     }
     setSelected(msg);
     setCompose(false);

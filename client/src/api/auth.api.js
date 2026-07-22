@@ -19,6 +19,9 @@ const authApi = {
   dismiss2faPrompt:   ()    => http.post('/auth/dismiss-2fa-prompt'),
   forgotPassword:     email => http.post('/auth/forgot-password', { email }),
   resetPassword:      d     => http.post('/auth/reset-password', d),
+  smsStatus:               ()    => http.get('/auth/sms/status'),
+  forgotPasswordByPhone:   phone => http.post('/auth/forgot-password/phone', { phone }),
+  resetPasswordByPhone:    d     => http.post('/auth/reset-password/phone', d),
   googleStatus:       ()    => http.get('/auth/google/status'),
   googleDisconnect:   ()    => http.post('/auth/google/disconnect'),
 };

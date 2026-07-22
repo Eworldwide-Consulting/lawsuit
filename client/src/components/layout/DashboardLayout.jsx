@@ -44,7 +44,8 @@ export default function DashboardLayout({ children }) {
 
   // WebSocket — message count + notification count
   useEffect(() => {
-    messagesApi.unreadCount().then(r => setUnreadMsg(r.data.count)).catch(() => {});
+    const refreshUnreadMsg = () => messagesApi.unreadCount().then(r => setUnreadMsg(r.data.count)).catch(() => {});
+    refreshUnreadMsg();
 
     const token  = localStorage.getItem('lp_token');
     const socket = io({ auth: { token }, transports: ['websocket'], reconnectionDelay: 2000 });
@@ -54,7 +55,14 @@ export default function DashboardLayout({ children }) {
     socket.on('notification:new', ()      => setUnreadNotif(n => n + 1));
     socket.on('invoice:paid',     ()      => {}); // panels handle their own state
 
-    return () => { socket.disconnect(); socketRef.current = null; };
+    // The Messages page marks messages read locally (it doesn't own this
+    // badge's state) — it dispatches this event so the count re-syncs here.
+    window.addEventListener('lp:messages-read', refreshUnreadMsg);
+
+    return () => {
+      socket.disconnect(); socketRef.current = null;
+      window.removeEventListener('lp:messages-read', refreshUnreadMsg);
+    };
   }, []);
 
   const mobileClientNav = [

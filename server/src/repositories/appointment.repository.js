@@ -35,7 +35,7 @@ const AppointmentRepository = {
   },
 
   findById(id) {
-    return one('SELECT id FROM appointments WHERE id = ?', [id]);
+    return one('SELECT * FROM appointments WHERE id = ?', [id]);
   },
 
   findForAttorneyDashboard(after, limit = 5) {
@@ -59,6 +59,23 @@ const AppointmentRepository = {
 
   delete(id) {
     return run('DELETE FROM appointments WHERE id = ?', [id]);
+  },
+
+  updateStatus(id, status) {
+    return run('UPDATE appointments SET status = ? WHERE id = ?', [status, id]);
+  },
+
+  async reschedule(id, { startTime, endTime }) {
+    const original = await one('SELECT * FROM appointments WHERE id = ?', [id]);
+    if (!original) return null;
+
+    const r = await run(
+      'INSERT INTO appointments (matter_id, title, type, start_time, end_time, location, notes, status) VALUES (?,?,?,?,?,?,?,?)',
+      [original.matter_id, original.title, original.type, startTime, endTime || null, original.location, original.notes, 'scheduled']
+    );
+    await run('UPDATE appointments SET status = ? WHERE id = ?', ['rescheduled', id]);
+
+    return one('SELECT * FROM appointments WHERE id = ?', [r.insertId]);
   },
 };
 

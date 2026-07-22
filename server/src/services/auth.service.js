@@ -282,6 +282,44 @@ const AuthService = {
     return { success: true };
   },
 
+  // SMS password reset — a full alternative to the email-link flow above
+  // (not layered on top of it): phone number in, 6-digit SMS code out, new
+  // password set directly from that code. Same hash:expiry OTP convention as
+  // issueLoginOtp/verifyLoginOtp, just stored in its own column so an
+  // in-flight login OTP and a phone-reset OTP never collide.
+  async forgotPasswordByPhone(phone) {
+    const user = await UserRepo.findByPhone(phone);
+    // Same anti-enumeration shape as forgotPassword: always looks like success.
+    if (!user) return { sent: true };
+
+    const code    = String(crypto.randomInt(100000, 1000000));
+    const hash    = crypto.createHash('sha256').update(code).digest('hex');
+    const expires = Date.now() + 10 * 60 * 1000;
+    await UserRepo.update(user.id, { phone_reset_otp: `${hash}:${expires}` });
+    return { sent: true, _phone: user.phone, _code: code };
+  },
+
+  async resetPasswordByPhone({ phone, code, newPassword }) {
+    if (!phone)  throw new ValidationError('Phone number required');
+    if (!code)   throw new ValidationError('Code required');
+    if (!newPassword || newPassword.length < 8) throw new ValidationError('Password must be at least 8 characters');
+
+    const user = await UserRepo.findByPhone(phone);
+    if (!user?.phone_reset_otp) throw new UnauthorizedError('Invalid or expired code');
+
+    const [hash, expires] = user.phone_reset_otp.split(':');
+    if (Date.now() > Number(expires)) {
+      await UserRepo.update(user.id, { phone_reset_otp: null });
+      throw new UnauthorizedError('Code expired. Please request a new one.');
+    }
+    const given = crypto.createHash('sha256').update(String(code).trim()).digest('hex');
+    if (given !== hash) throw new UnauthorizedError('Invalid code');
+
+    await UserRepo.setPasswordHash(user.id, await bcrypt.hash(newPassword, 12));
+    await UserRepo.update(user.id, { phone_reset_otp: null });
+    return { success: true };
+  },
+
 };
 
 module.exports = AuthService;

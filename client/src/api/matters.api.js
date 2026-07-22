@@ -14,6 +14,7 @@ const mattersApi = {
   updateStage:     (id, stage)    => http.put(`/matters/${id}`, { stage }),
   updateType:      (id, matterType) => http.put(`/matters/${id}`, { matter_type: matterType }),
   byCaseNumber:    caseNumber       => http.get(`/matters/by-case-number/${caseNumber}`),
+  updateCaseInfo:  (id, d)         => http.put(`/matters/${id}/case-info`, d),
 };
 
 export default mattersApi;

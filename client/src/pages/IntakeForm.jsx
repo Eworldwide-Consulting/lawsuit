@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import Spinner from '../components/ui/Spinner';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
-import { Shield, User, HeartHandshake, Upload, Check, Save, FileText } from 'lucide-react';
+import { Shield, User, HeartHandshake, Upload, Check, Save, FileText, Trash2 } from 'lucide-react';
 
 const UPLOAD_CATEGORY = 'Intake Form';
 
@@ -39,6 +39,8 @@ export default function IntakeForm() {
   const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState([]);
+  const [legalCaseNumber, setLegalCaseNumber] = useState('');
+  const [savingCaseNumber, setSavingCaseNumber] = useState(false);
 
   useEffect(() => {
     mattersApi.list()
@@ -50,6 +52,25 @@ export default function IntakeForm() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const m = matters.find(m => m.id === matterId);
+    setLegalCaseNumber(m?.legal_case_number || '');
+  }, [matterId, matters]);
+
+  async function saveLegalCaseNumber() {
+    if (!matterId) return;
+    setSavingCaseNumber(true);
+    try {
+      const res = await mattersApi.updateCaseInfo(matterId, { legalCaseNumber });
+      setMatters(prev => prev.map(m => m.id === matterId ? { ...m, ...res.data } : m));
+      toast.success('Legal Case Number saved');
+    } catch {
+      toast.error('Could not save. Please try again.');
+    } finally {
+      setSavingCaseNumber(false);
+    }
+  }
 
   useEffect(() => {
     if (!matterId) return;
@@ -118,6 +139,17 @@ export default function IntakeForm() {
     }
   }
 
+  async function handleDeleteDoc(doc) {
+    if (!confirm(`Delete "${doc.name}"? This cannot be undone.`)) return;
+    try {
+      await documentsApi.delete(doc.id);
+      setUploadedDocs(prev => prev.filter(d => d.id !== doc.id));
+      toast.success('Document deleted');
+    } catch {
+      toast.error('Delete failed. Please try again.');
+    }
+  }
+
   if (loading) {
     return <div className="flex justify-center py-20"><Spinner size={8} /></div>;
   }
@@ -158,6 +190,22 @@ export default function IntakeForm() {
               <span className="font-mono font-semibold text-[#0f2057]">{currentMatter.case_number}</span>
             </div>
           )}
+          <div className="flex items-center gap-2 mt-2">
+            <label className="text-xs text-gray-500 flex-shrink-0">Legal Case Number:</label>
+            <input
+              value={legalCaseNumber}
+              onChange={e => setLegalCaseNumber(e.target.value)}
+              placeholder="Court docket number, once assigned"
+              className="form-input py-1 text-xs w-56"
+            />
+            <button
+              onClick={saveLegalCaseNumber}
+              disabled={savingCaseNumber}
+              className="text-xs font-medium text-white bg-[#0f2057] hover:bg-[#1a3476] disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+            >
+              {savingCaseNumber ? <Spinner size={3} color="text-white" /> : 'Save'}
+            </button>
+          </div>
         </div>
         {status && (
           <Badge variant={submitted ? 'success' : 'warning'}>
@@ -251,6 +299,14 @@ export default function IntakeForm() {
                 <Badge size="sm" variant={d.status === 'approved' ? 'success' : d.status === 'rejected' ? 'error' : 'info'}>
                   {d.status}
                 </Badge>
+                <button
+                  onClick={() => handleDeleteDoc(d)}
+                  aria-label={`Delete ${d.name}`}
+                  title="Delete document"
+                  className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                >
+                  <Trash2 size={13} />
+                </button>
               </li>
             ))}
           </ul>

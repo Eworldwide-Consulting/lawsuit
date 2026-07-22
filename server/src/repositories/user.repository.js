@@ -25,6 +25,12 @@ const UserRepository = {
     return one('SELECT * FROM users WHERE verification_token = ?', [token]);
   },
 
+  // phone_reset_otp is deliberately excluded from USER_COLUMNS (same reasoning
+  // as login_otp) — fetched here only where the SMS password-reset flow needs it.
+  findByPhone(phone) {
+    return one(`SELECT ${USER_COLUMNS}, phone_reset_otp FROM users WHERE phone = ?`, [phone]);
+  },
+
   findAll({ limit = 50, offset = 0 } = {}) {
     return require('../db').all(
       `SELECT ${SAFE_COLUMNS} FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?`,

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mattersApi, checklistApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { GEORGIA_COUNTIES } from '../constants/counties';
+import { useToast } from '../context/ToastContext';
 import {
   Briefcase, Check, MapPin, Calendar, User, AlertCircle,
-  ClipboardList, ChevronRight, X, ArrowRight,
+  ClipboardList, ChevronRight, X, ArrowRight, Save,
 } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 
@@ -154,10 +156,14 @@ function SetupModal({ onComplete, onClose }) {
 export default function MyCase() {
   const { user }  = useAuth();
   const navigate  = useNavigate();
+  const toast     = useToast();
   const [matter,   setMatter]   = useState(null);
   const [checklist, setChecklist] = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [showSetup, setShowSetup] = useState(false);
+  const [legalCaseNumber, setLegalCaseNumber] = useState('');
+  const [county, setCounty]         = useState('');
+  const [savingCaseInfo, setSavingCaseInfo] = useState(false);
 
   useEffect(() => {
     mattersApi.list()
@@ -169,12 +175,28 @@ export default function MyCase() {
         } else {
           const m = list[0];
           setMatter(m);
+          setLegalCaseNumber(m.legal_case_number || '');
+          setCounty(m.county || '');
           return checklistApi.getByMatter(m.id).then(cr => setChecklist(cr.data)).catch(() => {});
         }
       })
       .catch(() => setLoading(false))
       .finally(() => setLoading(false));
   }, []);
+
+  async function saveCaseInfo() {
+    if (!matter) return;
+    setSavingCaseInfo(true);
+    try {
+      const res = await mattersApi.updateCaseInfo(matter.id, { legalCaseNumber, county });
+      setMatter(m => ({ ...m, ...res.data }));
+      toast.success('Case details saved');
+    } catch {
+      toast.error('Could not save case details. Please try again.');
+    } finally {
+      setSavingCaseInfo(false);
+    }
+  }
 
   function handleSetupComplete(newMatter) {
     setMatter(newMatter);
@@ -239,7 +261,7 @@ export default function MyCase() {
             <div className="card p-5">
               <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
                 <div>
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Case Number</div>
+                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Reference Number</div>
                   <div className="font-mono font-semibold text-[#0f2057]">#{matter.case_number || matter.id}</div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
@@ -293,6 +315,37 @@ export default function MyCase() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
+                <div>
+                  <label className="text-xs text-gray-400 uppercase tracking-wide font-medium">Legal Case Number</label>
+                  <input
+                    value={legalCaseNumber}
+                    onChange={e => setLegalCaseNumber(e.target.value)}
+                    placeholder="Court docket number, once assigned"
+                    className="form-input mt-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 uppercase tracking-wide font-medium">County</label>
+                  <select value={county} onChange={e => setCounty(e.target.value)} className="form-input mt-1 text-sm">
+                    <option value="">— Select county —</option>
+                    {GEORGIA_COUNTIES.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <button
+                    onClick={saveCaseInfo}
+                    disabled={savingCaseInfo}
+                    className="flex items-center gap-2 text-sm font-medium text-white bg-[#0f2057] hover:bg-[#1a3476] disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {savingCaseInfo ? <Spinner size={4} color="text-white" /> : <Save size={14} />}
+                    Save Case Details
+                  </button>
+                </div>
               </div>
             </div>
 

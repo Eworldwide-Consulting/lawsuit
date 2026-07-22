@@ -155,6 +155,49 @@ router.post('/reset-password', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── SMS password reset (alternative to the email-link flow above) ───────────
+
+const SmsService = require('../services/sms.service');
+
+router.get('/sms/status', (req, res) => {
+  res.json({ configured: SmsService.isConfigured() });
+});
+
+router.post('/forgot-password/phone', async (req, res, next) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'phone required' });
+
+    const logger = require('../logger');
+    const result = await AuthService.forgotPasswordByPhone(phone.trim());
+
+    if (result._phone) {
+      const delivery = await SmsService.sendResetCode(result._phone, result._code);
+      if (!delivery.delivered) {
+        if (!config.isProduction) {
+          // Dev fallback: no Twilio configured — return the code directly,
+          // same escape hatch /forgot-password uses via _devResetLink.
+          return res.json({ sent: true, _devCode: result._code });
+        }
+        logger.error({ phone: result._phone, reason: delivery.reason }, 'SMS reset code delivery failed');
+      }
+    } else {
+      logger.warn({ phone: phone.trim() }, 'Phone password reset requested for unregistered number');
+    }
+
+    // Always the same response to prevent phone-number enumeration.
+    res.json({ sent: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/reset-password/phone', async (req, res, next) => {
+  try {
+    const { phone, code, newPassword } = req.body;
+    const result = await AuthService.resetPasswordByPhone({ phone, code, newPassword });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 
 // Non-secret health check — lets the login page show a proper message when

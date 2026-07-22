@@ -266,9 +266,9 @@ export default function CareTasks() {
                   {task.description && <div className="text-xs text-gray-500 mt-0.5 ml-3.5">{task.description}</div>}
                   <div className={`text-xs font-medium mt-1 ml-3.5 ${color}`}>{text}</div>
                 </div>
-                {!done && task.action_label && (
+                {!done && task.action_label && (task._isChecklist || task.matter_id) && (
                   <button
-                    onClick={() => task._isChecklist ? navigate('/checklist') : undefined}
+                    onClick={() => task._isChecklist ? navigate('/checklist') : navigate(`/matters/${task.matter_id}`)}
                     className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg flex-shrink-0 text-white transition-colors ${
                       task._isChecklist ? 'bg-blue-600 hover:bg-blue-700' : 'bg-navy-900 hover:bg-navy-800'
                     }`}

@@ -65,6 +65,12 @@ const config = {
     clientSecret: optional('GOOGLE_CLIENT_SECRET'),
   },
 
+  sms: {
+    accountSid: optional('TWILIO_ACCOUNT_SID'),
+    authToken:  optional('TWILIO_AUTH_TOKEN'),
+    fromNumber: optional('TWILIO_FROM_NUMBER'),
+  },
+
   uploads: {
     dir:         optional('UPLOAD_DIR'),
     maxFileMb:   parseInt(optional('MAX_FILE_SIZE_MB', '20')),

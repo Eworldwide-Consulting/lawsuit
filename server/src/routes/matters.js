@@ -10,6 +10,7 @@ const AuditService        = require('../services/audit.service');
 const config              = require('../config');
 const { ForbiddenError, NotFoundError, ValidationError } = require('../lib/errors');
 const { all, one, run }   = require('../db');
+const { isStaff }         = require('../domain/user');
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -104,6 +105,32 @@ router.post('/', requireAuth, async (req, res, next) => {
       ip: req.ip,
     });
     res.status(201).json(matter);
+  } catch (err) { next(err); }
+});
+
+// Client (own matter) or staff — narrowly scoped to the two fields a client
+// is allowed to self-edit. Deliberately separate from the staff-only PUT /:id
+// below, which also lets staff change stage/status/attorney_id.
+router.put('/:id/case-info', requireAuth, async (req, res, next) => {
+  try {
+    const matter = await MatterRepo.findById(req.params.id);
+    if (!matter) throw new NotFoundError('Matter');
+    if (!isStaff(req.user.role) && matter.client_id !== req.user.id) throw new ForbiddenError();
+
+    const legalCaseNumber = req.body.legalCaseNumber != null ? String(req.body.legalCaseNumber).trim().slice(0, 100) || null : matter.legal_case_number;
+    const county           = req.body.county != null ? String(req.body.county).trim().slice(0, 100) || null : matter.county;
+
+    await run('UPDATE matters SET legal_case_number = ?, county = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [legalCaseNumber, county, req.params.id]);
+
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.MATTER_UPDATED,
+      entity: 'matter', entityId: req.params.id,
+      meta: { action: 'case_info_updated' },
+      ip: req.ip,
+    });
+
+    res.json(await MatterRepo.findById(req.params.id));
   } catch (err) { next(err); }
 });
 
