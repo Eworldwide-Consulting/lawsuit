@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import ContactSalesModal from '../components/ui/ContactSalesModal';
@@ -8,7 +8,7 @@ import {
   Users, Bell, Menu, X, Globe, Award,
   Database, Eye, Fingerprint, Check, Phone,
   Mail, BarChart2, Key, ChevronDown, Zap,
-  TrendingUp, Clock, BookOpen, Scale,
+  TrendingUp, Clock, BookOpen, Scale, Sparkles,
 } from 'lucide-react';
 
 export default function Landing() {
@@ -18,8 +18,11 @@ export default function Landing() {
   const [faqOpen,       setFaqOpen]       = useState(null);
   const [salesModal,    setSalesModal]    = useState(false);
   const [salesPlan,     setSalesPlan]     = useState('Enterprise');
+  const [statsVisible,  setStatsVisible]  = useState(false);
+  const [counts,        setCounts]        = useState([0, 0, 0, 0]);
   const heroRef     = useRef(null);
   const servicesRef = useRef(null);
+  const statsRef    = useRef(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -35,6 +38,117 @@ export default function Landing() {
     servicesRef.current?.querySelectorAll('.srv-card').forEach(c => io.observe(c));
     return () => io.disconnect();
   }, []);
+
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setStatsVisible(true); io.disconnect(); } },
+      { threshold: 0.2 }
+    );
+    if (statsRef.current) io.observe(statsRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!statsVisible) return;
+    const targets = [12400, 58000, 640, 99.97];
+    const duration = 2400;
+    const start = performance.now();
+    let rafId;
+    const animate = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      setCounts(targets.map(v => v * ease));
+      if (t < 1) { rafId = requestAnimationFrame(animate); }
+      else { setCounts(targets); }
+    };
+    rafId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafId);
+  }, [statsVisible]);
+
+  // ── 3D Trust Arc (stats) ──────────────────────────────
+  const [reducedMotion] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+  const orbitStageRef  = useRef(null);
+  const orbitAngleRef  = useRef(0);
+  const orbitTiltRef   = useRef(0);
+  const orbitDragRef   = useRef({ dragging: false, startX: 0, startAngle: 0 });
+
+  const orbitParticles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    top: 40 + Math.random() * 55,
+    size: 2 + Math.random() * 3,
+    duration: 9 + Math.random() * 9,
+    delay: -(Math.random() * 16),
+    drift: `${Math.round((Math.random() - 0.5) * 90)}px`,
+  })), []);
+
+  useEffect(() => {
+    if (!statsVisible || reducedMotion) return;
+    let rafId;
+    const tick = (now) => {
+      const sway = Math.sin(now / 2500) * 6;
+      const stage = orbitStageRef.current;
+      if (stage) {
+        stage.style.transform = `rotateX(${orbitTiltRef.current}deg) rotateY(${orbitAngleRef.current + sway}deg)`;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [statsVisible, reducedMotion]);
+
+  const onOrbitTilt = (e) => {
+    const r  = e.currentTarget.getBoundingClientRect();
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    orbitTiltRef.current = Math.max(-12, Math.min(12, -py * 16));
+  };
+  const onOrbitTiltReset = () => { orbitTiltRef.current = 0; };
+  const onOrbitPointerDown = (e) => {
+    orbitDragRef.current = { dragging: true, startX: e.clientX, startAngle: orbitAngleRef.current };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onOrbitPointerMove = (e) => {
+    if (!orbitDragRef.current.dragging) return;
+    const dx = e.clientX - orbitDragRef.current.startX;
+    orbitAngleRef.current = Math.max(-40, Math.min(40, orbitDragRef.current.startAngle + dx * 0.4));
+  };
+  const onOrbitPointerUp = () => { orbitDragRef.current.dragging = false; };
+
+  // ── Impact grid (3D tilt cards) ───────────────────────
+  const impactRef = useRef(null);
+  const [impactVisible, setImpactVisible] = useState(false);
+
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setImpactVisible(true); io.disconnect(); } },
+      { threshold: 0.25 }
+    );
+    if (impactRef.current) io.observe(impactRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  const onImpactMove = (e) => {
+    if (reducedMotion) return;
+    const el = e.currentTarget;
+    const r  = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width;
+    const py = (e.clientY - r.top)  / r.height;
+    const rx = (0.5 - py) * 20;
+    const ry = (px - 0.5) * 20;
+    el.style.transition = 'transform .12s ease-out, box-shadow .2s ease';
+    el.style.transform  = `rotateX(${rx}deg) rotateY(${ry}deg) scale3d(1.045,1.045,1.045)`;
+    el.style.setProperty('--mx', `${px * 100}%`);
+    el.style.setProperty('--my', `${py * 100}%`);
+    el.style.setProperty('--glare', '1');
+  };
+  const onImpactLeave = (e) => {
+    const el = e.currentTarget;
+    el.style.transition = 'transform .6s cubic-bezier(.22,1,.36,1), box-shadow .3s ease';
+    el.style.transform  = 'rotateX(0deg) rotateY(0deg) scale3d(1,1,1)';
+    el.style.setProperty('--glare', '0');
+  };
 
   const onSrvMove = (e) => {
     const el = e.currentTarget;
@@ -68,11 +182,16 @@ export default function Landing() {
   ];
 
   const stats = [
-    { value: '12,400+', label: 'Clients Served'       },
-    { value: '58,000+', label: 'Documents Secured'    },
-    { value: '640+',    label: 'Verified Attorneys'   },
-    { value: '99.97%',  label: 'Platform Uptime'      },
+    { target: 12400, label: 'Clients Served',    icon: Users,      color: '#3b82f6', accent: 'rgba(59,130,246,.14)'  },
+    { target: 58000, label: 'Documents Secured', icon: Shield,     color: '#d4af37', accent: 'rgba(212,175,55,.14)'  },
+    { target: 640,   label: 'Verified Attorneys',icon: Scale,      color: '#10b981', accent: 'rgba(16,185,129,.14)'  },
+    { target: 99.97, label: 'Platform Uptime',   icon: TrendingUp, color: '#a78bfa', accent: 'rgba(167,139,250,.14)' },
   ];
+
+  const fmtCount = (v, i) => {
+    if (i === 3) return v.toFixed(2) + '%';
+    return Math.floor(v).toLocaleString() + '+';
+  };
 
   const faqs = [
     {
@@ -278,6 +397,204 @@ export default function Landing() {
           .srv-card.srv-in { opacity: 1; transform: none; }
           .srv-icon, .srv-tag, .srv-stat { transition: none; }
           .srv-dot { animation: none; }
+        }
+
+        /* ── Stats Section ── */
+        @keyframes statReveal {
+          from { opacity: 0; transform: translateY(40px) scale(.94); }
+          to   { opacity: 1; transform: translateY(0)    scale(1);   }
+        }
+        @keyframes borderPulse {
+          0%,100% { opacity: .55; }
+          50%     { opacity: 1;   }
+        }
+        .stat-card-pro {
+          transition: transform .36s cubic-bezier(.22,1,.36,1), box-shadow .36s ease;
+        }
+        .stat-card-pro:hover {
+          transform: translateY(-10px) scale(1.02);
+          box-shadow: 0 28px 80px rgba(0,0,0,.4);
+        }
+        .stats-visible .stat-card-pro {
+          animation: statReveal .78s cubic-bezier(.22,1,.36,1) both;
+        }
+        .stat-icon-wrap {
+          transition: transform .32s cubic-bezier(.34,1.56,.64,1);
+        }
+        .stat-card-pro:hover .stat-icon-wrap {
+          transform: scale(1.15) rotate(4deg);
+        }
+
+        /* ── 3D Trust Arc ── */
+        @keyframes orbitRingSpin    { to { transform: rotateZ(360deg);  } }
+        @keyframes orbitRingSpinRev { to { transform: rotateZ(-360deg); } }
+        @keyframes orbitCoreGlow {
+          0%,100% { box-shadow: 0 0 30px 6px rgba(212,175,55,.32), 0 0 70px 20px rgba(59,130,246,.12); }
+          50%     { box-shadow: 0 0 48px 13px rgba(212,175,55,.58), 0 0 100px 28px rgba(59,130,246,.22); }
+        }
+        @keyframes orbitCardBob {
+          0%,100% { transform: translateY(0); }
+          50%     { transform: translateY(-9px); }
+        }
+        @keyframes orbitParticleFloat {
+          0%   { transform: translate3d(0,0,0); opacity: 0; }
+          12%  { opacity: .85; }
+          88%  { opacity: .5; }
+          100% { transform: translate3d(var(--drift,0px), -150px, 0); opacity: 0; }
+        }
+
+        .stat-orbit-wrap {
+          position: relative;
+          perspective: 1700px;
+          padding: 36px 0 6px;
+        }
+        .stat-orbit-particles {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: hidden;
+        }
+        .orbit-particle {
+          position: absolute;
+          border-radius: 9999px;
+          background: radial-gradient(circle, rgba(212,175,55,.9), rgba(212,175,55,0) 72%);
+          animation-name: orbitParticleFloat;
+          animation-timing-function: ease-in;
+          animation-iteration-count: infinite;
+        }
+        .stat-orbit-stage {
+          position: relative;
+          width: 100%;
+          max-width: 900px;
+          height: 380px;
+          margin: 0 auto;
+          transform-style: preserve-3d;
+          touch-action: pan-y;
+          cursor: grab;
+        }
+        .stat-orbit-stage:active { cursor: grabbing; }
+
+        .stat-orbit-core {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 96px; height: 96px;
+          transform: translate(-50%,-50%) translateZ(30px);
+          transform-style: preserve-3d;
+          border-radius: 9999px;
+          background: radial-gradient(circle at 35% 30%, rgba(212,175,55,.4), rgba(4,9,30,.92) 72%);
+          display: flex; align-items: center; justify-content: center;
+          animation: orbitCoreGlow 3.2s ease-in-out infinite;
+        }
+        .orbit-ring {
+          position: absolute;
+          inset: -20px;
+          border-radius: 9999px;
+          border: 1px dashed rgba(212,175,55,.35);
+        }
+        .orbit-ring-a { animation: orbitRingSpin 13s linear infinite; }
+        .orbit-ring-b { inset: -42px; border-color: rgba(59,130,246,.28); animation: orbitRingSpinRev 19s linear infinite; }
+        .orbit-ring-c { inset: -64px; border-color: rgba(255,255,255,.12); animation: orbitRingSpin 30s linear infinite; }
+
+        .stat-orbit-card {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 230px;
+          opacity: 0;
+          transition: opacity .8s ease;
+          transition-delay: calc(var(--i,0) * .12s);
+        }
+        .stat-orbit-in .stat-orbit-card { opacity: 1; }
+        .stat-orbit-card-inner {
+          border-radius: 20px;
+          padding: 24px 20px;
+          background: linear-gradient(135deg,rgba(255,255,255,.075) 0%,rgba(255,255,255,.015) 100%);
+          border: 1px solid rgba(255,255,255,.1);
+          backdrop-filter: blur(14px);
+          animation: orbitCardBob 5.5s ease-in-out infinite;
+          animation-delay: calc(var(--i,0) * .35s);
+          transition: box-shadow .3s ease, border-color .3s ease, filter .3s ease;
+        }
+        .stat-orbit-card-inner:hover {
+          border-color: rgba(212,175,55,.42);
+          filter: brightness(1.1);
+          box-shadow: 0 20px 50px rgba(0,0,0,.35);
+        }
+        .stat-orbit-hint {
+          text-align: center;
+          font-size: .72rem;
+          letter-spacing: .04em;
+          color: rgba(147,197,253,.4);
+          margin-top: 6px;
+          user-select: none;
+        }
+
+        @media (max-width: 767px) {
+          .stat-orbit-stage { height: 300px; }
+          .stat-orbit-card  { width: 168px; }
+          .stat-orbit-card-inner { padding: 18px 14px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .orbit-ring, .stat-orbit-core, .stat-orbit-card-inner, .orbit-particle { animation: none; }
+        }
+
+        /* ── Impact Grid (3D tilt cards) ── */
+        @keyframes impactCardIn {
+          from { opacity: 0; transform: translateY(36px) scale(.95); }
+          to   { opacity: 1; transform: translateY(0)    scale(1);   }
+        }
+        .impact-grid { perspective: 1100px; }
+        .impact-card {
+          opacity: 0;
+          transform: translateY(36px) scale(.95);
+        }
+        .impact-grid.impact-in .impact-card {
+          animation: impactCardIn .75s cubic-bezier(.22,1,.36,1) both;
+        }
+        .impact-card-inner {
+          position: relative;
+          border-radius: 20px;
+          padding: 26px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          cursor: default;
+          overflow: hidden;
+          transform-style: preserve-3d;
+          will-change: transform;
+          box-shadow: 0 10px 26px rgba(15,23,42,.12);
+        }
+        .impact-card-icon,
+        .impact-card-value,
+        .impact-card-label {
+          position: relative;
+          z-index: 1;
+        }
+        .impact-card-icon  { transform: translateZ(38px); }
+        .impact-card-value { transform: translateZ(26px); }
+        .impact-card-label { transform: translateZ(14px); }
+        .impact-card-glare {
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          pointer-events: none;
+          background: radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.5), transparent 62%);
+          opacity: var(--glare, 0);
+          transition: opacity .25s ease;
+          mix-blend-mode: overlay;
+        }
+        .impact-card-shine {
+          position: absolute;
+          left: 0; right: 0; top: 0;
+          height: 40%;
+          background: linear-gradient(180deg, rgba(255,255,255,.16), transparent);
+          pointer-events: none;
+          transform: translateZ(2px);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .impact-card { opacity: 1 !important; transform: none !important; animation: none !important; }
+          .impact-card-inner { transform: none !important; }
         }
       `}</style>
 
@@ -539,20 +856,159 @@ export default function Landing() {
         {/* ════════════════════════
             STATS BAR
         ════════════════════════ */}
-        <section className="py-16 bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 border-y border-white/5">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              {stats.map(({ value, label }, i) => (
-                <div
-                  key={label}
-                  className="text-center stat-card animate-count-up"
-                  style={{ animationDelay: `${i * .1}s` }}
-                >
-                  <div className="font-display text-4xl md:text-5xl font-bold gold-shimmer mb-2">{value}</div>
-                  <div className="text-blue-300 text-sm">{label}</div>
-                </div>
-              ))}
+        <section
+          ref={statsRef}
+          className={`relative py-24 overflow-hidden${statsVisible ? ' stats-visible' : ''}`}
+          style={{ background: 'linear-gradient(180deg,#030816 0%,#050c1f 55%,#030816 100%)' }}
+        >
+          {/* Subtle grid */}
+          <div className="absolute inset-0 hero-grid opacity-20 pointer-events-none" />
+          {/* Top / bottom hairlines */}
+          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-gold-500/45 to-transparent" />
+          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/6 to-transparent" />
+          {/* Ambient orbs */}
+          <div className="absolute -top-40 left-1/3 w-[520px] h-[520px] bg-blue-700/7 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-40 right-1/4 w-[520px] h-[520px] bg-gold-500/6 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 max-w-6xl mx-auto px-6">
+
+            {/* Section header */}
+            <div className="text-center mb-14">
+              <div className="inline-flex items-center gap-2 border border-gold-500/22 bg-gold-500/8 rounded-full px-4 py-1.5 mb-5">
+                <span className="w-1.5 h-1.5 rounded-full bg-gold-400 inline-block srv-dot" />
+                <span className="text-gold-400/90 section-label">Platform Statistics</span>
+              </div>
+              <h2 className="font-display text-3xl md:text-4xl font-bold text-white tracking-tight">
+                The Platform That <span className="gold-shimmer">Outperforms Your In-House Team</span> — Every Single Day
+              </h2>
             </div>
+
+            {/* 3D Trust Arc */}
+            {reducedMotion ? (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+                {stats.map(({ label, icon: Icon, color, accent }, i) => (
+                  <div
+                    key={label}
+                    className="stat-card-pro group relative rounded-2xl p-6 cursor-default overflow-hidden"
+                    style={{ animationDelay: `${i * .15}s` }}
+                  >
+                    <div
+                      className="absolute inset-0 rounded-2xl border border-white/8"
+                      style={{ background: 'linear-gradient(135deg,rgba(255,255,255,.045) 0%,rgba(255,255,255,.01) 100%)' }}
+                    />
+                    <div
+                      className="absolute top-0 inset-x-0 h-[2px] rounded-t-2xl"
+                      style={{ background: `linear-gradient(90deg,transparent,${color},transparent)`, animation: `borderPulse 3s ease-in-out infinite ${i * .45}s` }}
+                    />
+                    <div className="relative z-10">
+                      <div
+                        className="stat-icon-wrap w-11 h-11 rounded-xl flex items-center justify-center mb-5"
+                        style={{ background: accent, border: `1px solid ${color}35` }}
+                      >
+                        <Icon size={20} style={{ color }} />
+                      </div>
+                      <div className="font-display text-4xl md:text-5xl font-bold mb-2 leading-none tabular-nums" style={{ color }}>
+                        {statsVisible ? fmtCount(counts[i], i) : (i === 3 ? '0.00%' : '0+')}
+                      </div>
+                      <div className="text-blue-300/75 text-sm font-medium mb-4">{label}</div>
+                      <div style={{ height: 3, borderRadius: 9999, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            height: '100%', borderRadius: 9999,
+                            background: `linear-gradient(90deg,${color}70,${color})`,
+                            width: statsVisible ? '100%' : '0%',
+                            transition: `width 2.4s cubic-bezier(.22,1,.36,1) ${i * .15}s`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="stat-orbit-wrap"
+                onMouseMove={onOrbitTilt}
+                onMouseLeave={onOrbitTiltReset}
+              >
+                <div className="stat-orbit-particles">
+                  {orbitParticles.map(p => (
+                    <span
+                      key={p.id}
+                      className="orbit-particle"
+                      style={{
+                        left: `${p.left}%`,
+                        top: `${p.top}%`,
+                        width: p.size,
+                        height: p.size,
+                        animationDuration: `${p.duration}s`,
+                        animationDelay: `${p.delay}s`,
+                        '--drift': p.drift,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div
+                  className={`stat-orbit-stage${statsVisible ? ' stat-orbit-in' : ''}`}
+                  ref={orbitStageRef}
+                  onPointerDown={onOrbitPointerDown}
+                  onPointerMove={onOrbitPointerMove}
+                  onPointerUp={onOrbitPointerUp}
+                  onPointerLeave={onOrbitPointerUp}
+                >
+                  <div className="stat-orbit-core">
+                    <div className="orbit-ring orbit-ring-a" />
+                    <div className="orbit-ring orbit-ring-b" />
+                    <div className="orbit-ring orbit-ring-c" />
+                    <Sparkles size={22} className="text-gold-300 relative z-10" />
+                  </div>
+
+                  {stats.map(({ label, icon: Icon, color, accent }, i) => {
+                    const angle = -33 + i * 22;
+                    const rad   = (angle * Math.PI) / 180;
+                    const R     = 330;
+                    const x     = Math.sin(rad) * R;
+                    const z     = (Math.cos(rad) - 1) * R;
+                    return (
+                      <div
+                        key={label}
+                        className="stat-orbit-card"
+                        style={{
+                          '--i': i,
+                          transform: `translate(-50%,-50%) translate3d(${x}px,0,${z}px) rotateY(${angle}deg)`,
+                        }}
+                      >
+                        <div className="stat-orbit-card-inner">
+                          <div
+                            className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                            style={{ background: accent, border: `1px solid ${color}35` }}
+                          >
+                            <Icon size={20} style={{ color }} />
+                          </div>
+                          <div className="font-display text-3xl md:text-4xl font-bold mb-1.5 leading-none tabular-nums" style={{ color }}>
+                            {statsVisible ? fmtCount(counts[i], i) : (i === 3 ? '0.00%' : '0+')}
+                          </div>
+                          <div className="text-blue-300/75 text-sm font-medium mb-3">{label}</div>
+                          <div style={{ height: 3, borderRadius: 9999, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                height: '100%', borderRadius: 9999,
+                                background: `linear-gradient(90deg,${color}70,${color})`,
+                                width: statsVisible ? '100%' : '0%',
+                                transition: `width 2.2s cubic-bezier(.22,1,.36,1) ${i * .15}s`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="stat-orbit-hint">DRAG TO ROTATE · HOVER TO EXPLORE</div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -870,18 +1326,29 @@ export default function Landing() {
                 </div>
               </div>
 
-              {/* Visual grid */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Visual grid — 3D tilt cards */}
+              <div
+                ref={impactRef}
+                className={`impact-grid grid grid-cols-2 gap-4${impactVisible ? ' impact-in' : ''}`}
+              >
                 {[
                   { value: '12,400+', label: 'Clients Served',      icon: Users,       bg: 'bg-navy-950', textVal: 'text-gold-400', textLbl: 'text-blue-300' },
                   { value: '99.97%',  label: 'Platform Uptime',     icon: TrendingUp,  bg: 'bg-green-600', textVal: 'text-white',    textLbl: 'text-green-100' },
                   { value: '24 hrs',  label: 'Review Turnaround',   icon: Clock,       bg: 'bg-gold-500',  textVal: 'text-navy-950', textLbl: 'text-navy-800' },
                   { value: '640+',    label: 'Verified Attorneys',  icon: BookOpen,    bg: 'bg-navy-950',  textVal: 'text-gold-400', textLbl: 'text-blue-300' },
-                ].map(({ value, label, icon: Icon, bg, textVal, textLbl }) => (
-                  <div key={label} className={`${bg} rounded-2xl p-6 flex flex-col gap-3 card-lift cursor-default`}>
-                    <Icon size={20} className={textLbl} />
-                    <div className={`font-display text-3xl font-bold ${textVal}`}>{value}</div>
-                    <div className={`text-sm font-medium ${textLbl}`}>{label}</div>
+                ].map(({ value, label, icon: Icon, bg, textVal, textLbl }, i) => (
+                  <div key={label} className="impact-card" style={{ animationDelay: `${i * .12}s` }}>
+                    <div
+                      className={`impact-card-inner ${bg}`}
+                      onMouseMove={onImpactMove}
+                      onMouseLeave={onImpactLeave}
+                    >
+                      <div className="impact-card-shine" />
+                      <div className="impact-card-glare" />
+                      <Icon size={20} className={`impact-card-icon ${textLbl}`} />
+                      <div className={`impact-card-value font-display text-3xl font-bold ${textVal}`}>{value}</div>
+                      <div className={`impact-card-label text-sm font-medium ${textLbl}`}>{label}</div>
+                    </div>
                   </div>
                 ))}
               </div>
