@@ -170,19 +170,19 @@ export default function CareTasks() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm text-gray-700">
               Title
-              <input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm" placeholder="Task title" />
+              <input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 text-gray-900 px-3 py-2 text-sm" placeholder="Task title" />
             </label>
             <label className="block text-sm text-gray-700">
               Due date
-              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm" />
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 text-gray-900 px-3 py-2 text-sm" />
             </label>
             <label className="block text-sm text-gray-700 sm:col-span-2">
               Description
-              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm" placeholder="Task details" />
+              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 text-gray-900 px-3 py-2 text-sm" placeholder="Task details" />
             </label>
             <label className="block text-sm text-gray-700">
               Priority
-              <select value={priority} onChange={e => setPriority(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+              <select value={priority} onChange={e => setPriority(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 text-gray-900 px-3 py-2 text-sm">
                 <option value="normal">Normal</option>
                 <option value="high">High</option>
                 <option value="urgent">Urgent</option>
@@ -191,7 +191,7 @@ export default function CareTasks() {
             {matters.length > 0 && (
               <label className="block text-sm text-gray-700 sm:col-span-2">
                 Matter
-                <select value={matterId} onChange={e => setMatterId(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+                <select value={matterId} onChange={e => setMatterId(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 text-gray-900 px-3 py-2 text-sm">
                   <option value="">Select matter (optional)</option>
                   {matters.map(m => (
                     <option key={m.id} value={m.id}>{m.case_number || `Matter #${m.id}`} - {m.client_name || m.attorney_name || m.matter_type}</option>
@@ -201,7 +201,7 @@ export default function CareTasks() {
             )}
             <label className="block text-sm text-gray-700 sm:col-span-2">
               Assign to
-              <select value={assignTo} onChange={e => setAssignTo(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+              <select value={assignTo} onChange={e => setAssignTo(e.target.value)} className="mt-1 w-full rounded-lg border-gray-300 bg-gray-50 text-gray-900 px-3 py-2 text-sm">
                 <option value="self">Myself</option>
                 <option value="other" disabled={!otherPartyId}>
                   {otherPartyLabel}{!otherPartyId ? ' (select a matter first)' : ''}

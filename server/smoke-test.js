@@ -25,13 +25,12 @@ async function run() {
   const h = await req('GET', '/health');
   ok('GET /health → 200', h.status === 200, JSON.stringify(h.data));
 
-  // ── Login: all four demo accounts ──────────────────────────────────────────
+  // ── Login: demo accounts that skip OTP (email/password → immediate token) ──
   console.log('\n── Login (demo accounts) ───────────────────────────');
   const accounts = [
     ['partner@trivanta.com',    'partner'],
     ['attorney@trivanta.com',   'attorney'],
     ['client@trivanta.com',     'client'],
-    ['itsupport@gkasevault.io', 'itsupport'],
   ];
   const tokens = {};
   for (const [email, label] of accounts) {
@@ -40,6 +39,16 @@ async function run() {
     ok(`Login ${label}`, gotToken, `status=${r.status} data=${JSON.stringify(r.data)}`);
     if (gotToken) tokens[label] = r.data.token;
   }
+
+  // ── Login: itsupport is a real admin account now — must be OTP-gated, not
+  // an immediate token (L6 fix: removed from the DEMO_EMAILS OTP exemption) ──
+  console.log('\n── Login (itsupport — must require mail OTP) ───────');
+  const itSupportLogin = await req('POST', '/auth/login', {
+    email: 'itsupport@gkasevault.io', password: 'Password123!',
+  });
+  ok('Login itsupport → otpRequired (not an immediate token)',
+    itSupportLogin.status === 200 && itSupportLogin.data.otpRequired === true && !itSupportLogin.data.token,
+    `status=${itSupportLogin.status} data=${JSON.stringify(itSupportLogin.data)}`);
 
   // ── /me with valid token ────────────────────────────────────────────────────
   console.log('\n── /me ─────────────────────────────────────────────');

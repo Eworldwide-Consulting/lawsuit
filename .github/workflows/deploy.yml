@@ -18,6 +18,12 @@ on:
 #   DATABASE_URL    mysql://u511005792_dbadmin:<pass>@127.0.0.1:3306/u511005792_lawsuit
 #   SMTP_USER       <gmail address>
 #   SMTP_PASS       <gmail app password>
+#
+#   TWILIO_ACCOUNT_SID           <Twilio Account SID, starts with AC...>
+#   TWILIO_AUTH_TOKEN            <Twilio Auth Token>
+#   TWILIO_MESSAGING_SERVICE_SID <Twilio Messaging Service SID, starts with MG...>
+#     (leave unset / empty secret if SMS password reset is not yet configured —
+#      sms.service.js degrades gracefully and just disables the phone-reset option)
 # ---------------------------------------------------------------------------
 
 jobs:
@@ -150,6 +156,9 @@ jobs:
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
             STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+            TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
+            TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
+            TWILIO_MESSAGING_SERVICE_SID=${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}
         run: |
           echo "$ENV_CONTENT" > /tmp/trivanta.env
           sshpass -e scp \

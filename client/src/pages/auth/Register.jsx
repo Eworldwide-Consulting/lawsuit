@@ -65,7 +65,7 @@ function Field({ label, error, children }) {
 function Input({ className = '', ...props }) {
   return (
     <input
-      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 ${className}`}
+      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 ${className}`}
       {...props}
     />
   );
@@ -74,7 +74,7 @@ function Input({ className = '', ...props }) {
 function Select({ className = '', children, ...props }) {
   return (
     <select
-      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+      className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
       {...props}
     >
       {children}
