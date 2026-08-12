@@ -1,0 +1,69 @@
+# Read-only diagnostic for the "Internal server error" on admin user deletion.
+# Prints the live users-table schema and the last errors from the app log.
+# Makes no changes to the server or database.
+name: Diag — user delete 500
+
+on: workflow_dispatch
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
+
+      - name: Dump users schema + recent errors
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          cat > /tmp/diag.js <<'JSEOF'
+          // Read-only: lists users columns and confirms the lifecycle ones exist.
+          require('dotenv').config();
+          const mysql = require('./server/node_modules/mysql2/promise');
+          (async () => {
+            const conn = await mysql.createConnection(process.env.DATABASE_URL);
+            const [cols] = await conn.query('SHOW COLUMNS FROM users');
+            const names = cols.map(c => c.Field);
+            console.log('--- lifecycle columns ---');
+            for (const c of ['status','suspended_at','suspended_by','suspended_reason',
+                             'deleted_at','deleted_by','original_email']) {
+              const hit = cols.find(x => x.Field === c);
+              console.log(`${hit ? 'PRESENT' : 'MISSING'}  ${c}${hit ? `  (${hit.Type}, null=${hit.Null})` : ''}`);
+            }
+            console.log('\n--- other columns written by the delete ---');
+            for (const c of ['email','password_hash','google_id','verification_token',
+                             'verification_token_expires','password_reset_token',
+                             'password_reset_expires','login_otp','phone_reset_otp',
+                             'two_fa_enabled','two_fa_secret']) {
+              console.log(`${names.includes(c) ? 'PRESENT' : 'MISSING'}  ${c}`);
+            }
+            const [[mode]] = await conn.query("SELECT @@sql_mode AS m");
+            console.log('\nsql_mode:', mode.m);
+            const [migs] = await conn.query("SELECT name, applied_at FROM _migrations ORDER BY id DESC LIMIT 4");
+            console.log('\n--- last migrations applied ---');
+            migs.forEach(m => console.log(`${m.applied_at}  ${m.name}`));
+            await conn.end();
+          })().catch(e => { console.error('DIAG FAILED:', e.message); process.exit(1); });
+          JSEOF
+
+          sshpass -e scp -P ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+            /tmp/diag.js ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/diag.js
+
+          sshpass -e ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -l -c '
+              cd ${{ secrets.DEPLOY_PATH }}
+              echo \"=== SCHEMA ===\"
+              node /tmp/diag.js 2>&1 || echo \"(schema dump failed)\"
+              echo \"\"
+              echo \"=== RECENT ERRORS (app.log) ===\"
+              grep -iE \"admin.users|softDelete|Unknown column|deleted_at|original_email|ER_\" logs/app.log 2>/dev/null | tail -25 || echo \"(no matches)\"
+              echo \"\"
+              echo \"=== error.log tail ===\"
+              tail -n 40 logs/error.log 2>/dev/null || echo \"(no error.log)\"
+              echo \"\"
+              echo \"=== pm2 error tail ===\"
+              (pm2 logs trivanta --err --lines 40 --nostream 2>/dev/null || echo \"(pm2 unavailable)\")
+              rm -f /tmp/diag.js
+            '"
