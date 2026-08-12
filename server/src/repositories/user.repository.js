@@ -1,5 +1,6 @@
 const { one, run } = require('../db');
 const { USER_COLUMNS, LOGIN_COLUMNS, USER_STATUS } = require('../domain/user');
+const { nowSql } = require('../lib/dates');
 
 const SAFE_COLUMNS =
   'id, first_name, last_name, email, role, phone, avatar_initials, email_verified, approval_status, created_at, ' +
@@ -106,7 +107,7 @@ const UserRepository = {
       `UPDATE users
           SET status = ?, suspended_at = ?, suspended_by = ?, suspended_reason = ?
         WHERE id = ?`,
-      [USER_STATUS.SUSPENDED, new Date().toISOString(), byUserId || null, reason || null, id]
+      [USER_STATUS.SUSPENDED, nowSql(), byUserId || null, reason || null, id]
     );
   },
 
@@ -134,7 +135,7 @@ const UserRepository = {
               two_fa_enabled = 0, two_fa_secret = NULL
         WHERE id = ?`,
       [
-        USER_STATUS.DELETED, new Date().toISOString(), byUserId || null, email,
+        USER_STATUS.DELETED, nowSql(), byUserId || null, email,
         `deleted+${id}@deleted.invalid`,
         id,
       ]

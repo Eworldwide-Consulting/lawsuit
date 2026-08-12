@@ -4,6 +4,7 @@
 const { getQueue, QUEUE_NAMES } = require('../queue');
 const { run } = require('../db');
 const logger  = require('../logger');
+const { nowSql } = require('../lib/dates');
 
 // All known action strings — exhaustive enum prevents typo drift.
 const ACTIONS = {
@@ -53,7 +54,11 @@ function log({ userId, action, entity, entityId, meta, ip }) {
     entityId:  entityId  || null,
     meta:      meta      ? JSON.stringify(meta) : null,
     ip:        ip        || null,
-    createdAt: new Date().toISOString(),
+    // audit_log.created_at is a DATETIME; a full toISOString() is rejected by
+    // MySQL under strict mode. processJob() swallows write errors so the app
+    // never breaks on audit I/O, which meant these inserts were failing
+    // silently in production rather than surfacing.
+    createdAt: nowSql(),
   });
 }
 
