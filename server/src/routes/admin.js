@@ -287,6 +287,21 @@ router.put('/users/:id/role', ...guard, async (req, res, next) => {
 
 // ── Account lifecycle: suspend / reactivate / delete ──────────────────────────
 
+// These three routes surface the underlying database message instead of the
+// generic "Internal server error" the global handler produces in production.
+// They are admin-only (itsupport/partner) and act on a single account, so the
+// operator who triggered the failure is the one who needs to read the cause —
+// otherwise a schema problem here is only diagnosable over SSH.
+function lifecycleError(res, req, err, action) {
+  const detail = err?.sqlMessage || err?.message || 'unknown error';
+  req.log?.error({ err, action, code: err?.code, errno: err?.errno }, `admin lifecycle ${action} failed`);
+  res.status(500).json({
+    error:  `Could not ${action} this account: ${detail}`,
+    code:   err?.code || null,
+    action,
+  });
+}
+
 // Shared preconditions for the lifecycle actions below. An admin may not act on
 // their own account (instant self-lockout), and the last admin who can still
 // sign in may not be frozen or removed — that would leave nobody able to reach
@@ -345,7 +360,7 @@ router.put('/users/:id/suspend', ...guard, async (req, res, next) => {
     });
 
     res.json({ success: true, id: user.id, status: 'suspended', email: user.email });
-  } catch (err) { next(err); }
+  } catch (err) { lifecycleError(res, req, err, 'suspend'); }
 });
 
 router.put('/users/:id/reactivate', ...guard, async (req, res, next) => {
@@ -377,7 +392,7 @@ router.put('/users/:id/reactivate', ...guard, async (req, res, next) => {
     });
 
     res.json({ success: true, id: user.id, status: 'active', email: user.email });
-  } catch (err) { next(err); }
+  } catch (err) { lifecycleError(res, req, err, 'reactivate'); }
 });
 
 // Soft delete — see migration 012 for why this is not a hard DELETE. The row
@@ -411,7 +426,7 @@ router.delete('/users/:id', ...guard, async (req, res, next) => {
       emailReleased: true,
       note: 'Case history is retained. This email can be used to register a new account.',
     });
-  } catch (err) { next(err); }
+  } catch (err) { lifecycleError(res, req, err, 'delete'); }
 });
 
 router.put('/users/:id/approve', ...guard, async (req, res, next) => {
