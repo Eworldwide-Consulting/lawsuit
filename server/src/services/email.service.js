@@ -128,6 +128,33 @@ const EmailService = {
     return queue(JOB.ATTORNEY_DECISION, { to, firstName, decision });
   },
 
+  // Account-lifecycle notices are sent directly rather than queued: the
+  // suspension/deletion has already taken effect by the time this runs, so the
+  // notice must not be lost if the process restarts before the queue drains.
+  sendAccountSuspended(to, { firstName, reason }) {
+    return send({
+      to,
+      subject: 'Your TriVanta account has been suspended',
+      html: tmplAccountSuspended({ firstName, reason }),
+    });
+  },
+
+  sendAccountReactivated(to, { firstName }) {
+    return send({
+      to,
+      subject: 'Your TriVanta account has been restored',
+      html: tmplAccountReactivated({ firstName }),
+    });
+  },
+
+  sendAccountDeleted(to, { firstName }) {
+    return send({
+      to,
+      subject: 'Your TriVanta account has been closed',
+      html: tmplAccountDeleted({ firstName }),
+    });
+  },
+
   sendAttorneyInvite(to, { clientName, name, signupLink }) {
     return send({
       to,
@@ -465,6 +492,35 @@ function tmplAttorneyDecision({ firstName, decision }) {
       : p('After reviewing your application, we are unable to approve your TriVanta professional account at this time. Please contact support if you have questions.')
     }
     ${isApproved ? btn(`${config.client.url}/login`, 'Log In to TriVanta') : ''}
+  `);
+}
+
+function tmplAccountSuspended({ firstName, reason }) {
+  return wrap(`
+    ${h2('Your account has been suspended')}
+    ${p(`Hi ${esc(firstName)},`)}
+    ${p('An administrator has suspended your TriVanta account. While it is suspended you cannot sign in, and any active session has been ended.')}
+    ${reason ? p(`<strong>Reason:</strong> ${esc(reason)}`) : ''}
+    ${p('Your case history, documents and messages are unchanged. Contact support if you believe this was a mistake.')}
+  `);
+}
+
+function tmplAccountReactivated({ firstName }) {
+  return wrap(`
+    ${h2('Your account has been restored')}
+    ${p(`Hi ${esc(firstName)},`)}
+    ${p('Your TriVanta account has been reactivated. You can sign in again with your existing email and password.')}
+    ${btn(`${config.client.url}/login`, 'Sign In to TriVanta')}
+  `);
+}
+
+function tmplAccountDeleted({ firstName }) {
+  return wrap(`
+    ${h2('Your account has been closed')}
+    ${p(`Hi ${esc(firstName)},`)}
+    ${p('An administrator has closed your TriVanta account. You can no longer sign in with it.')}
+    ${p('Your case records are retained as required for legal recordkeeping. If you need access again, you are free to register a new account with this same email address.')}
+    ${btn(`${config.client.url}/register`, 'Create a New Account')}
   `);
 }
 

@@ -12,6 +12,8 @@ const SSO_ERRORS = {
   google_unverified: 'Your Google account email is not verified.',
   approval_pending:  'Your account is pending admin approval. Please check back later.',
   account_rejected:  'Your account was not approved. Please contact support.',
+  account_suspended: 'Your account has been suspended. Please contact support to restore access.',
+  account_deleted:   'This account has been closed. You can register again with the same email address.',
 };
 
 const ROLE_TABS = [

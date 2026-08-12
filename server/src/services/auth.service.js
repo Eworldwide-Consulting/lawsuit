@@ -7,7 +7,7 @@ const config = require('../config');
 const { run, all }  = require('../db');
 const UserRepo = require('../repositories/user.repository');
 const EmailService = require('./email.service');
-const { sanitizeUser }  = require('../domain/user');
+const { sanitizeUser, isSuspended }  = require('../domain/user');
 const { buildCaseNumber } = require('../domain/matter');
 const { in24Hours }     = require('../lib/dates');
 const { AppError, ConflictError, UnauthorizedError, ValidationError, ForbiddenError } = require('../lib/errors');
@@ -165,6 +165,15 @@ const AuthService = {
         );
       throw new UnauthorizedError('Invalid credentials');
     }
+
+    // Checked before every other gate (and before any OTP is emailed) so a
+    // frozen account cannot even start a login it will never be allowed to
+    // finish. Deleted accounts never reach here — findByEmail skips them.
+    if (isSuspended(user))
+      throw Object.assign(
+        new ForbiddenError('Your account has been suspended. Please contact support to restore access.'),
+        { suspended: true }
+      );
 
     if (portal && portal !== user.role)
       throw new ForbiddenError(`This email is registered as ${user.role}. Please sign in using the ${user.role} portal.`);

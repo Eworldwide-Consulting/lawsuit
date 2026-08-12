@@ -19,6 +19,19 @@ http.interceptors.response.use(
       localStorage.removeItem('lp_user');
       window.location.href = '/login';
     }
+
+    // An account frozen or closed mid-session: the token is still valid but the
+    // server refuses every authenticated route, so end the session here instead
+    // of leaving the user on a dashboard where nothing loads.
+    const code = err.response?.data?.code;
+    if (err.response?.status === 403 &&
+        (code === 'ACCOUNT_SUSPENDED' || code === 'ACCOUNT_DELETED') &&
+        localStorage.getItem('lp_token')) {
+      localStorage.removeItem('lp_token');
+      localStorage.removeItem('lp_user');
+      window.location.href = `/login?error=${code === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'account_deleted'}`;
+    }
+
     return Promise.reject(err);
   }
 );

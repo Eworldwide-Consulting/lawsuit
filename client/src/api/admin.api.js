@@ -10,6 +10,11 @@ const adminApi = {
   resetPassword: (id, newPassword) => http.put(`/admin/users/${id}/reset-password`, { newPassword }),
   forceVerify: id           => http.post(`/admin/users/${id}/force-verify`),
   resendInvite: id          => http.post(`/admin/users/${id}/resend-verification`),
+  suspend:     (id, reason) => http.put(`/admin/users/${id}/suspend`, { reason }),
+  reactivate:  id           => http.put(`/admin/users/${id}/reactivate`),
+  // Soft delete: case history is kept, but the email is released so the same
+  // address can be used to register a new account.
+  deleteUser:  id           => http.delete(`/admin/users/${id}`),
   activity:    ()           => http.get('/admin/activity'),
   health:      ()           => http.get('/admin/health'),
   dbStats:     ()           => http.get('/admin/db-stats'),

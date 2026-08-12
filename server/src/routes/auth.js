@@ -302,6 +302,12 @@ router.get('/google/callback', async (req, res) => {
       user = await one('SELECT * FROM users WHERE id = ?', [user.id]);
     }
 
+    // Same freeze as the password login path — Google sign-in must not be a
+    // way around a suspension. (Deleted accounts never get here: findByEmail
+    // skips them, so this flow treats the released email as a brand new user.)
+    if (require('../domain/user').isSuspended(user))
+      return res.redirect(`${config.client.url}/login?error=account_suspended`);
+
     // Approval checks apply only to professional roles — consistent with the
     // regular login flow in auth.service.js which also gates on attorney/partner.
     if (['attorney', 'partner'].includes(user.role)) {

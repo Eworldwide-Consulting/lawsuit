@@ -4,6 +4,7 @@ import {
   Users, CheckCircle, XCircle, Clock, AlertTriangle, Database,
   Activity, Server, Mail, CreditCard, Shield, RefreshCw, Loader2,
   ChevronDown, ChevronUp, Check, X, MoreHorizontal, KeyRound,
+  Ban, RotateCcw, Trash2,
 } from 'lucide-react';
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -71,6 +72,19 @@ function ApprovalBadge({ status }) {
   );
 }
 
+// ── Account status badge ──────────────────────────────────────────────────────
+// Only rendered for frozen accounts — active ones show nothing, so suspended
+// users stand out in a long list.
+
+function AccountStatusBadge({ status }) {
+  if (status !== 'suspended') return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
+      <Ban size={11} /> Suspended
+    </span>
+  );
+}
+
 // ── Format date ───────────────────────────────────────────────────────────────
 
 function fmtDate(iso) {
@@ -112,6 +126,10 @@ export default function ITSupportDashboard() {
   const [newPw, setNewPw]           = useState('');
   const [confirmPw, setConfirmPw]   = useState('');
   const [resetPwError, setResetPwError] = useState('');
+  const [suspendModal, setSuspendModal] = useState(null); // { id, name }
+  const [suspendReason, setSuspendReason] = useState('');
+  const [deleteModal, setDeleteModal] = useState(null);   // { id, name, email }
+  const [deleteConfirm, setDeleteConfirm] = useState(''); // must equal the email
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -177,6 +195,25 @@ export default function ITSupportDashboard() {
     setResetPwModal(null);
     setNewPw('');
     setConfirmPw('');
+  };
+
+  const handleSuspendSubmit = async () => {
+    if (!suspendModal) return;
+    await withLoading(`suspend_${suspendModal.id}`, () =>
+      adminApi.suspend(suspendModal.id, suspendReason.trim())
+    );
+    setSuspendModal(null);
+    setSuspendReason('');
+  };
+
+  const handleReactivate = id =>
+    withLoading(`reactivate_${id}`, () => adminApi.reactivate(id));
+
+  const handleDeleteSubmit = async () => {
+    if (!deleteModal) return;
+    await withLoading(`delete_${deleteModal.id}`, () => adminApi.deleteUser(deleteModal.id));
+    setDeleteModal(null);
+    setDeleteConfirm('');
   };
 
   // ── Filtered users ────────────────────────────────────────────────────────────
@@ -405,6 +442,7 @@ export default function ITSupportDashboard() {
                           ? <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Verified</span>
                           : <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Unverified</span>}
                         {u.approval_status && <ApprovalBadge status={u.approval_status} />}
+                        <AccountStatusBadge status={u.status} />
                       </div>
                     </td>
                     <td className="px-5 py-3 text-gray-500">{fmtDate(u.created_at)}</td>
@@ -436,6 +474,33 @@ export default function ITSupportDashboard() {
                           className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600"
                         >
                           <KeyRound size={12} /> Reset Password
+                        </button>
+
+                        {u.status === 'suspended' ? (
+                          <button
+                            onClick={() => handleReactivate(u.id)}
+                            disabled={!!actionLoading[`reactivate_${u.id}`]}
+                            title="Restore account access"
+                            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 disabled:opacity-50"
+                          >
+                            <RotateCcw size={12} /> Reactivate
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { setSuspendModal({ id: u.id, name: `${u.first_name} ${u.last_name}` }); setSuspendReason(''); }}
+                            title="Freeze this account — blocks login and ends active sessions"
+                            className="flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600"
+                          >
+                            <Ban size={12} /> Suspend
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => { setDeleteModal({ id: u.id, name: `${u.first_name} ${u.last_name}`, email: u.email }); setDeleteConfirm(''); }}
+                          title="Close this account and release its email"
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600"
+                        >
+                          <Trash2 size={12} /> Delete
                         </button>
                       </div>
                     </td>
@@ -505,6 +570,97 @@ export default function ITSupportDashboard() {
                   ? <Loader2 size={14} className="animate-spin" />
                   : null}
                 Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Suspend modal ── */}
+      {suspendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-gray-900 mb-1">Suspend Account</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              <strong>{suspendModal.name}</strong> will be signed out immediately and blocked from
+              logging in. Case data, documents and messages are untouched, and you can reactivate
+              the account at any time.
+            </p>
+            <textarea
+              value={suspendReason}
+              onChange={e => setSuspendReason(e.target.value)}
+              placeholder="Reason (optional — included in the email they receive)"
+              rows={3}
+              maxLength={500}
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => { setSuspendModal(null); setSuspendReason(''); }}
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSuspendSubmit}
+                disabled={!!actionLoading[`suspend_${suspendModal.id}`]}
+                className="flex-1 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-semibold hover:bg-orange-700 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {actionLoading[`suspend_${suspendModal.id}`]
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : null}
+                Suspend Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete modal ── */}
+      {/* Typing the email is required: deletion cannot be undone from the UI,
+          so a mis-click on the wrong row must not be enough to close an account. */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="font-bold text-gray-900 mb-1">Delete Account</h3>
+            <p className="text-sm text-gray-500 mb-3">
+              This closes <strong>{deleteModal.name}</strong>'s account permanently. It cannot be
+              undone from this screen.
+            </p>
+            <ul className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4 space-y-1.5">
+              <li>· They are signed out and can never log in with this account again.</li>
+              <li>· Matters, documents, invoices and messages are <strong>retained</strong> for legal recordkeeping.</li>
+              <li>· <strong>{deleteModal.email}</strong> is released — they can register a brand new account with it.</li>
+            </ul>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Type <span className="font-mono text-gray-900">{deleteModal.email}</span> to confirm
+            </label>
+            <input
+              value={deleteConfirm}
+              onChange={e => setDeleteConfirm(e.target.value)}
+              placeholder={deleteModal.email}
+              autoComplete="off"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => { setDeleteModal(null); setDeleteConfirm(''); }}
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteSubmit}
+                disabled={
+                  deleteConfirm.trim().toLowerCase() !== deleteModal.email.toLowerCase() ||
+                  !!actionLoading[`delete_${deleteModal.id}`]
+                }
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {actionLoading[`delete_${deleteModal.id}`]
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : null}
+                Delete Account
               </button>
             </div>
           </div>

@@ -20,6 +20,9 @@ const ACTIONS = {
   ADMIN_REJECT_USER:      'admin.reject_user',
   ADMIN_FORCE_VERIFY:     'admin.force_verify',
   ADMIN_RESEND_VERIFY:    'admin.resend_verify',
+  ADMIN_SUSPEND_USER:     'admin.suspend_user',
+  ADMIN_REACTIVATE_USER:  'admin.reactivate_user',
+  ADMIN_DELETE_USER:      'admin.delete_user',
   // Matter
   MATTER_CREATED:         'matter.created',
   MATTER_UPDATED:         'matter.updated',

@@ -2,7 +2,7 @@ const jwt   = require('jsonwebtoken');
 const { one } = require('../db');
 const cache   = require('../cache');
 const config  = require('../config');
-const { USER_COLUMNS } = require('../domain/user');
+const { USER_COLUMNS, isSuspended, isDeleted } = require('../domain/user');
 
 const USER_CACHE_TTL = 60;
 
@@ -25,6 +25,18 @@ async function requireAuth(req, res, next) {
     }
 
     if (!user) return res.status(401).json({ error: 'User not found' });
+
+    // A suspended or deleted account is frozen mid-session: the JWT stays
+    // valid but every authenticated route stops serving it. Admin actions
+    // invalidate this cache entry, so the freeze lands on the next request
+    // rather than after USER_CACHE_TTL.
+    if (isDeleted(user))
+      return res.status(403).json({ error: 'This account has been deleted.', code: 'ACCOUNT_DELETED' });
+    if (isSuspended(user))
+      return res.status(403).json({
+        error: 'Your account is suspended. Contact support to restore access.',
+        code:  'ACCOUNT_SUSPENDED',
+      });
 
     req.user = user;
     next();

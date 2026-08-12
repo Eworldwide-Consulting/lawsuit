@@ -1,8 +1,13 @@
 const { one, run } = require('../db');
-const { USER_COLUMNS, LOGIN_COLUMNS } = require('../domain/user');
+const { USER_COLUMNS, LOGIN_COLUMNS, USER_STATUS } = require('../domain/user');
 
 const SAFE_COLUMNS =
-  'id, first_name, last_name, email, role, phone, avatar_initials, email_verified, approval_status, created_at';
+  'id, first_name, last_name, email, role, phone, avatar_initials, email_verified, approval_status, created_at, ' +
+  'status, suspended_at, suspended_reason';
+
+// Soft-deleted rows are kept so matters/documents/invoices keep their foreign
+// keys, but they are hidden from every normal lookup.
+const NOT_DELETED = `COALESCE(status, '${USER_STATUS.ACTIVE}') <> '${USER_STATUS.DELETED}'`;
 
 const UserRepository = {
   findById(id) {
@@ -18,7 +23,9 @@ const UserRepository = {
 
   findByEmail(email) {
     // LOGIN_COLUMNS includes password_hash — only needed at login for bcrypt.compare
-    return one(`SELECT ${LOGIN_COLUMNS} FROM users WHERE email = ?`, [email.toLowerCase()]);
+    // Deleted rows are excluded so their released email reads as unregistered:
+    // login finds nothing, and register() sees the address as free to reuse.
+    return one(`SELECT ${LOGIN_COLUMNS} FROM users WHERE email = ? AND ${NOT_DELETED}`, [email.toLowerCase()]);
   },
 
   findByVerificationToken(token) {
@@ -27,20 +34,22 @@ const UserRepository = {
 
   // phone_reset_otp is deliberately excluded from USER_COLUMNS (same reasoning
   // as login_otp) — fetched here only where the SMS password-reset flow needs it.
+  // A deleted account keeps its phone number (only the email is released), so
+  // this must filter explicitly or the SMS reset flow would still reach it.
   findByPhone(phone) {
-    return one(`SELECT ${USER_COLUMNS}, phone_reset_otp FROM users WHERE phone = ?`, [phone]);
+    return one(`SELECT ${USER_COLUMNS}, phone_reset_otp FROM users WHERE phone = ? AND ${NOT_DELETED}`, [phone]);
   },
 
   findAll({ limit = 50, offset = 0 } = {}) {
     return require('../db').all(
-      `SELECT ${SAFE_COLUMNS} FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT ${SAFE_COLUMNS} FROM users WHERE ${NOT_DELETED} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       [limit, offset]
     );
   },
 
   findByEmailSafe(email) {
     return one(
-      `SELECT ${SAFE_COLUMNS} FROM users WHERE email = ?`,
+      `SELECT ${SAFE_COLUMNS} FROM users WHERE email = ? AND ${NOT_DELETED}`,
       [email.toLowerCase()]
     );
   },
@@ -86,6 +95,63 @@ const UserRepository = {
 
   setApprovalStatus(id, status) {
     return run("UPDATE users SET approval_status = ? WHERE id = ?", [status, id]);
+  },
+
+  // ── Account lifecycle ───────────────────────────────────────────────────────
+
+  // Freezes the account. The row, its email and all case data stay intact —
+  // requireAuth and login both refuse the account until it is reactivated.
+  suspend(id, { byUserId, reason }) {
+    return run(
+      `UPDATE users
+          SET status = ?, suspended_at = ?, suspended_by = ?, suspended_reason = ?
+        WHERE id = ?`,
+      [USER_STATUS.SUSPENDED, new Date().toISOString(), byUserId || null, reason || null, id]
+    );
+  },
+
+  reactivate(id) {
+    return run(
+      `UPDATE users
+          SET status = ?, suspended_at = NULL, suspended_by = NULL, suspended_reason = NULL
+        WHERE id = ?`,
+      [USER_STATUS.ACTIVE, id]
+    );
+  },
+
+  // Soft delete. The email is rewritten to a per-id tombstone address so the
+  // UNIQUE index no longer holds the real address — that is what lets the
+  // person register again with the same email. Credentials and pending tokens
+  // are scrubbed so the tombstoned row can never be authenticated against.
+  softDelete(id, { byUserId, email }) {
+    return run(
+      `UPDATE users
+          SET status = ?, deleted_at = ?, deleted_by = ?, original_email = ?,
+              email = ?, password_hash = '', google_id = NULL,
+              verification_token = NULL, verification_token_expires = NULL,
+              password_reset_token = NULL, password_reset_expires = NULL,
+              login_otp = NULL, phone_reset_otp = NULL,
+              two_fa_enabled = 0, two_fa_secret = NULL
+        WHERE id = ?`,
+      [
+        USER_STATUS.DELETED, new Date().toISOString(), byUserId || null, email,
+        `deleted+${id}@deleted.invalid`,
+        id,
+      ]
+    );
+  },
+
+  // Counts admins that can still sign in — used to refuse suspending or
+  // deleting the last one and locking everybody out of the admin portal.
+  countActiveAdmins(excludeId) {
+    return one(
+      `SELECT COUNT(*) AS cnt FROM users
+        WHERE role IN ('itsupport', 'partner')
+          AND ${NOT_DELETED}
+          AND COALESCE(status, '${USER_STATUS.ACTIVE}') <> '${USER_STATUS.SUSPENDED}'
+          AND id <> ?`,
+      [excludeId]
+    );
   },
 
   setPasswordHash(id, hash) {

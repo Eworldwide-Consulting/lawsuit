@@ -285,6 +285,135 @@ router.put('/users/:id/role', ...guard, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Account lifecycle: suspend / reactivate / delete ──────────────────────────
+
+// Shared preconditions for the lifecycle actions below. An admin may not act on
+// their own account (instant self-lockout), and the last admin who can still
+// sign in may not be frozen or removed — that would leave nobody able to reach
+// the admin portal at all.
+async function loadLifecycleTarget(req, res, { requireAdminHeadroom = true } = {}) {
+  const user = await one(
+    'SELECT id, email, first_name, last_name, role, status FROM users WHERE id = ?',
+    [req.params.id]
+  );
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return null;
+  }
+  if (String(user.id) === String(req.user.id)) {
+    res.status(400).json({ error: 'You cannot perform this action on your own account.' });
+    return null;
+  }
+  if (requireAdminHeadroom && ['itsupport', 'partner'].includes(user.role)) {
+    const { cnt } = await UserRepo.countActiveAdmins(user.id);
+    if (Number(cnt) === 0) {
+      res.status(400).json({ error: 'This is the last active admin account — it cannot be suspended or deleted.' });
+      return null;
+    }
+  }
+  return user;
+}
+
+router.put('/users/:id/suspend', ...guard, async (req, res, next) => {
+  try {
+    const user = await loadLifecycleTarget(req, res);
+    if (!user) return;
+
+    const reason = (req.body?.reason || '').trim().slice(0, 500) || null;
+    await UserRepo.suspend(user.id, { byUserId: req.user.id, reason });
+    // Drops the cached copy so requireAuth re-reads the frozen status on the
+    // target's very next request instead of up to USER_CACHE_TTL later.
+    await invalidateUserCache(user.id);
+
+    NotificationService.create({
+      userId:     user.id,
+      type:       'account_updated',
+      title:      'Account suspended',
+      body:       reason
+        ? `Your account has been suspended by an administrator. Reason: ${reason}`
+        : 'Your account has been suspended by an administrator. Contact support to restore access.',
+      entityType: 'user',
+      entityId:   user.id,
+    });
+    EmailService.sendAccountSuspended(user.email, { firstName: user.first_name, reason });
+
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.ADMIN_SUSPEND_USER,
+      entity: 'user', entityId: user.id,
+      meta: { targetEmail: user.email, reason },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, id: user.id, status: 'suspended', email: user.email });
+  } catch (err) { next(err); }
+});
+
+router.put('/users/:id/reactivate', ...guard, async (req, res, next) => {
+  try {
+    // No admin-headroom check — restoring access can never lock anyone out.
+    const user = await loadLifecycleTarget(req, res, { requireAdminHeadroom: false });
+    if (!user) return;
+    if (user.status === 'deleted')
+      return res.status(400).json({ error: 'Deleted accounts cannot be reactivated.' });
+
+    await UserRepo.reactivate(user.id);
+    await invalidateUserCache(user.id);
+
+    NotificationService.create({
+      userId:     user.id,
+      type:       'account_updated',
+      title:      'Account restored',
+      body:       'Your account has been reactivated. You can sign in again.',
+      entityType: 'user',
+      entityId:   user.id,
+    });
+    EmailService.sendAccountReactivated(user.email, { firstName: user.first_name });
+
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.ADMIN_REACTIVATE_USER,
+      entity: 'user', entityId: user.id,
+      meta: { targetEmail: user.email },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, id: user.id, status: 'active', email: user.email });
+  } catch (err) { next(err); }
+});
+
+// Soft delete — see migration 012 for why this is not a hard DELETE. The row
+// survives so matters/documents/invoices stay referentially intact, but the
+// email is released so the same person can register again from scratch.
+router.delete('/users/:id', ...guard, async (req, res, next) => {
+  try {
+    const user = await loadLifecycleTarget(req, res);
+    if (!user) return;
+    if (user.status === 'deleted')
+      return res.status(400).json({ error: 'Account is already deleted.' });
+
+    // Send before the address is tombstoned — afterwards the column no longer
+    // holds a deliverable address.
+    EmailService.sendAccountDeleted(user.email, { firstName: user.first_name });
+
+    await UserRepo.softDelete(user.id, { byUserId: req.user.id, email: user.email });
+    await invalidateUserCache(user.id);
+
+    AuditService.log({
+      userId: req.user.id, action: AuditService.ACTIONS.ADMIN_DELETE_USER,
+      entity: 'user', entityId: user.id,
+      meta: { targetEmail: user.email, targetRole: user.role },
+      ip: req.ip,
+    });
+
+    res.json({
+      success: true,
+      id: user.id,
+      email: user.email,
+      emailReleased: true,
+      note: 'Case history is retained. This email can be used to register a new account.',
+    });
+  } catch (err) { next(err); }
+});
+
 router.put('/users/:id/approve', ...guard, async (req, res, next) => {
   try {
     const user = await one('SELECT id, email, first_name FROM users WHERE id = ?', [req.params.id]);
