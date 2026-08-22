@@ -6,9 +6,12 @@ import { GEORGIA_COUNTIES } from '../constants/counties';
 import { useToast } from '../context/ToastContext';
 import {
   Briefcase, Check, MapPin, Calendar, User, AlertCircle,
-  ClipboardList, ChevronRight, X, ArrowRight, Save,
+  ClipboardList, ChevronRight, X, ArrowRight, Save, RefreshCw,
 } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
+import AttorneyStatusBadge from '../components/attorney/AttorneyStatusBadge';
+import AttorneyPickerModal from '../components/attorney/AttorneyPickerModal';
+import InviteAttorneyModal from '../components/attorney/InviteAttorneyModal';
 
 const MATTER_TYPES = [
   { value: 'guardianship',                       label: 'Guardianship',                          desc: 'Appointment of a person to care for an individual who cannot make personal decisions.' },
@@ -164,9 +167,11 @@ export default function MyCase() {
   const [legalCaseNumber, setLegalCaseNumber] = useState('');
   const [county, setCounty]         = useState('');
   const [savingCaseInfo, setSavingCaseInfo] = useState(false);
+  const [showAttyPicker, setShowAttyPicker] = useState(false);
+  const [showInvite, setShowInvite]         = useState(false);
 
-  useEffect(() => {
-    mattersApi.list()
+  function loadMatter() {
+    return mattersApi.list()
       .then(r => {
         const list = r.data?.matters || r.data || [];
         if (list.length === 0) {
@@ -182,7 +187,14 @@ export default function MyCase() {
       })
       .catch(() => setLoading(false))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { loadMatter(); }, []);
+
+  function handleAssigned(msg, isError) {
+    toast[isError ? 'error' : 'success'](msg);
+    if (!isError) loadMatter();
+  }
 
   async function saveCaseInfo() {
     if (!matter) return;
@@ -282,13 +294,16 @@ export default function MyCase() {
                 </div>
                 <div className="flex items-start gap-2.5">
                   <User size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1">
                     <div className="text-xs text-gray-400 uppercase tracking-wide">Attorney</div>
-                    <div className="font-medium text-gray-800">
-                      {matter.attorney_name
-                        ? matter.attorney_name
-                        : <span className="text-amber-600">Not yet assigned</span>}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {matter.attorney_name && <div className="font-medium text-gray-800">{matter.attorney_name}</div>}
+                      <AttorneyStatusBadge hasAttorney={Boolean(matter.attorney_id)} caseAccepted={matter.case_accepted === 1 || matter.case_accepted === true} />
                     </div>
+                    <button onClick={() => setShowAttyPicker(true)}
+                      className="mt-1 text-xs font-medium text-[#0f2057] hover:text-[#1a3476] flex items-center gap-1">
+                      {matter.attorney_id ? <><RefreshCw size={11} /> Change Attorney</> : 'Select an attorney →'}
+                    </button>
                   </div>
                 </div>
                 {(matter.court || matter.county || matter.state) && (
@@ -457,6 +472,17 @@ export default function MyCase() {
           </>
         )}
       </div>
+
+      <AttorneyPickerModal
+        open={showAttyPicker}
+        onClose={() => setShowAttyPicker(false)}
+        matterId={matter?.id}
+        currentAttorneyId={matter?.attorney_id}
+        onAssigned={handleAssigned}
+        onInviteInstead={() => setShowInvite(true)}
+      />
+
+      {showInvite && <InviteAttorneyModal onClose={() => setShowInvite(false)} />}
     </>
   );
 }

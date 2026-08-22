@@ -1,13 +1,16 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardApi, mattersApi, usersApi, documentsApi } from '../../api';
+import { dashboardApi, documentsApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import {
   Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare,
-  Shield, Check, CheckCircle, Briefcase, ArrowRight, Clock, UserCheck, X,
-  Mail, Send, AlertCircle, ExternalLink,
+  Shield, Check, CheckCircle, Briefcase, ArrowRight, Clock, UserCheck,
+  Mail, RefreshCw, ExternalLink,
 } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
+import AttorneyStatusBadge from '../../components/attorney/AttorneyStatusBadge';
+import AttorneyPickerModal from '../../components/attorney/AttorneyPickerModal';
+import InviteAttorneyModal from '../../components/attorney/InviteAttorneyModal';
 
 const ACTION_CFG = {
   Upload:  { Icon: Upload,      cls: 'bg-[#0f2057] hover:bg-[#1a3476]' },
@@ -49,120 +52,6 @@ const ReadinessGauge = memo(function ReadinessGauge({ value }) {
     </div>
   );
 });
-
-// ── Attorney row in picker ───────────────────────────────────────────────────
-function AttorneyCard({ attorney, onAssign, assigning }) {
-  const specs = attorney.specializations?.split(',').slice(0, 2).join(', ') || null;
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-[#0f2057]/30 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all">
-      <div className="w-10 h-10 rounded-full bg-[#0f2057] text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-        {attorney.avatar_initials || `${attorney.first_name[0]}${attorney.last_name[0]}`}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-          {attorney.first_name} {attorney.last_name}
-          <span className="ml-1.5 text-xs text-gray-400 font-normal capitalize">{attorney.role}</span>
-        </div>
-        {specs && <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{specs}</div>}
-        {attorney.years_experience && <div className="text-xs text-gray-400">{attorney.years_experience} yrs experience</div>}
-      </div>
-      <button onClick={() => onAssign(attorney.id)} disabled={assigning}
-        className="flex-shrink-0 text-xs font-semibold bg-[#0f2057] text-white px-3 py-1.5 rounded-lg hover:bg-[#1a3476] disabled:opacity-50 transition-colors">
-        {assigning ? '...' : 'Select'}
-      </button>
-    </div>
-  );
-}
-
-// ── Invite Attorney Modal ────────────────────────────────────────────────────
-function InviteAttorneyModal({ onClose }) {
-  const [email, setEmail]     = useState('');
-  const [name, setName]       = useState('');
-  const [sending, setSending] = useState(false);
-  const [result, setResult]   = useState(null);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setSending(true);
-    try   { setResult((await usersApi.inviteAttorney(email.trim(), name.trim())).data); }
-    catch (err) { setResult({ error: err.response?.data?.error || 'Failed to send invite' }); }
-    finally { setSending(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-slideUp">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-bold text-gray-900 dark:text-white text-lg">Invite Your Attorney</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Send a registration invite to an attorney not yet on the platform</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1"><X size={18} /></button>
-        </div>
-
-        {!result ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="form-label">Attorney's Name <span className="text-xs text-gray-400">(optional)</span></label>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith" className="form-input" />
-            </div>
-            <div>
-              <label className="form-label">Attorney's Email <span className="text-red-500">*</span></label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="attorney@lawfirm.com" required className="form-input" />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button type="button" onClick={onClose}
-                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700">
-                Cancel
-              </button>
-              <button type="submit" disabled={sending || !email.trim()}
-                className="flex-1 py-2.5 bg-[#0f2057] hover:bg-[#1a3476] text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
-                {sending ? <><Spinner size={4} /> Sending…</> : <><Send size={14} /> Send Invite</>}
-              </button>
-            </div>
-          </form>
-        ) : result.error ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-xl text-sm">
-              <AlertCircle size={16} /> {result.error}
-            </div>
-            <button onClick={onClose} className="w-full py-2.5 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700">Close</button>
-          </div>
-        ) : result.alreadyRegistered ? (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
-              <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="text-sm font-semibold text-green-700 dark:text-green-400">Already on TriVanta!</div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                  {result.attorney.first_name} {result.attorney.last_name} is already registered. Select them from the attorney list.
-                </div>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-full py-2.5 bg-[#0f2057] text-white rounded-lg text-sm font-semibold hover:bg-[#1a3476]">
-              Select from Attorney List
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
-              <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="text-sm font-semibold text-green-700 dark:text-green-400">Invite sent!</div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                  A registration invite was emailed to <strong>{result.email}</strong>. Once they register, select them as your attorney.
-                </div>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-full py-2.5 bg-[#0f2057] text-white rounded-lg text-sm font-semibold hover:bg-[#1a3476]">Done</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Required Documents panel ─────────────────────────────────────────────────
 function RequiredDocsPanel({ matterType, uploadedDocs }) {
@@ -253,9 +142,6 @@ export default function ClientDashboard() {
   const [loading, setLoading]               = useState(true);
   const [showAttyPicker, setShowAttyPicker] = useState(false);
   const [showInvite, setShowInvite]         = useState(false);
-  const [attorneys, setAttorneys]           = useState([]);
-  const [attysLoading, setAttysLoading]     = useState(false);
-  const [assigning, setAssigning]           = useState(false);
   const [assignMsg, setAssignMsg]           = useState('');
 
   const loadDashboard = () =>
@@ -263,28 +149,10 @@ export default function ClientDashboard() {
 
   useEffect(() => { loadDashboard(); }, []);
 
-  async function openAttyPicker() {
-    setShowAttyPicker(true);
-    if (attorneys.length) return;
-    setAttysLoading(true);
-    try   { setAttorneys((await usersApi.availableAttorneys()).data || []); }
-    finally { setAttysLoading(false); }
-  }
-
-  async function handleAssign(attorneyId) {
-    if (!data?.matter?.id) return;
-    setAssigning(true);
-    try {
-      await mattersApi.assignAttorney(data.matter.id, attorneyId);
-      setShowAttyPicker(false);
-      setAssignMsg('Attorney request sent! They will review and accept your case.');
-      setTimeout(() => setAssignMsg(''), 5000);
-      setLoading(true);
-      loadDashboard();
-    } catch (err) {
-      setAssignMsg(err.response?.data?.error || 'Failed to assign attorney');
-      setTimeout(() => setAssignMsg(''), 4000);
-    } finally { setAssigning(false); }
+  function handleAssigned(msg, isError) {
+    setAssignMsg(msg);
+    setTimeout(() => setAssignMsg(''), isError ? 4000 : 5000);
+    if (!isError) { setLoading(true); loadDashboard(); }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size={8} /></div>;
@@ -410,14 +278,12 @@ export default function ClientDashboard() {
                   <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                     {matter.description && <span>{matter.description} ·</span>}
                     {matter.attorney_name
-                      ? <span className="flex items-center gap-1">
+                      ? <span className="flex items-center gap-1.5">
                           <UserCheck size={11} className={caseAccepted ? 'text-green-500' : 'text-amber-500'} />
                           {matter.attorney_name}
-                          {caseAccepted
-                            ? <span className="text-green-600 font-medium ml-1">· Accepted</span>
-                            : <span className="text-amber-600 font-medium ml-1">· Pending</span>}
+                          <AttorneyStatusBadge hasAttorney caseAccepted={caseAccepted} />
                         </span>
-                      : <button onClick={openAttyPicker}
+                      : <button onClick={() => setShowAttyPicker(true)}
                           className="text-amber-600 font-medium hover:text-amber-700 underline underline-offset-2">
                           Attorney not yet assigned — click to select
                         </button>
@@ -623,7 +489,7 @@ export default function ClientDashboard() {
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                 Choose a registered attorney or invite your own to the platform.
               </p>
-              <button onClick={openAttyPicker}
+              <button onClick={() => setShowAttyPicker(true)}
                 className="w-full py-2 bg-[#0f2057] text-white text-sm font-semibold rounded-xl hover:bg-[#1a3476] transition-colors mb-2">
                 View Available Attorneys
               </button>
@@ -643,17 +509,21 @@ export default function ClientDashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">{matter.attorney_name || 'Your Attorney'}</div>
-                  <div className={`text-xs flex items-center gap-1 ${caseAccepted ? 'text-green-600' : 'text-amber-600'}`}>
-                    {caseAccepted ? <><Check size={10} /> Case Accepted</> : <><Clock size={10} /> Pending Acceptance</>}
-                  </div>
+                  <AttorneyStatusBadge hasAttorney caseAccepted={caseAccepted} />
                 </div>
               </div>
-              {caseAccepted && (
-                <button onClick={() => navigate('/messages')}
-                  className="w-full flex items-center justify-center gap-2 py-2 bg-[#0f2057] text-white text-xs font-semibold rounded-lg hover:bg-[#1a3476] transition-colors">
-                  <MessageSquare size={13} /> Send Message to Attorney
+              <div className="flex gap-2">
+                {caseAccepted && (
+                  <button onClick={() => navigate('/messages')}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#0f2057] text-white text-xs font-semibold rounded-lg hover:bg-[#1a3476] transition-colors">
+                    <MessageSquare size={13} /> Message
+                  </button>
+                )}
+                <button onClick={() => setShowAttyPicker(true)}
+                  className={`flex items-center justify-center gap-1.5 py-2 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${caseAccepted ? 'flex-1' : 'w-full'}`}>
+                  <RefreshCw size={12} /> Change Attorney
                 </button>
-              )}
+              </div>
             </div>
           )}
 
@@ -753,41 +623,14 @@ export default function ClientDashboard() {
         </div>
       </div>
 
-      {/* Attorney Picker Modal */}
-      {showAttyPicker && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-              <div>
-                <div className="font-bold text-gray-900 dark:text-white">Choose Your Attorney</div>
-                <div className="text-xs text-gray-500">Select an attorney to handle your case</div>
-              </div>
-              <button onClick={() => setShowAttyPicker(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {attysLoading ? (
-                <div className="flex justify-center py-8"><Spinner /></div>
-              ) : attorneys.length === 0 ? (
-                <div className="text-center py-8 space-y-3">
-                  <div className="text-gray-400 text-sm">No attorneys available at this time</div>
-                  <button onClick={() => { setShowAttyPicker(false); setShowInvite(true); }}
-                    className="text-xs bg-[#0f2057] text-white px-4 py-2 rounded-lg hover:bg-[#1a3476]">
-                    Invite Your Attorney by Email
-                  </button>
-                </div>
-              ) : attorneys.map(a => (
-                <AttorneyCard key={a.id} attorney={a} onAssign={handleAssign} assigning={assigning} />
-              ))}
-            </div>
-            <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700">
-              <button onClick={() => { setShowAttyPicker(false); setShowInvite(true); }}
-                className="w-full text-xs text-[#0f2057] dark:text-blue-400 font-medium flex items-center justify-center gap-1 hover:underline">
-                <Mail size={12} /> My attorney isn't listed — invite them
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AttorneyPickerModal
+        open={showAttyPicker}
+        onClose={() => setShowAttyPicker(false)}
+        matterId={matter?.id}
+        currentAttorneyId={matter?.attorney_id}
+        onAssigned={handleAssigned}
+        onInviteInstead={() => setShowInvite(true)}
+      />
 
       {showInvite && <InviteAttorneyModal onClose={() => setShowInvite(false)} />}
     </div>
