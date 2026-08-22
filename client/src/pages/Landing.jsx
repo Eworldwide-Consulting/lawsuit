@@ -1317,7 +1317,7 @@ export default function Landing() {
               </h2>
               <p className="text-gray-500 text-lg leading-relaxed">
                 Legacy legal platforms are slow, insecure, and fragmented. TriVanta brings together
-                every tool you need — encrypted vault, expert review, and attorney booking — in a
+                every tool you need  encrypted vault, expert review, and attorney booking  in a
                 single, privacy-first environment.
               </p>
             </div>
