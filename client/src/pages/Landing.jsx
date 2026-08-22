@@ -8,7 +8,7 @@ import {
   Users, Bell, Menu, X, Globe, Award,
   Database, Eye, Fingerprint, Check, Phone,
   Mail, BarChart2, Key, ChevronDown, Zap,
-  TrendingUp, Clock, BookOpen, Scale, Sparkles,
+  TrendingUp, Clock, Scale, Sparkles,
 } from 'lucide-react';
 
 export default function Landing() {
@@ -116,7 +116,7 @@ export default function Landing() {
   };
   const onOrbitPointerUp = () => { orbitDragRef.current.dragging = false; };
 
-  // ── Impact grid (3D tilt cards) ───────────────────────
+  // ── Why TriVanta reveal (numbered list + reach panel) ─
   const impactRef = useRef(null);
   const [impactVisible, setImpactVisible] = useState(false);
 
@@ -128,27 +128,6 @@ export default function Landing() {
     if (impactRef.current) io.observe(impactRef.current);
     return () => io.disconnect();
   }, []);
-
-  const onImpactMove = (e) => {
-    if (reducedMotion) return;
-    const el = e.currentTarget;
-    const r  = el.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width;
-    const py = (e.clientY - r.top)  / r.height;
-    const rx = (0.5 - py) * 20;
-    const ry = (px - 0.5) * 20;
-    el.style.transition = 'transform .12s ease-out, box-shadow .2s ease';
-    el.style.transform  = `rotateX(${rx}deg) rotateY(${ry}deg) scale3d(1.045,1.045,1.045)`;
-    el.style.setProperty('--mx', `${px * 100}%`);
-    el.style.setProperty('--my', `${py * 100}%`);
-    el.style.setProperty('--glare', '1');
-  };
-  const onImpactLeave = (e) => {
-    const el = e.currentTarget;
-    el.style.transition = 'transform .6s cubic-bezier(.22,1,.36,1), box-shadow .3s ease';
-    el.style.transform  = 'rotateX(0deg) rotateY(0deg) scale3d(1,1,1)';
-    el.style.setProperty('--glare', '0');
-  };
 
   const onSrvMove = (e) => {
     const el = e.currentTarget;
@@ -538,63 +517,82 @@ export default function Landing() {
           .orbit-ring, .stat-orbit-core, .stat-orbit-card-inner, .orbit-particle { animation: none; }
         }
 
-        /* ── Impact Grid (3D tilt cards) ── */
-        @keyframes impactCardIn {
-          from { opacity: 0; transform: translateY(36px) scale(.95); }
-          to   { opacity: 1; transform: translateY(0)    scale(1);   }
+        /* ── Why TriVanta — numbered dossier list ── */
+        @keyframes whyRowIn {
+          from { opacity: 0; transform: translateY(22px); }
+          to   { opacity: 1; transform: translateY(0);    }
         }
-        .impact-grid { perspective: 1100px; }
-        .impact-card {
+        .why-row {
           opacity: 0;
-          transform: translateY(36px) scale(.95);
+          transform: translateY(22px);
         }
-        .impact-grid.impact-in .impact-card {
-          animation: impactCardIn .75s cubic-bezier(.22,1,.36,1) both;
+        .why-in .why-row {
+          animation: whyRowIn .6s cubic-bezier(.22,1,.36,1) both;
         }
-        .impact-card-inner {
-          position: relative;
-          border-radius: 20px;
-          padding: 26px;
+        .why-num {
+          transition: color .3s ease;
+        }
+        .why-row:hover .why-num {
+          color: rgba(212,175,55,.85);
+        }
+        .why-row-bar {
+          transition: background-color .3s ease;
+        }
+        .why-row:hover .why-row-bar {
+          background-color: #d4af37;
+        }
+
+        /* ── Why TriVanta — nationwide reach panel ── */
+        .reach-panel {
+          opacity: 0;
+          transform: translateY(28px);
+        }
+        .why-in .reach-panel {
+          animation: fadeUp .75s cubic-bezier(.22,1,.36,1) both;
+          animation-delay: .15s;
+        }
+        .reach-mosaic {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(3, 34px);
+          gap: 3px;
+          grid-template-areas:
+            "w  w  .  ne"
+            "w  w  mw mw"
+            "s  s  s  s";
+        }
+        .reach-block {
+          border-radius: 6px;
+          background: linear-gradient(135deg,#d4af37,#f5cc5a);
           display: flex;
-          flex-direction: column;
-          gap: 12px;
-          cursor: default;
+          align-items: center;
+          justify-content: center;
+          font-size: .68rem;
+          font-weight: 800;
+          letter-spacing: .03em;
+          color: #060e2d;
           overflow: hidden;
-          transform-style: preserve-3d;
-          will-change: transform;
-          box-shadow: 0 10px 26px rgba(15,23,42,.12);
+          white-space: nowrap;
         }
-        .impact-card-icon,
-        .impact-card-value,
-        .impact-card-label {
-          position: relative;
-          z-index: 1;
-        }
-        .impact-card-icon  { transform: translateZ(38px); }
-        .impact-card-value { transform: translateZ(26px); }
-        .impact-card-label { transform: translateZ(14px); }
-        .impact-card-glare {
-          position: absolute;
-          inset: 0;
-          border-radius: inherit;
-          pointer-events: none;
-          background: radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.5), transparent 62%);
-          opacity: var(--glare, 0);
-          transition: opacity .25s ease;
-          mix-blend-mode: overlay;
-        }
-        .impact-card-shine {
-          position: absolute;
-          left: 0; right: 0; top: 0;
-          height: 40%;
-          background: linear-gradient(180deg, rgba(255,255,255,.16), transparent);
-          pointer-events: none;
-          transform: translateZ(2px);
+        .reach-chip {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 30px;
+          padding: 3px 6px;
+          border-radius: 6px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          color: #cfe0ff;
+          font-size: .68rem;
+          font-weight: 700;
+          letter-spacing: .02em;
+          font-variant-numeric: tabular-nums;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .impact-card { opacity: 1 !important; transform: none !important; animation: none !important; }
-          .impact-card-inner { transform: none !important; }
+          .why-row { opacity: 1 !important; transform: none !important; animation: none !important; }
+          .reach-panel { opacity: 1 !important; transform: none !important; animation: none !important; }
         }
       `}</style>
 
@@ -879,7 +877,7 @@ export default function Landing() {
                 <span className="text-gold-400/90 section-label">Platform Statistics</span>
               </div>
               <h2 className="font-display text-3xl md:text-4xl font-bold text-white tracking-tight">
-                The Platform That <span className="gold-shimmer">Outperforms Your In-House Team</span> — Every Single Day
+                The Platform That <span className="gold-shimmer">Supports Your In-House Team</span> — Every Single Day
               </h2>
             </div>
 
@@ -1288,69 +1286,139 @@ export default function Landing() {
         {/* ════════════════════════
             IMPACT / WHY TRIVANTA
         ════════════════════════ */}
-        <section className="py-24 bg-white">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              <div>
-                <span className="section-label text-navy-500 bg-navy-50 rounded-full px-4 py-2 inline-block mb-6">
-                  Why TriVanta
-                </span>
-                <h2 className="font-display text-4xl md:text-5xl font-bold text-navy-950 mb-6 leading-tight tracking-tight">
-                  Built for Modern<br />
-                  Legal Compliance
-                </h2>
-                <p className="text-gray-500 text-lg leading-relaxed mb-8">
-                  Legacy legal platforms are slow, insecure, and fragmented. TriVanta brings together
-                  every tool you need — encrypted vault, expert review, and attorney booking — in a
-                  single, privacy-first environment.
-                </p>
+        <section className="py-24 bg-white relative overflow-hidden">
+          {/* Ambient watermark + dot field */}
+          <Scale
+            size={560}
+            strokeWidth={0.6}
+            aria-hidden="true"
+            className="hidden md:block absolute -right-28 top-1/2 -translate-y-1/2 text-navy-950 pointer-events-none select-none"
+            style={{ opacity: .035 }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'radial-gradient(rgba(15,32,87,.09) 1px, transparent 1px)',
+              backgroundSize: '26px 26px',
+              maskImage: 'radial-gradient(ellipse 65% 55% at 50% 40%, black, transparent)',
+              WebkitMaskImage: 'radial-gradient(ellipse 65% 55% at 50% 40%, black, transparent)',
+            }}
+          />
 
-                <div className="space-y-4">
-                  {[
-                    { icon: Zap,       title: 'Instant Setup',           desc: 'Live in under 5 minutes. No IT team required.'           },
-                    { icon: Lock,      title: 'Zero-Knowledge Security',  desc: 'Your data is unreadable even to our engineers.'          },
-                    { icon: TrendingUp,title: 'Real-time Case Tracking',  desc: 'Always know exactly where your matter stands.'           },
-                    { icon: Clock,     title: '24-Hour Document Review',  desc: 'Qualified attorneys review your filings within 24 hours.' },
-                    { icon: Scale,     title: 'Fully GDPR Compliant',     desc: 'Built from the ground up for global privacy law.'        },
-                  ].map(({ icon: Icon, title, desc }) => (
-                    <div key={title} className="flex items-start gap-4 p-4 rounded-xl hover:bg-navy-50 transition-colors duration-200 cursor-default">
-                      <div className="w-9 h-9 rounded-lg bg-navy-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Icon size={17} className="text-navy-600" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-navy-950 text-sm">{title}</div>
-                        <div className="text-gray-500 text-sm">{desc}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="max-w-6xl mx-auto px-6 relative z-10">
 
-              {/* Visual grid — 3D tilt cards */}
-              <div
-                ref={impactRef}
-                className={`impact-grid grid grid-cols-2 gap-4${impactVisible ? ' impact-in' : ''}`}
-              >
+            {/* Header — centered */}
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <span className="section-label text-navy-500 bg-navy-50 rounded-full px-4 py-2 inline-block mb-6">
+                Why TriVanta
+              </span>
+              <h2 className="font-display text-4xl md:text-5xl font-bold text-navy-950 mb-6 leading-tight tracking-tight">
+                Built for Modern Legal Compliance
+              </h2>
+              <p className="text-gray-500 text-lg leading-relaxed">
+                Legacy legal platforms are slow, insecure, and fragmented. TriVanta brings together
+                every tool you need — encrypted vault, expert review, and attorney booking — in a
+                single, privacy-first environment.
+              </p>
+            </div>
+
+            <div
+              ref={impactRef}
+              className={`grid lg:grid-cols-12 gap-10 lg:gap-14 items-start${impactVisible ? ' why-in' : ''}`}
+            >
+
+              {/* Numbered dossier list */}
+              <div className="lg:col-span-7">
                 {[
-                  { value: '12,400+', label: 'Clients Served',      icon: Users,       bg: 'bg-navy-950', textVal: 'text-gold-400', textLbl: 'text-blue-300' },
-                  { value: '99.97%',  label: 'Platform Uptime',     icon: TrendingUp,  bg: 'bg-green-600', textVal: 'text-white',    textLbl: 'text-green-100' },
-                  { value: '24 hrs',  label: 'Review Turnaround',   icon: Clock,       bg: 'bg-gold-500',  textVal: 'text-navy-950', textLbl: 'text-navy-800' },
-                  { value: '640+',    label: 'Verified Attorneys',  icon: BookOpen,    bg: 'bg-navy-950',  textVal: 'text-gold-400', textLbl: 'text-blue-300' },
-                ].map(({ value, label, icon: Icon, bg, textVal, textLbl }, i) => (
-                  <div key={label} className="impact-card" style={{ animationDelay: `${i * .12}s` }}>
-                    <div
-                      className={`impact-card-inner ${bg}`}
-                      onMouseMove={onImpactMove}
-                      onMouseLeave={onImpactLeave}
-                    >
-                      <div className="impact-card-shine" />
-                      <div className="impact-card-glare" />
-                      <Icon size={20} className={`impact-card-icon ${textLbl}`} />
-                      <div className={`impact-card-value font-display text-3xl font-bold ${textVal}`}>{value}</div>
-                      <div className={`impact-card-label text-sm font-medium ${textLbl}`}>{label}</div>
+                  { icon: Zap,        title: 'Instant Setup',           desc: 'Live in under 5 minutes. No IT team required.'            },
+                  { icon: Lock,       title: 'Zero-Knowledge Security', desc: 'Your data is unreadable even to our engineers.'           },
+                  { icon: TrendingUp, title: 'Real-time Case Tracking', desc: 'Always know exactly where your matter stands.'            },
+                  { icon: Clock,      title: '24-Hour Document Review', desc: 'Qualified attorneys review your filings within 24 hours.' },
+                  { icon: Scale,      title: 'Fully GDPR Compliant',    desc: 'Built from the ground up for global privacy law.'         },
+                ].map(({ icon: Icon, title, desc }, i) => (
+                  <div
+                    key={title}
+                    className="why-row group flex items-center gap-5 md:gap-6 py-5 border-b border-navy-50 last:border-0 cursor-default"
+                    style={{ animationDelay: `${i * .1}s` }}
+                  >
+                    <span className="why-num font-display text-4xl md:text-5xl font-semibold text-navy-100 flex-shrink-0 w-12 md:w-14 tabular-nums">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="why-row-bar w-0.5 self-stretch bg-navy-100 flex-shrink-0" />
+                    <div className="w-10 h-10 rounded-lg bg-navy-50 flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover:bg-gold-500/12">
+                      <Icon size={18} className="text-navy-600 transition-colors duration-300 group-hover:text-gold-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-navy-950">{title}</div>
+                      <div className="text-gray-500 text-sm">{desc}</div>
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Nationwide Reach — regional breakdown + full state list */}
+              <div className="lg:col-span-5">
+                <div className="reach-panel rounded-2xl bg-navy-950 border border-white/5 overflow-hidden">
+                  <div className="p-7 md:p-8">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-blue-300/60 text-xs font-bold uppercase tracking-widest">Nationwide Reach</span>
+                      <Globe size={16} className="text-gold-400/70" />
+                    </div>
+                    <div className="font-display text-2xl md:text-3xl font-bold text-white mb-6">
+                      Clients Support in All 50 States
+                    </div>
+
+                    {/* Regional mosaic */}
+                    <div className="reach-mosaic mb-7" aria-hidden="true">
+                      <div className="reach-block" style={{ gridArea: 'w' }}><span>West</span></div>
+                      <div className="reach-block" style={{ gridArea: 'mw', opacity: .82 }}><span>Midwest</span></div>
+                      <div className="reach-block" style={{ gridArea: 'ne', opacity: .68 }}><span>NE</span></div>
+                      <div className="reach-block" style={{ gridArea: 's' }}><span>South</span></div>
+                    </div>
+
+                    {/* Region breakdown bars */}
+                    <div className="space-y-4 mb-7">
+                      {[
+                        { name: 'South',     count: 17 },
+                        { name: 'West',      count: 13 },
+                        { name: 'Midwest',   count: 12 },
+                        { name: 'Northeast', count: 9  },
+                      ].map(r => (
+                        <div key={r.name}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-white text-sm font-medium">{r.name}</span>
+                            <span className="text-gold-400 text-xs font-bold tabular-nums">{r.count} states</span>
+                          </div>
+                          <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-gold-600 to-gold-400"
+                              style={{ width: `${(r.count / 17) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Full state list, grouped by region */}
+                    <div className="border-t border-white/8 pt-6 space-y-4">
+                      {[
+                        { name: 'South',     states: ['AL','AR','DC','DE','FL','GA','KY','LA','MD','MS','NC','OK','SC','TN','TX','VA','WV'] },
+                        { name: 'West',      states: ['AK','AZ','CA','CO','HI','ID','MT','NM','NV','OR','UT','WA','WY'] },
+                        { name: 'Midwest',   states: ['IA','IL','IN','KS','MI','MN','MO','ND','NE','OH','SD','WI'] },
+                        { name: 'Northeast', states: ['CT','MA','ME','NH','NJ','NY','PA','RI','VT'] },
+                      ].map(r => (
+                        <div key={r.name}>
+                          <div className="text-blue-300/45 text-[10px] font-bold uppercase tracking-widest mb-2">{r.name}</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {r.states.map(s => (
+                              <span key={s} className="reach-chip">{s}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
