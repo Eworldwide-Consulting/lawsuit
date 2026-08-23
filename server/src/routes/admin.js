@@ -24,7 +24,10 @@ router.get('/stats', ...guard, async (req, res, next) => {
         SUM(CASE WHEN role='attorney'  THEN 1 ELSE 0 END) AS attorneys,
         SUM(CASE WHEN role='partner'   THEN 1 ELSE 0 END) AS partners,
         SUM(CASE WHEN approval_status='pending' THEN 1 ELSE 0 END) AS pendingApprovals,
-        SUM(CASE WHEN email_verified=0 THEN 1 ELSE 0 END) AS unverifiedEmails
+        SUM(CASE WHEN email_verified=0 THEN 1 ELSE 0 END) AS unverifiedEmails,
+        SUM(CASE WHEN email_verified=0 AND role='client'   THEN 1 ELSE 0 END) AS unverifiedClients,
+        SUM(CASE WHEN email_verified=0 AND role='attorney' THEN 1 ELSE 0 END) AS unverifiedAttorneys,
+        SUM(CASE WHEN email_verified=0 AND role='partner'  THEN 1 ELSE 0 END) AS unverifiedPartners
         FROM users`),
       one(`SELECT COUNT(*) AS total,
         SUM(CASE WHEN status='active'  THEN 1 ELSE 0 END) AS active,
@@ -41,7 +44,11 @@ router.get('/stats', ...guard, async (req, res, next) => {
         FROM messages`),
     ]);
     res.json({
-      users:     { total: +u.total, clients: +u.clients, attorneys: +u.attorneys, partners: +u.partners, pendingApprovals: +u.pendingApprovals, unverifiedEmails: +u.unverifiedEmails },
+      users:     {
+        total: +u.total, clients: +u.clients, attorneys: +u.attorneys, partners: +u.partners,
+        pendingApprovals: +u.pendingApprovals, unverifiedEmails: +u.unverifiedEmails,
+        unverifiedClients: +u.unverifiedClients, unverifiedAttorneys: +u.unverifiedAttorneys, unverifiedPartners: +u.unverifiedPartners,
+      },
       matters:   { total: +m.total, active: +m.active, atRisk: +m.atRisk },
       documents: { total: +d.total, pending: +d.pending },
       tasks:     { total: +t.total, overdue: +t.overdue },
@@ -183,6 +190,70 @@ router.get('/users', ...guard, async (req, res, next) => {
   try {
     const { limit, offset } = parsePagination(req.query);
     res.json(await UserRepo.findAll({ limit, offset }));
+  } catch (err) { next(err); }
+});
+
+// Full profile view for the admin/partner "click a user" detail panel —
+// core info + role-specific matters (as client or as attorney) + recent
+// activity involving them (as actor or as target) + payment history (clients).
+router.get('/users/:id/profile', ...guard, async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const row = await one(`
+      SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role,
+             u.avatar_initials, u.avatar_url, u.email_verified, u.approval_status,
+             u.status, u.suspended_at, u.suspended_reason, u.created_at, u.last_login,
+             u.login_provider, u.two_fa_enabled, u.is_prime,
+             up.bar_number, up.state_bar, up.years_experience, up.specializations,
+             up.firm_role, up.practice_groups
+      FROM users u
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      WHERE u.id = ?
+    `, [id]);
+    if (!row) return res.status(404).json({ error: 'User not found' });
+
+    const { bar_number, state_bar, years_experience, specializations, firm_role, practice_groups, ...user } = row;
+    const profile = (bar_number || state_bar || years_experience || specializations || firm_role || practice_groups)
+      ? { bar_number, state_bar, years_experience, specializations, firm_role, practice_groups }
+      : null;
+
+    let matters = [];
+    if (user.role === 'client') {
+      matters = await all(`
+        SELECT m.id, m.case_number, m.matter_type, m.stage, m.status, m.created_at,
+               a.first_name AS other_first_name, a.last_name AS other_last_name
+        FROM matters m
+        LEFT JOIN users a ON a.id = m.attorney_id
+        WHERE m.client_id = ?
+        ORDER BY m.created_at DESC
+      `, [id]);
+    } else if (['attorney', 'partner'].includes(user.role)) {
+      matters = await all(`
+        SELECT m.id, m.case_number, m.matter_type, m.stage, m.status, m.created_at,
+               c.first_name AS other_first_name, c.last_name AS other_last_name
+        FROM matters m
+        LEFT JOIN users c ON c.id = m.client_id
+        WHERE m.attorney_id = ?
+        ORDER BY m.created_at DESC
+      `, [id]);
+    }
+
+    const activityRows = await all(`
+      SELECT a.id, a.action, a.entity, a.entity_id, a.created_at
+      FROM audit_log a
+      WHERE a.user_id = ? OR (a.entity = 'user' AND a.entity_id = ?)
+      ORDER BY a.created_at DESC
+      LIMIT 25
+    `, [id, id]);
+    const activity = activityRows.map(r => ({ ...r, details: r.action.replace(/\./g, ' · ').replace(/_/g, ' ') }));
+
+    let payments = [];
+    if (user.role === 'client') {
+      const InvoiceRepo = require('../repositories/invoice.repository');
+      payments = await InvoiceRepo.findByClient(id, { limit: 20, offset: 0 });
+    }
+
+    res.json({ user, profile, matters, activity, payments });
   } catch (err) { next(err); }
 });
 

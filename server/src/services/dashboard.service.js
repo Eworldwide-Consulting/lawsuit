@@ -203,7 +203,8 @@ const DashboardService = {
          LIMIT 8`
       ),
       db.all(
-        `SELECT u.first_name || ' ' || u.last_name AS name,
+        `SELECT u.id,
+                u.first_name || ' ' || u.last_name AS name,
                 u.avatar_initials AS initials,
                 COALESCE(SUM(i.amount), 0) AS billed_cents,
                 COALESCE(SUM(CASE WHEN i.status = 'paid' THEN i.amount ELSE 0 END), 0) AS collected_cents,
@@ -283,6 +284,7 @@ const DashboardService = {
 
     // Top clients for revenue table
     const topClientsList = topClients.map(c => ({
+      id:        c.id,
       name:      c.name,
       initials:  c.initials || (c.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
       billed:    Math.round(Number(c.billed_cents) / 100),

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
+import UserProfileModal from '../../components/admin/UserProfileModal';
 import {
   Users, CheckCircle, XCircle, Clock, AlertTriangle, Database,
   Activity, Server, Mail, CreditCard, Shield, RefreshCw, Loader2,
@@ -123,6 +124,7 @@ export default function ITSupportDashboard() {
   const [rejectModal, setRejectModal] = useState(null); // { id, name }
   const [rejectNotes, setRejectNotes] = useState('');
   const [roleModal, setRoleModal] = useState(null); // { id, name, current }
+  const [profileUserId, setProfileUserId] = useState(null);
   const [usersSearch, setUsersSearch] = useState('');
   const [resetPwModal, setResetPwModal] = useState(null); // { id, name }
   const [newPw, setNewPw]           = useState('');
@@ -315,7 +317,10 @@ export default function ITSupportDashboard() {
                 <StatCard label="Attorneys"           value={s.users.attorneys}        icon={Shield}    color="purple" />
                 <StatCard label="Partners"            value={s.users.partners}         icon={Shield}    color="blue"   />
                 <StatCard label="Pending Approvals"   value={s.users.pendingApprovals} icon={Clock}     color="orange" />
-                <StatCard label="Unverified Emails"   value={s.users.unverifiedEmails} icon={Mail}      color="red"    />
+                <StatCard
+                  label="Unverified Emails" value={s.users.unverifiedEmails} icon={Mail} color="red"
+                  sub={`${s.users.unverifiedClients || 0} clients · ${s.users.unverifiedAttorneys || 0} attorneys · ${s.users.unverifiedPartners || 0} partners`}
+                />
               </div>
             </div>
           )}
@@ -358,12 +363,21 @@ export default function ITSupportDashboard() {
             <div className="divide-y divide-gray-100">
               {pending.map(u => (
                 <div key={u.id} className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 shrink-0">
+                  <button
+                    onClick={() => setProfileUserId(u.id)}
+                    className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 shrink-0 hover:ring-2 hover:ring-blue-300 transition-all"
+                    title="View full profile"
+                  >
                     {u.avatar_initials || (u.first_name?.[0] + u.last_name?.[0]).toUpperCase()}
-                  </div>
+                  </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900">{u.first_name} {u.last_name}</span>
+                      <button
+                        onClick={() => setProfileUserId(u.id)}
+                        className="font-semibold text-gray-900 hover:text-blue-600 hover:underline"
+                      >
+                        {u.first_name} {u.last_name}
+                      </button>
                       <RoleBadge role={u.role} />
                       {!u.email_verified && <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Email unverified</span>}
                     </div>
@@ -453,7 +467,13 @@ export default function ITSupportDashboard() {
                 {filteredUsers.map(u => (
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-5 py-3">
-                      <div className="font-medium text-gray-900">{u.first_name} {u.last_name}</div>
+                      <button
+                        onClick={() => setProfileUserId(u.id)}
+                        className="font-medium text-gray-900 hover:text-blue-600 hover:underline text-left"
+                        title="View full profile"
+                      >
+                        {u.first_name} {u.last_name}
+                      </button>
                       <div className="text-xs text-gray-400">{u.email}</div>
                     </td>
                     <td className="px-5 py-3">
@@ -749,6 +769,12 @@ export default function ITSupportDashboard() {
           </div>
         </div>
       )}
+
+      <UserProfileModal
+        userId={profileUserId}
+        open={!!profileUserId}
+        onClose={() => setProfileUserId(null)}
+      />
     </div>
   );
 }

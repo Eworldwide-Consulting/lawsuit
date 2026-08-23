@@ -8,6 +8,7 @@ import {
   TrendingUp, DollarSign, FileText, Users, Calendar, MessageSquare,
 } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
+import UserProfileModal from '../../components/admin/UserProfileModal';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = n => {
@@ -112,6 +113,7 @@ export default function PartnerDashboard() {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [profileUserId, setProfileUserId] = useState(null);
 
   useEffect(() => {
     dashboardApi.partner().then(r => setData(r.data)).catch(() => setData(null)).finally(() => setLoading(false));
@@ -426,12 +428,17 @@ export default function PartnerDashboard() {
                   <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="py-2 pr-3 text-gray-400 font-medium">{i + 1}</td>
                     <td className="pr-3">
-                      <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => c.id && setProfileUserId(c.id)}
+                        disabled={!c.id}
+                        className="flex items-center gap-1.5 hover:text-blue-600 disabled:cursor-default"
+                        title={c.id ? 'View full profile' : undefined}
+                      >
                         <div className="w-6 h-6 rounded-full bg-navy-900 text-white text-[9px] flex items-center justify-center font-bold flex-shrink-0">
                           {c.initials}
                         </div>
-                        <span className="text-gray-700 font-medium">{c.name}</span>
-                      </div>
+                        <span className="text-gray-700 font-medium hover:underline">{c.name}</span>
+                      </button>
                     </td>
                     <td className="pr-3 font-semibold text-gray-800">{fmtShort(c.billed)}</td>
                     <td className="pr-3 text-green-600 font-semibold">{fmtShort(c.collected)}</td>
@@ -587,6 +594,12 @@ export default function PartnerDashboard() {
 
         </div>
       </div>
+
+      <UserProfileModal
+        userId={profileUserId}
+        open={!!profileUserId}
+        onClose={() => setProfileUserId(null)}
+      />
     </div>
   );
 }

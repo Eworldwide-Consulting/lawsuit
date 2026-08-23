@@ -1,15 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mattersApi, formsApi } from '../api';
-import { ArrowLeft, Calendar, FileText, MapPin, Shield } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, MapPin, Shield, Loader2 } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import Badge from '../components/ui/Badge';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+
+// Mirrors server/src/domain/matter.js MATTER_STAGES — kept in sync manually,
+// same convention as the read-only stageLabel() formatting already in use here.
+const STAGE_OPTIONS = [
+  'intake', 'hearing_prep', 'initial_inventory', 'monthly_records',
+  'annual_return_prep', 'court_review', 'complete',
+];
 
 export default function MatterDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
+  const toast = useToast();
   const [matter, setMatter] = useState(null);
   const [intakeForm, setIntakeForm] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [stageSaving, setStageSaving] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +39,21 @@ export default function MatterDetail() {
   if (!matter) return <div className="p-6 text-gray-500">Matter not found.</div>;
 
   const stageLabel = s => s?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—';
+  const canEditStage = ['attorney', 'partner'].includes(user?.role);
+
+  async function handleStageChange(newStage) {
+    if (newStage === matter.stage) return;
+    setStageSaving(true);
+    try {
+      await mattersApi.updateStage(matter.id, newStage);
+      setMatter(m => ({ ...m, stage: newStage }));
+      toast.success(`Stage updated to ${stageLabel(newStage)}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not update the stage.');
+    } finally {
+      setStageSaving(false);
+    }
+  }
 
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto">
@@ -40,8 +67,24 @@ export default function MatterDetail() {
             <div className="font-mono text-sm text-gray-500">Case #{matter.case_number}</div>
             <h1 className="text-xl font-bold text-gray-900 mt-0.5">{matter.description || 'Untitled Matter'}</h1>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <span className="badge badge-blue">{stageLabel(matter.stage)}</span>
+          <div className="flex gap-2 flex-wrap items-center">
+            {canEditStage ? (
+              <div className="relative">
+                <select
+                  value={matter.stage}
+                  disabled={stageSaving}
+                  onChange={e => handleStageChange(e.target.value)}
+                  className="badge badge-blue appearance-none pr-6 cursor-pointer disabled:opacity-60"
+                >
+                  {STAGE_OPTIONS.map(s => (
+                    <option key={s} value={s}>{stageLabel(s)}</option>
+                  ))}
+                </select>
+                {stageSaving && <Loader2 size={12} className="animate-spin absolute right-1.5 top-1/2 -translate-y-1/2" />}
+              </div>
+            ) : (
+              <span className="badge badge-blue">{stageLabel(matter.stage)}</span>
+            )}
             <span className={`badge ${matter.status === 'active' ? 'badge-green' : matter.status === 'at_risk' ? 'badge-red' : 'badge-gray'}`}>
               {matter.status === 'at_risk' ? 'At Risk' : matter.status === 'active' ? 'Active' : matter.status}
             </span>
