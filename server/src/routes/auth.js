@@ -128,6 +128,26 @@ router.post('/resend-login-code', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Attorney-signup email code (Google OAuth new-attorney path — see /google/callback below).
+// Separate temp-token claim (attorneySignupPending) from the password-login OTP above so
+// a stolen signup tempToken can never be replayed to finish somebody else's password login.
+router.post('/verify-attorney-signup', async (req, res, next) => {
+  try {
+    const result = await AuthService.verifyAttorneySignupOtp(req.body);
+    AuditService.log({
+      userId: result.user?.id, action: AuditService.ACTIONS.USER_EMAIL_VERIFIED,
+      meta: { provider: 'google', role: 'attorney' }, ip: req.ip,
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/resend-attorney-signup-code', async (req, res, next) => {
+  try {
+    res.json(await AuthService.resendAttorneySignupOtp(req.body));
+  } catch (err) { next(err); }
+});
+
 // L5: password reset — two-step flow (request token → consume token + set new password)
 router.post('/forgot-password', async (req, res, next) => {
   try {
@@ -229,6 +249,11 @@ router.get('/google', (req, res) => {
   if (!config.google.clientId)
     return res.redirect(`${config.client.url}/login?error=google_failed`);
 
+  // Round-tripped through Google's own `state` param so the callback knows
+  // which portal tab the user clicked "Continue with Google" from — Google
+  // echoes state back unchanged, it never touches the redirect_uri/allowlist.
+  const intent = req.query.intent === 'attorney' ? 'attorney' : 'client';
+
   res.redirect(
     `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
       client_id:     config.google.clientId,
@@ -237,6 +262,7 @@ router.get('/google', (req, res) => {
       scope:         'openid email profile',
       access_type:   'offline',
       prompt:        'select_account',
+      state:         intent,
     })}`
   );
 });
@@ -271,33 +297,56 @@ router.get('/google/callback', async (req, res) => {
 
     const { run, one } = require('../db');
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const intent = req.query.state === 'attorney' ? 'attorney' : 'client';
     let isNew = false;
     let user = await UserRepo.findByEmail(gUser.email);
     if (!user) {
       isNew = true;
       const fn = gUser.given_name  || gUser.name?.split(' ')[0]              || 'User';
       const ln = gUser.family_name || gUser.name?.split(' ').slice(1).join(' ') || '';
-      // approval_status is explicitly NULL for Google-created clients — identical to
-      // regular client registration where isPro=false sets approvalStatus to null.
-      // Without this the MySQL column default ('pending') blocks every new Google user.
-      const r  = await run(
-        `INSERT INTO users
-           (first_name, last_name, email, password_hash, role, avatar_initials,
-            email_verified, approval_status, google_id, avatar_url, login_provider, last_login)
-         VALUES (?,?,?,?,?,?,1,NULL,?,?,?,?)`,
-        [fn, ln, gUser.email.toLowerCase(), '', 'client',
-         `${fn[0]}${(ln[0] || fn[1] || 'U')}`.toUpperCase(),
-         gUser.id, gUser.picture || null, 'google', now]
-      );
-      user = await one('SELECT * FROM users WHERE id = ?', [r.insertId]);
+      const initials = `${fn[0]}${(ln[0] || fn[1] || 'U')}`.toUpperCase();
+
+      if (intent === 'attorney') {
+        // Mirrors the manual attorney registration path in AuthService.register():
+        // role=attorney, unverified until the code below is confirmed, and gated
+        // behind partner approval (approval_status='pending') exactly like every
+        // other professional signup — Google authenticating the email is not the
+        // same as a partner vouching for the applicant.
+        const r = await run(
+          `INSERT INTO users
+             (first_name, last_name, email, password_hash, role, avatar_initials,
+              email_verified, approval_status, google_id, avatar_url, login_provider, last_login)
+           VALUES (?,?,?,?,?,?,0,'pending',?,?,?,?)`,
+          [fn, ln, gUser.email.toLowerCase(), '', 'attorney', initials,
+           gUser.id, gUser.picture || null, 'google', now]
+        );
+        user = await one('SELECT * FROM users WHERE id = ?', [r.insertId]);
+      } else {
+        // approval_status is explicitly NULL for Google-created clients — identical to
+        // regular client registration where isPro=false sets approvalStatus to null.
+        // Without this the MySQL column default ('pending') blocks every new Google user.
+        const r  = await run(
+          `INSERT INTO users
+             (first_name, last_name, email, password_hash, role, avatar_initials,
+              email_verified, approval_status, google_id, avatar_url, login_provider, last_login)
+           VALUES (?,?,?,?,?,?,1,NULL,?,?,?,?)`,
+          [fn, ln, gUser.email.toLowerCase(), '', 'client', initials,
+           gUser.id, gUser.picture || null, 'google', now]
+        );
+        user = await one('SELECT * FROM users WHERE id = ?', [r.insertId]);
+      }
     } else {
-      // Update Google profile data and last login on every sign-in
+      // Update Google profile data and last login on every sign-in. Attorney
+      // accounts still mid-signup (started via Google, never entered their code)
+      // are left unverified here on purpose — the block below resends the code
+      // instead of silently marking them verified.
+      const stillPendingAttorneyCode = user.role === 'attorney' && !user.email_verified && user.login_provider !== 'email';
       await UserRepo.update(user.id, {
         google_id:      gUser.id,
         avatar_url:     gUser.picture || user.avatar_url || null,
         login_provider: user.login_provider === 'email' && !user.google_id ? 'email' : 'google',
         last_login:     now,
-        ...(user.email_verified ? {} : { email_verified: 1 }),
+        ...(user.email_verified || stillPendingAttorneyCode ? {} : { email_verified: 1 }),
       });
       user = await one('SELECT * FROM users WHERE id = ?', [user.id]);
     }
@@ -307,6 +356,31 @@ router.get('/google/callback', async (req, res) => {
     // skips them, so this flow treats the released email as a brand new user.)
     if (require('../domain/user').isSuspended(user))
       return res.redirect(`${config.client.url}/login?error=account_suspended`);
+
+    // Attorney accounts that haven't confirmed their signup code yet (brand new,
+    // or a repeat Google click before finishing) never get a JWT here — they go
+    // to the code-entry screen instead, same as the password-login OTP gate.
+    if (user.role === 'attorney' && !user.email_verified) {
+      let tempToken;
+      try {
+        tempToken = await AuthService.issueAttorneySignupOtp(user);
+      } catch (err) {
+        require('../logger').error({ err }, 'Attorney signup code send failed');
+        return res.redirect(`${config.client.url}/login?error=email_delivery_failed`);
+      }
+      if (isNew) {
+        AuditService.log({
+          userId: user.id, action: AuditService.ACTIONS.USER_REGISTERED,
+          meta: { provider: 'google', role: 'attorney' }, ip: req.ip,
+        });
+      }
+      const verifyParams = new URLSearchParams({
+        attorneyVerify: '1',
+        tempToken,
+        maskedEmail: user.email.replace(/^(.).*(@.*)$/, '$1***$2'),
+      });
+      return res.redirect(`${config.client.url}/auth/callback?${verifyParams}`);
+    }
 
     // Approval checks apply only to professional roles — consistent with the
     // regular login flow in auth.service.js which also gates on attorney/partner.

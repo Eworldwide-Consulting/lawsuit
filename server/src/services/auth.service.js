@@ -261,6 +261,69 @@ const AuthService = {
     return { success: true, maskedEmail: maskEmail(user.email) };
   },
 
+  // ── Attorney Google-signup verification ─────────────────────────────────────
+  // A brand-new attorney account created via /google/callback lands here instead
+  // of getting an immediate JWT: Google having verified the email address is not
+  // the same as this platform verifying the *applicant*, so a short-lived code
+  // (same hash:expiry convention as issueLoginOtp) gates account creation. The
+  // account row already exists (role=attorney, email_verified=0) by the time
+  // this runs — verifying the code only flips email_verified, it does not
+  // touch approval_status, so the partner-approval gate still applies afterward
+  // exactly as it does for a manually-registered attorney.
+  async issueAttorneySignupOtp(user) {
+    const code    = String(crypto.randomInt(100000, 1000000));
+    const hash    = crypto.createHash('sha256').update(code).digest('hex');
+    const expires = Date.now() + 10 * 60 * 1000;
+    await UserRepo.update(user.id, { login_otp: `${hash}:${expires}` });
+    const delivery = await EmailService.sendAttorneySignupCode(user.email, { firstName: user.first_name, code });
+    if (delivery && delivery.delivered === false) {
+      await UserRepo.update(user.id, { login_otp: null });
+      throw new AppError(
+        'We could not send your verification code right now. Please try again shortly.',
+        503, 'EMAIL_DELIVERY_FAILED'
+      );
+    }
+    return jwt.sign({ userId: user.id, attorneySignupPending: true }, config.jwt.secret, { expiresIn: '10m' });
+  },
+
+  async verifyAttorneySignupOtp({ tempToken, code }) {
+    let payload;
+    try { payload = jwt.verify(tempToken, config.jwt.secret); }
+    catch { throw new UnauthorizedError('Session expired. Please sign in with Google again.'); }
+    if (!payload.attorneySignupPending) throw new ValidationError('Invalid token');
+
+    const user = await UserRepo.findByIdWithLoginOtp(payload.userId);
+    if (!user?.login_otp) throw new UnauthorizedError('No active code. Please sign in with Google again.');
+
+    const [hash, expires] = user.login_otp.split(':');
+    if (Date.now() > Number(expires)) {
+      await UserRepo.update(user.id, { login_otp: null });
+      throw new UnauthorizedError('Code expired. Please request a new one.');
+    }
+    const given = crypto.createHash('sha256').update(String(code || '').trim()).digest('hex');
+    if (given !== hash) throw new UnauthorizedError('Invalid code');
+
+    await UserRepo.update(user.id, { login_otp: null, email_verified: 1 });
+    const verified = await UserRepo.findById(user.id);
+    // Same shape as verifyEmail(): a JWT is issued immediately even if
+    // approval_status is still 'pending' — the dashboard shows the pending-
+    // approval banner rather than gating the token itself, matching how a
+    // manually-registered attorney's email-link verification already behaves.
+    return { token: AuthService.signToken(verified.id), user: sanitizeUser(verified) };
+  },
+
+  async resendAttorneySignupOtp({ tempToken }) {
+    let payload;
+    try { payload = jwt.verify(tempToken, config.jwt.secret); }
+    catch { throw new UnauthorizedError('Session expired. Please sign in with Google again.'); }
+    if (!payload.attorneySignupPending) throw new ValidationError('Invalid token');
+
+    const user = await UserRepo.findById(payload.userId);
+    if (!user) throw new UnauthorizedError('User not found');
+    const newTempToken = await AuthService.issueAttorneySignupOtp(user);
+    return { success: true, maskedEmail: maskEmail(user.email), tempToken: newTempToken };
+  },
+
   async verify2fa({ tempToken, code }) {
     const payload = jwt.verify(tempToken, config.jwt.secret);
     if (!payload.twoFaPending) throw new ValidationError('Invalid token');

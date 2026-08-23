@@ -124,6 +124,17 @@ const EmailService = {
     return queue(JOB.ATTORNEY_PENDING, { to, firstName, lastName, email, role });
   },
 
+  // Direct send — same reasoning as sendLoginCode: the Google-signup verify
+  // screen is blocked on this code arriving, so it must not sit in the queue.
+  sendAttorneySignupCode(to, { firstName, code }) {
+    return send({
+      to,
+      subject: `${code} is your TriVanta attorney verification code`,
+      html: tmplAttorneySignupCode({ firstName, code }),
+      text: `Your TriVanta attorney verification code is ${code}. It expires in 10 minutes.`,
+    });
+  },
+
   sendAttorneyDecision(to, { firstName, decision }) {
     return queue(JOB.ATTORNEY_DECISION, { to, firstName, decision });
   },
@@ -429,6 +440,17 @@ function tmplLoginCode({ firstName, code }) {
       <span style="display:inline-block;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:16px 32px;font-size:32px;font-weight:800;letter-spacing:10px;color:#0f2057;font-family:monospace">${esc(code)}</span>
     </div>
     <p style="color:#9ca3af;font-size:13px">This code expires in <strong>10 minutes</strong>. If you did not try to sign in, change your password immediately.</p>
+  `);
+}
+
+function tmplAttorneySignupCode({ firstName, code }) {
+  return wrap(`
+    ${h2('Verify your attorney account')}
+    ${p(`Hi ${esc(firstName || 'there')}, use this code to verify your email and finish creating your TriVanta attorney account:`)}
+    <div style="text-align:center;margin:24px 0">
+      <span style="display:inline-block;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:16px 32px;font-size:32px;font-weight:800;letter-spacing:10px;color:#0f2057;font-family:monospace">${esc(code)}</span>
+    </div>
+    <p style="color:#9ca3af;font-size:13px">This code expires in <strong>10 minutes</strong>. Once verified, a TriVanta partner will review your account before you get full access.</p>
   `);
 }
 

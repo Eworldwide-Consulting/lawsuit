@@ -14,6 +14,7 @@ const SSO_ERRORS = {
   account_rejected:  'Your account was not approved. Please contact support.',
   account_suspended: 'Your account has been suspended. Please contact support to restore access.',
   account_deleted:   'This account has been closed. You can register again with the same email address.',
+  email_delivery_failed: 'We could not send your verification code right now. Please try again shortly.',
 };
 
 const ROLE_TABS = [
@@ -33,7 +34,7 @@ const ROLE_TABS = [
     icon:     Scale,
     heading:  'Attorney Portal',
     sub:      'Sign in to manage client cases.',
-    showSSO:  false,
+    showSSO:  true,
     active:   'border-indigo-600 text-indigo-600 bg-indigo-50',
     inactive: 'border-transparent text-gray-500 hover:text-gray-700',
   },
@@ -264,7 +265,7 @@ export default function Login() {
         </button>
       </form>
 
-      {/* â”€â”€ SSO buttons (Client only) â”€â”€ */}
+      {/* â”€â”€ SSO buttons â”€â”€ */}
       {tab.showSSO && (
         <>
           <div className="relative my-5">
@@ -277,7 +278,7 @@ export default function Login() {
           </div>
 
           <a
-            href="/api/auth/google"
+            href={`/api/auth/google${activeRole === 'attorney' ? '?intent=attorney' : ''}`}
             className="btn-secondary"
           >
             <svg width="18" height="18" viewBox="0 0 48 48">

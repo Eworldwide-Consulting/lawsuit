@@ -22,6 +22,20 @@ export default function AuthCallback() {
     const isNew    = params.get('isNew') === '1';
     setProvider(prov);
 
+    // New attorney signup via Google — no JWT yet, the account still needs its
+    // emailed code confirmed. Hand off to the same /verify screen the password
+    // login OTP uses, just in "attorney_signup" mode.
+    const attorneyVerify = params.get('attorneyVerify') === '1';
+    const tempToken       = params.get('tempToken');
+    if (attorneyVerify && tempToken) {
+      window.history.replaceState({}, '', '/auth/callback');
+      sessionStorage.setItem('lp_temp_token', tempToken);
+      sessionStorage.setItem('lp_otp_mode', 'attorney_signup');
+      sessionStorage.setItem('lp_otp_email', params.get('maskedEmail') || '');
+      navigate('/verify', { replace: true });
+      return;
+    }
+
     if (error || !token) {
       navigate('/login?error=' + (error || 'unknown'), { replace: true });
       return;

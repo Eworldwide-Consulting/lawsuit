@@ -74,7 +74,9 @@ export default function TwoFactor() {
     setLoading(true);
     setError('');
     try {
-      const res = otpMode === 'email'
+      const res = otpMode === 'attorney_signup'
+        ? await authApi.verifyAttorneySignupCode({ tempToken, code: full })
+        : otpMode === 'email'
         ? await authApi.verifyLoginCode({ tempToken, code: full })
         : await authApi.verify2fa({ tempToken, code: full });
       const fromPath = sessionStorage.getItem('lp_from_path');
@@ -99,14 +101,21 @@ export default function TwoFactor() {
   }
 
   async function resend() {
-    if (otpMode !== 'email' || resending) return;
+    if ((otpMode !== 'email' && otpMode !== 'attorney_signup') || resending) return;
     const tempToken = sessionStorage.getItem('lp_temp_token');
     if (!tempToken) return navigate('/login');
     setResending(true);
     setError('');
     setInfo('');
     try {
-      await authApi.resendLoginCode({ tempToken });
+      if (otpMode === 'attorney_signup') {
+        const res = await authApi.resendAttorneySignupCode({ tempToken });
+        // Each resend mints a fresh 10-minute temp token — keep it in sync so a
+        // later verify/resend on this screen still resolves to the same account.
+        if (res.data?.tempToken) sessionStorage.setItem('lp_temp_token', res.data.tempToken);
+      } else {
+        await authApi.resendLoginCode({ tempToken });
+      }
       setTimeLeft(600);
       setCode(['', '', '', '', '', '']);
       setInfo('A new code has been sent to your email.');
@@ -125,15 +134,25 @@ export default function TwoFactor() {
           <ShieldCheck className="text-green-400" size={28} />
         </div>
         <h1 className="text-2xl font-bold text-gray-900">
-          {otpMode === 'email' ? 'Verify Your Sign-In' : 'Two-Factor Authentication'}
+          {otpMode === 'attorney_signup' ? 'Verify Your Attorney Account'
+            : otpMode === 'email' ? 'Verify Your Sign-In' : 'Two-Factor Authentication'}
         </h1>
-        <p className="text-gray-500 text-sm mt-2">Enter the 6-digit verification code to access your dashboard.</p>
+        <p className="text-gray-500 text-sm mt-2">
+          {otpMode === 'attorney_signup'
+            ? 'Enter the 6-digit code to confirm your email and finish creating your account.'
+            : 'Enter the 6-digit verification code to access your dashboard.'}
+        </p>
         <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500 bg-gray-50 py-2 px-4 rounded-lg">
           <Info size={14} />
-          {otpMode === 'email'
+          {otpMode === 'email' || otpMode === 'attorney_signup'
             ? <span>We sent a code to <strong>{maskedEmail || 'your email'}</strong></span>
             : <span>Enter the code from your authenticator app</span>}
         </div>
+        {otpMode === 'attorney_signup' && (
+          <p className="mt-2 text-xs text-gray-400">
+            Once verified, a TriVanta partner will review your account before you get full access.
+          </p>
+        )}
       </div>
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm text-center">{error}</div>}
@@ -153,7 +172,7 @@ export default function TwoFactor() {
           <Clock size={14} />
           Code expires in <span className={`font-mono font-bold ${timeLeft < 30 ? 'text-red-500' : 'text-gray-700'}`}>{fmt(timeLeft)}</span>
         </span>
-        {otpMode === 'email' && (
+        {(otpMode === 'email' || otpMode === 'attorney_signup') && (
           <button className="text-green-600 hover:text-green-700 font-medium disabled:opacity-50"
             onClick={resend} disabled={resending}>
             {resending ? 'Sending…' : 'Resend code'}
@@ -170,7 +189,7 @@ export default function TwoFactor() {
         {loading ? <Spinner size={5} color="text-white" /> : <><ShieldCheck size={16} /> Verify & Continue</>}
       </button>
 
-      {otpMode !== 'email' && <button className="btn-secondary">Use backup code</button>}
+      {otpMode === 'totp' && <button className="btn-secondary">Use backup code</button>}
 
       <div className="flex items-center justify-between mt-5 text-sm">
         <button onClick={() => navigate('/login')} className="flex items-center gap-1 text-gray-500 hover:text-gray-700">
