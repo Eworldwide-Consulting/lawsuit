@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../../api';
+import { useToast } from '../../context/ToastContext';
 import {
   Users, CheckCircle, XCircle, Clock, AlertTriangle, Database,
   Activity, Server, Mail, CreditCard, Shield, RefreshCw, Loader2,
@@ -109,6 +110,7 @@ function Section({ title, action, children }) {
 // ── Main dashboard ────────────────────────────────────────────────────────────
 
 export default function ITSupportDashboard() {
+  const toast = useToast();
   const [stats,    setStats]    = useState(null);
   const [health,   setHealth]   = useState(null);
   const [pending,  setPending]  = useState([]);
@@ -183,6 +185,15 @@ export default function ITSupportDashboard() {
 
   const handleForceVerify = id =>
     withLoading(`verify_${id}`, () => adminApi.forceVerify(id));
+
+  // Actually re-sends the verification email (unlike Force Verify, which bypasses
+  // it) — the SMTP-down failure mode is silent by design (never blocks the
+  // request), so a toast here is the only signal an admin gets that the send
+  // was attempted, not a guarantee it was delivered.
+  const handleResendVerification = id =>
+    withLoading(`resend_${id}`, () =>
+      adminApi.resendInvite(id).then(() => toast.success('Verification email re-sent.'))
+    );
 
   const handleResetPasswordSubmit = async () => {
     if (!resetPwModal) return;
@@ -386,13 +397,25 @@ export default function ITSupportDashboard() {
                       <X size={14} /> Reject
                     </button>
                     {!u.email_verified && (
-                      <button
-                        onClick={() => handleForceVerify(u.id)}
-                        disabled={!!actionLoading[`verify_${u.id}`]}
-                        className="px-3 py-2 border border-gray-300 text-gray-600 text-xs font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-60"
-                      >
-                        {actionLoading[`verify_${u.id}`] ? <Loader2 size={12} className="animate-spin" /> : 'Force Verify'}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleResendVerification(u.id)}
+                          disabled={!!actionLoading[`resend_${u.id}`]}
+                          className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-600 text-xs font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-60"
+                        >
+                          {actionLoading[`resend_${u.id}`]
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <Mail size={12} />}
+                          Resend Verification
+                        </button>
+                        <button
+                          onClick={() => handleForceVerify(u.id)}
+                          disabled={!!actionLoading[`verify_${u.id}`]}
+                          className="px-3 py-2 border border-gray-300 text-gray-600 text-xs font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-60"
+                        >
+                          {actionLoading[`verify_${u.id}`] ? <Loader2 size={12} className="animate-spin" /> : 'Force Verify'}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -449,13 +472,22 @@ export default function ITSupportDashboard() {
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         {!u.email_verified && (
-                          <button
-                            onClick={() => handleForceVerify(u.id)}
-                            disabled={!!actionLoading[`verify_${u.id}`]}
-                            className="text-xs text-blue-600 hover:underline disabled:opacity-50"
-                          >
-                            Force Verify
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleResendVerification(u.id)}
+                              disabled={!!actionLoading[`resend_${u.id}`]}
+                              className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                            >
+                              Resend
+                            </button>
+                            <button
+                              onClick={() => handleForceVerify(u.id)}
+                              disabled={!!actionLoading[`verify_${u.id}`]}
+                              className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                            >
+                              Force Verify
+                            </button>
+                          </>
                         )}
                         <select
                           defaultValue={u.role}
