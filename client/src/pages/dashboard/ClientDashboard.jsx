@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner';
 import AttorneyStatusBadge from '../../components/attorney/AttorneyStatusBadge';
 import AttorneyPickerModal from '../../components/attorney/AttorneyPickerModal';
 import InviteAttorneyModal from '../../components/attorney/InviteAttorneyModal';
+import { STAGE_KEYS, getStageLabels } from '../../constants/caseStages';
 
 const ACTION_CFG = {
   Upload:  { Icon: Upload,      cls: 'bg-[#0f2057] hover:bg-[#1a3476]' },
@@ -18,9 +19,6 @@ const ACTION_CFG = {
   Sign:    { Icon: PenLine,     cls: 'bg-violet-600 hover:bg-violet-700' },
   Confirm: { Icon: CheckCircle, cls: 'bg-green-600  hover:bg-green-700' },
 };
-
-const STAGES     = ['Intake', 'Petition Filed', 'Hearing Prep', 'Guardian Appointed', 'Care Plan', 'Annual Review', 'Court Review'];
-const STAGE_KEYS = ['intake', 'petition_filed', 'hearing_prep', 'guardian_appointed', 'care_plan', 'annual_review', 'court_review'];
 
 const MATTER_TYPE_DOCS = {
   guardianship:                  ['Petition for Guardianship', 'Medical Records', 'Financial Disclosure', 'Background Check', 'Letters of Guardianship', 'Annual Guardian Report'],
@@ -158,6 +156,7 @@ export default function ClientDashboard() {
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size={8} /></div>;
 
   const matter        = data?.matter;
+  const STAGES        = getStageLabels(matter?.matter_type);
   const stageIdx      = matter ? STAGE_KEYS.indexOf(matter.stage) : 0;
   const readiness     = data?.readinessScore ?? 0;
   const docsUploaded  = data?.checklistUploaded ?? data?.completedDocs ?? 0;

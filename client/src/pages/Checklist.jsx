@@ -10,10 +10,10 @@ import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 
 const MATTER_TYPE_LABELS = {
-  conservatorship:                    'Conservatorship',
-  estate_administration:              'Estate Administration',
-  guardianship:                       'Guardianship',
-  joint_guardianship_conservatorship: 'Joint Guardianship & Conservatorship',
+  conservatorship:               'Conservatorship',
+  estate_administration:         'Estate Administration',
+  guardianship:                  'Guardianship',
+  guardianship_conservatorship:  'Joint Guardianship & Conservatorship',
 };
 
 export default function Checklist() {

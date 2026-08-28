@@ -12,26 +12,14 @@ import Spinner from '../components/ui/Spinner';
 import AttorneyStatusBadge from '../components/attorney/AttorneyStatusBadge';
 import AttorneyPickerModal from '../components/attorney/AttorneyPickerModal';
 import InviteAttorneyModal from '../components/attorney/InviteAttorneyModal';
+import { STAGE_KEYS, getStageLabels, getStageStory } from '../constants/caseStages';
 
 const MATTER_TYPES = [
-  { value: 'guardianship',                       label: 'Guardianship',                          desc: 'Appointment of a person to care for an individual who cannot make personal decisions.' },
-  { value: 'conservatorship',                    label: 'Conservatorship',                       desc: 'Appointment of a person to manage the finances or estate of another individual.' },
-  { value: 'joint_guardianship_conservatorship', label: 'Joint Guardianship & Conservatorship',  desc: 'Combined guardianship of the person and conservatorship of the estate.' },
-  { value: 'estate_administration',              label: 'Estate Administration',                  desc: 'Probate and administration of a deceased person\'s estate.' },
+  { value: 'guardianship',                  label: 'Guardianship',                          desc: 'Appointment of a person to care for an individual who cannot make personal decisions.' },
+  { value: 'conservatorship',               label: 'Conservatorship',                       desc: 'Appointment of a person to manage the finances or estate of another individual.' },
+  { value: 'guardianship_conservatorship',  label: 'Joint Guardianship & Conservatorship',  desc: 'Combined guardianship of the person and conservatorship of the estate.' },
+  { value: 'estate_administration',         label: 'Estate Administration',                  desc: 'Probate and administration of a deceased person\'s estate.' },
 ];
-
-const STAGES = ['Intake', 'Petition Filed', 'Hearing Prep', 'Guardian Appointed', 'Care Plan', 'Annual Review', 'Court Review'];
-const STAGE_KEYS = ['intake', 'petition_filed', 'hearing_prep', 'guardian_appointed', 'care_plan', 'annual_review', 'court_review'];
-
-const STAGE_STORY = {
-  intake:              'Your matter has been opened and intake is underway. Your legal team is reviewing your information.',
-  petition_filed:      'Your petition has been filed with the court. The team is preparing for the next steps.',
-  hearing_prep:        'Your legal team is preparing for the upcoming hearing. Please ensure all documents are uploaded.',
-  guardian_appointed:  'A guardian has been appointed by the court. The formal care plan is now in effect.',
-  care_plan:           'The care plan is active. Your team is monitoring progress and upcoming reporting deadlines.',
-  annual_review:       'An annual review is underway. Your legal team is preparing the required reports.',
-  court_review:        'Your case is under court review. Your attorney will update you following the hearing.',
-};
 
 function SetupModal({ onComplete, onClose }) {
   const [step, setStep]               = useState(1);
@@ -218,8 +206,9 @@ export default function MyCase() {
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size={8} /></div>;
 
+  const STAGES      = getStageLabels(matter?.matter_type);
   const stageIdx    = matter ? STAGE_KEYS.indexOf(matter.stage) : -1;
-  const stageStory  = matter ? (STAGE_STORY[matter.stage] || 'Your matter is underway.') : '';
+  const stageStory  = matter ? getStageStory(matter.matter_type, matter.stage) : '';
   const matterLabel = MATTER_TYPES.find(m => m.value === matter?.matter_type)?.label || matter?.matter_type || '';
 
   const neededNowItems   = checklist?.sections?.flatMap(s => s.items).filter(i => i.default_status === 'needed_now') || [];

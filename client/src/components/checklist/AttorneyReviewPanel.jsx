@@ -7,10 +7,10 @@ import Badge from '../ui/Badge';
 import Modal from '../ui/Modal';
 
 const MATTER_TYPE_LABELS = {
-  conservatorship:                  'Conservatorship',
-  estate_administration:            'Estate Administration',
-  guardianship:                     'Guardianship',
-  joint_guardianship_conservatorship: 'Joint Guardianship & Conservatorship',
+  conservatorship:               'Conservatorship',
+  estate_administration:         'Estate Administration',
+  guardianship:                  'Guardianship',
+  guardianship_conservatorship:  'Joint Guardianship & Conservatorship',
 };
 
 const STATUS_CFG = {
