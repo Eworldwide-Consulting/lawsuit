@@ -12,6 +12,7 @@ const { NotFoundError, ForbiddenError, ValidationError } = require('../lib/error
 const NotificationService = require('../services/notification.service');
 const AuditService        = require('../services/audit.service');
 const EmailService        = require('../services/email.service');
+const SmsService          = require('../services/sms.service');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../../../uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -96,6 +97,42 @@ router.post('/upload', requireAuth, upload.array('files', 10), async (req, res, 
 
     // Uploads land as status='uploaded' — not yet visible to the attorney.
     // The client must explicitly submit via POST /:id/submit-review below.
+
+    // When staff uploads to a client's matter, the client gets no other
+    // signal a new document exists — alert them across all three channels.
+    if (matterId && isStaff(req.user.role)) {
+      try {
+        const matter = await MatterRepo.findById(matterId);
+        if (matter?.client_id) {
+          const { one: dbOne } = require('../db');
+          const client = await dbOne(
+            "SELECT id, first_name, email, phone FROM users WHERE id = ? AND (status = 'active' OR status IS NULL)",
+            [matter.client_id]
+          );
+          if (client) {
+            const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
+            NotificationService.documentAvailable(client.id, {
+              docName: inserted.length > 1 ? `${inserted.length} documents` : inserted[0].name,
+              uploaderName,
+              matterId: Number(matterId),
+            });
+            EmailService.sendDocumentAvailable(client.email, {
+              firstName:    client.first_name,
+              uploaderName,
+              caseNumber:   matter.case_number || `Matter #${matterId}`,
+              docName:      inserted.length > 1 ? `${inserted.length} new documents` : inserted[0].name,
+            }).catch(() => {});
+            if (client.phone) {
+              SmsService.sendAlert(
+                client.phone,
+                `TriVanta: ${uploaderName} added a new document to case ${matter.case_number || `#${matterId}`}. View it at ${require('../config').client.url}/documents`
+              ).catch(() => {});
+            }
+          }
+        }
+      } catch { /* notification failure must never block the upload response */ }
+    }
+
     res.status(201).json(inserted);
   } catch (err) { next(err); }
 });
@@ -121,7 +158,7 @@ router.post('/:id/submit-review', requireAuth, async (req, res, next) => {
 
     const { one: dbOne } = require('../db');
     const attorney = await dbOne(
-      'SELECT id, first_name, last_name, email FROM users WHERE id = ?',
+      "SELECT id, first_name, last_name, email, phone FROM users WHERE id = ? AND (status = 'active' OR status IS NULL)",
       [matter.attorney_id]
     );
     const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
@@ -129,7 +166,7 @@ router.post('/:id/submit-review', requireAuth, async (req, res, next) => {
     if (attorney) {
       NotificationService.create({
         userId:     attorney.id,
-        type:       'document_uploaded',
+        type:       NotificationService.TYPES.DOCUMENT_UPLOADED,
         title:      'Document submitted for review',
         body:       `${uploaderName} submitted "${doc.name}" for review on case ${matter.case_number || `#${doc.matter_id}`} — approval required.`,
         entityType: 'document',
@@ -145,6 +182,13 @@ router.post('/:id/submit-review', requireAuth, async (req, res, next) => {
           reviewUrl:    `${require('../config').client.url}/dashboard`,
         });
       } catch { /* non-fatal */ }
+
+      if (attorney.phone) {
+        SmsService.sendAlert(
+          attorney.phone,
+          `TriVanta: ${uploaderName} submitted "${doc.name}" for review on case ${matter.case_number || `#${doc.matter_id}`}.`
+        ).catch(() => {});
+      }
     }
 
     AuditService.log({
@@ -215,7 +259,7 @@ router.put('/:id/status', requireAuth, requireRole('attorney', 'partner', 'itsup
       reviewedBy: req.user.id,
     });
 
-    // Notify the document owner (may be the client)
+    // Notify the document owner (may be the client) — web, email, and SMS
     if (doc.user_id && doc.user_id !== req.user.id) {
       NotificationService.documentReviewed(doc.user_id, {
         docName: doc.name,
@@ -223,6 +267,30 @@ router.put('/:id/status', requireAuth, requireRole('attorney', 'partner', 'itsup
         matterId: doc.matter_id,
         note: status === 'rejected' ? note : null,
       });
+
+      try {
+        const { one: dbOne } = require('../db');
+        const owner = await dbOne(
+          "SELECT first_name, email, phone FROM users WHERE id = ? AND (status = 'active' OR status IS NULL)",
+          [doc.user_id]
+        );
+        const matter = doc.matter_id ? await MatterRepo.findById(doc.matter_id) : null;
+        if (owner?.email) {
+          EmailService.sendDocumentReviewed(owner.email, {
+            firstName:  owner.first_name,
+            caseNumber: matter?.case_number,
+            docName:    doc.name,
+            status,
+            note:       status === 'rejected' ? note : null,
+          }).catch(() => {});
+        }
+        if (owner?.phone) {
+          SmsService.sendAlert(
+            owner.phone,
+            `TriVanta: your document "${doc.name}" was ${status}${status === 'rejected' && note ? ` — ${note}` : ''}.`
+          ).catch(() => {});
+        }
+      } catch { /* notification failure must never block the status update */ }
     }
 
     AuditService.log({
@@ -265,12 +333,35 @@ router.post('/:id/reupload', requireAuth, upload.single('file'), async (req, res
         const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
         NotificationService.create({
           userId:     matter.attorney_id,
-          type:       'document_uploaded',
+          type:       NotificationService.TYPES.DOCUMENT_UPLOADED,
           title:      'Document re-uploaded after rejection',
           body:       `${uploaderName} re-uploaded "${req.file.originalname}" for case ${matter.case_number || `#${doc.matter_id}`} — review required.`,
           entityType: 'document',
           entityId:   doc.id,
         });
+
+        try {
+          const { one: dbOne } = require('../db');
+          const attorney = await dbOne(
+            "SELECT first_name, email, phone FROM users WHERE id = ? AND (status = 'active' OR status IS NULL)",
+            [matter.attorney_id]
+          );
+          if (attorney?.email) {
+            EmailService.sendDocumentUploaded(attorney.email, {
+              attorneyName: attorney.first_name,
+              clientName:   uploaderName,
+              caseNumber:   matter.case_number || `Matter #${doc.matter_id}`,
+              docNames:     [req.file.originalname],
+              reviewUrl:    `${require('../config').client.url}/dashboard`,
+            }).catch(() => {});
+          }
+          if (attorney?.phone) {
+            SmsService.sendAlert(
+              attorney.phone,
+              `TriVanta: ${uploaderName} re-uploaded "${req.file.originalname}" for case ${matter.case_number || `#${doc.matter_id}`} — review required.`
+            ).catch(() => {});
+          }
+        } catch { /* notification failure must never block the reupload response */ }
       }
     }
 

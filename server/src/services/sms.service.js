@@ -31,7 +31,22 @@ async function sendResetCode(phone, code) {
   }
 }
 
+// Generic short-text alert — used for document/message/interaction
+// notifications. Callers are responsible for checking the recipient has a
+// phone number before calling this; it stays a thin, safe no-op otherwise.
+async function sendAlert(phone, text) {
+  const sender = senderParams();
+  if (!phone || !client || !sender) return { delivered: false, reason: 'SMS not configured' };
+  try {
+    await client.messages.create({ body: text, to: phone, ...sender });
+    return { delivered: true };
+  } catch (err) {
+    return { delivered: false, reason: err.message };
+  }
+}
+
 module.exports = {
   sendResetCode,
+  sendAlert,
   isConfigured: () => Boolean(client && senderParams()),
 };

@@ -14,6 +14,21 @@ const STAGE_OPTIONS = [
   'annual_return_prep', 'court_review', 'complete',
 ];
 
+// Registration never collects a free-text case description (Register.jsx only
+// asks for matter type), so most matters have description=NULL by
+// construction — falling back to a generic "Untitled Matter" made every one
+// of those look broken. Derive a real fallback title from the matter type
+// instead, which is always present.
+const MATTER_TYPE_LABELS = {
+  guardianship:                 'Guardianship',
+  conservatorship:              'Conservatorship',
+  guardianship_conservatorship: 'Guardianship & Conservatorship',
+  estate_administration:        'Estate Administration',
+};
+function fallbackTitle(matterType) {
+  return `${MATTER_TYPE_LABELS[matterType] || 'Legal'} Matter`;
+}
+
 export default function MatterDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -65,7 +80,7 @@ export default function MatterDetail() {
         <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
           <div>
             <div className="font-mono text-sm text-gray-500">Case #{matter.case_number}</div>
-            <h1 className="text-xl font-bold text-gray-900 mt-0.5">{matter.description || 'Untitled Matter'}</h1>
+            <h1 className="text-xl font-bold text-gray-900 mt-0.5">{matter.description || fallbackTitle(matter.matter_type)}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
             {canEditStage ? (

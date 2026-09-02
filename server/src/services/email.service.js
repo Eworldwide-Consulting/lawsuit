@@ -23,6 +23,8 @@ const JOB = {
   PAYMENT_CONFIRMED:     'payment_confirmed',
   DOCUMENT_UPLOADED:     'document_uploaded',
   DOCUMENT_REMINDER:     'document_reminder',
+  DOCUMENT_AVAILABLE:    'document_available',
+  DOCUMENT_REVIEWED:     'document_reviewed',
 };
 
 // ── Transport ─────────────────────────────────────────────────────────────────
@@ -219,6 +221,18 @@ const EmailService = {
     return queue(JOB.DOCUMENT_REMINDER, { to, firstName, caseNumber, missingCount, missingLabels });
   },
 
+  // Sent to the client when their attorney/staff uploads a new document to
+  // their matter.
+  sendDocumentAvailable(to, { firstName, uploaderName, caseNumber, docName }) {
+    return queue(JOB.DOCUMENT_AVAILABLE, { to, firstName, uploaderName, caseNumber, docName });
+  },
+
+  // Sent to the client when their attorney approves, rejects, or requests
+  // corrections on a document they submitted.
+  sendDocumentReviewed(to, { firstName, caseNumber, docName, status, note }) {
+    return queue(JOB.DOCUMENT_REVIEWED, { to, firstName, caseNumber, docName, status, note });
+  },
+
   sendContactSales({ name, email, company, phone, plan, message }) {
     const salesTo = config.smtp.user || 'legal@trivanta.com';
     return send({
@@ -332,6 +346,20 @@ const EmailService = {
           to: data.to,
           subject: `${data.missingCount} document${data.missingCount !== 1 ? 's' : ''} still needed for your case`,
           html: tmplDocumentReminder(data),
+        };
+        break;
+      case JOB.DOCUMENT_AVAILABLE:
+        mail = {
+          to: data.to,
+          subject: `New document added to case ${esc(data.caseNumber || '')}`.trim(),
+          html: tmplDocumentAvailable(data),
+        };
+        break;
+      case JOB.DOCUMENT_REVIEWED:
+        mail = {
+          to: data.to,
+          subject: `Document ${esc(data.status)} — ${esc(data.caseNumber || 'your case')}`,
+          html: tmplDocumentReviewedEmail(data),
         };
         break;
       default:
@@ -690,5 +718,29 @@ function tmplDocumentReminder({ firstName, caseNumber, missingCount, missingLabe
     <ul style="margin:12px 0 20px;padding-left:20px">${list}</ul>
     ${p("Uploading these now keeps your case on track and speeds up your attorney's review.")}
     ${btn(`${config.client.url}/checklist`, 'Upload Documents')}
+  `);
+}
+
+function tmplDocumentAvailable({ firstName, uploaderName, caseNumber, docName }) {
+  return wrap(`
+    ${h2('A new document was added to your case')}
+    ${p(`Hi ${esc(firstName) || 'there'}, <strong>${esc(uploaderName) || 'your attorney'}</strong> added a new document${caseNumber ? ` to case <strong>${esc(caseNumber)}</strong>` : ''}:`)}
+    <div style="background:#f3f4f6;border-radius:8px;padding:12px 16px;margin:0 0 20px;color:#374151;font-size:14px;font-weight:600">${esc(docName)}</div>
+    ${btn(`${config.client.url}/documents`, 'View Document')}
+  `);
+}
+
+function tmplDocumentReviewedEmail({ firstName, caseNumber, docName, status, note }) {
+  const approved = status === 'accepted';
+  return wrap(`
+    ${h2(approved ? 'Document approved' : `Document ${esc(status)}`)}
+    ${p(`Hi ${esc(firstName) || 'there'}, your document <strong>${esc(docName)}</strong>${caseNumber ? ` on case <strong>${esc(caseNumber)}</strong>` : ''} has been ${esc(status)} by your attorney.`)}
+    ${note ? `
+      <div style="background:#fef3c7;border-left:4px solid #d97706;padding:14px 18px;border-radius:6px;margin:0 0 20px">
+        <p style="color:#92400e;font-size:14px;font-weight:600;margin:0 0 4px">What to fix</p>
+        <p style="color:#92400e;font-size:13px;margin:0">${esc(note)}</p>
+      </div>
+    ` : ''}
+    ${btn(`${config.client.url}/documents`, approved ? 'View Document' : 'Upload Corrected File')}
   `);
 }

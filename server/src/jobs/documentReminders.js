@@ -26,6 +26,7 @@ async function sweepOnce() {
      JOIN users c ON c.id = m.client_id
      WHERE m.case_accepted = 1
        AND m.status IN ('active', 'at_risk')
+       AND (c.status = 'active' OR c.status IS NULL)
        AND (m.last_doc_reminder_sent_at IS NULL OR m.last_doc_reminder_sent_at < ?)`,
     [threshold]
   );

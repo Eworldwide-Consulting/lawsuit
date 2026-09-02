@@ -8,6 +8,8 @@ const { isStaff }       = require('../domain/user');
 const { ForbiddenError, NotFoundError, ValidationError } = require('../lib/errors');
 const AuditService        = require('../services/audit.service');
 const NotificationService = require('../services/notification.service');
+const EmailService        = require('../services/email.service');
+const SmsService          = require('../services/sms.service');
 const TaskRepo            = require('../repositories/task.repository');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../../../uploads');
@@ -41,7 +43,7 @@ const upload = multer({
 async function assertMatterAccess(matterId, user) {
   const matter = await one(`SELECT id, client_id, attorney_id, matter_type FROM matters WHERE id = ?`, [matterId]);
   if (!matter) throw new NotFoundError('Matter not found');
-  if (!isStaff(user) && matter.client_id !== user.id) throw new ForbiddenError();
+  if (!isStaff(user.role) && matter.client_id !== user.id) throw new ForbiddenError();
   return matter;
 }
 
@@ -126,7 +128,7 @@ router.post('/items/:itemId/upload', requireAuth, upload.single('file'), async (
     if (!matter) throw new NotFoundError('Matter not found');
 
     // Clients can only upload for their own matter; staff can upload for any
-    if (!isStaff(req.user) && matter.client_id !== req.user.id) throw new ForbiddenError();
+    if (!isStaff(req.user.role) && matter.client_id !== req.user.id) throw new ForbiddenError();
 
     // Reject if already accepted
     if (item.status === 'accepted') {
@@ -155,6 +157,42 @@ router.post('/items/:itemId/upload', requireAuth, upload.single('file'), async (
       meta: { label: item.label, matterId: item.matter_id, fileName: req.file.originalname },
       ip: req.ip,
     });
+
+    // Client uploading for their own matter → alert the attorney across all
+    // three channels. Staff uploading on a client's behalf skips this (no
+    // one to notify).
+    if (!isStaff(req.user.role) && matter.attorney_id) {
+      try {
+        const attorney = await one(
+          "SELECT first_name, email, phone FROM users WHERE id = ? AND (status = 'active' OR status IS NULL)",
+          [matter.attorney_id]
+        );
+        const uploaderName = `${req.user.first_name} ${req.user.last_name}`.trim();
+        NotificationService.create({
+          userId:     matter.attorney_id,
+          type:       NotificationService.TYPES.DOCUMENT_UPLOADED,
+          title:      'Checklist document submitted for review',
+          body:       `${uploaderName} uploaded "${item.label.slice(0, 60)}" on case ${matter.case_number || `#${matter.id}`}.`,
+          entityType: 'checklist_item',
+          entityId:   item.id,
+        });
+        if (attorney?.email) {
+          EmailService.sendDocumentUploaded(attorney.email, {
+            attorneyName: attorney.first_name,
+            clientName:   uploaderName,
+            caseNumber:   matter.case_number || `Matter #${matter.id}`,
+            docNames:     [item.label],
+            reviewUrl:    `${require('../config').client.url}/checklist-review`,
+          }).catch(() => {});
+        }
+        if (attorney?.phone) {
+          SmsService.sendAlert(
+            attorney.phone,
+            `TriVanta: ${uploaderName} uploaded "${item.label.slice(0, 60)}" for review on case ${matter.case_number || `#${matter.id}`}.`
+          ).catch(() => {});
+        }
+      } catch { /* notification failure must never block the upload response */ }
+    }
 
     const updated = await one(`SELECT * FROM matter_checklist_items WHERE id = ?`, [item.id]);
     res.json(updated);
@@ -209,7 +247,7 @@ router.put('/items/:itemId/review', requireAuth, requireRole('attorney', 'partne
       // Notify client
       NotificationService.create({
         userId:     matter.client_id,
-        type:       'document_reviewed',
+        type:       NotificationService.TYPES.DOCUMENT_REVIEWED,
         title:      'Document needs correction',
         body:       `"${item.label.slice(0, 60)}" — ${correctionReason.trim().slice(0, 120)}`,
         entityType: 'checklist_item',
@@ -220,12 +258,39 @@ router.put('/items/:itemId/review', requireAuth, requireRole('attorney', 'partne
     if (action === 'accepted') {
       NotificationService.create({
         userId:     matter.client_id,
-        type:       'document_reviewed',
+        type:       NotificationService.TYPES.DOCUMENT_REVIEWED,
         title:      'Document accepted',
         body:       `Your document "${item.label.slice(0, 60)}" has been accepted.`,
         entityType: 'checklist_item',
         entityId:   item.id,
       });
+    }
+
+    if (action === 'accepted' || action === 'needs_correction') {
+      try {
+        const client = await one(
+          "SELECT first_name, email, phone FROM users WHERE id = ? AND (status = 'active' OR status IS NULL)",
+          [matter.client_id]
+        );
+        const status = action === 'accepted' ? 'accepted' : 'rejected';
+        if (client?.email) {
+          EmailService.sendDocumentReviewed(client.email, {
+            firstName:  client.first_name,
+            caseNumber: matter.case_number,
+            docName:    item.label,
+            status,
+            note:       action === 'needs_correction' ? correctionReason.trim() : null,
+          }).catch(() => {});
+        }
+        if (client?.phone) {
+          SmsService.sendAlert(
+            client.phone,
+            action === 'accepted'
+              ? `TriVanta: your document "${item.label.slice(0, 60)}" was accepted.`
+              : `TriVanta: your document "${item.label.slice(0, 60)}" needs correction — ${correctionReason.trim().slice(0, 100)}`
+          ).catch(() => {});
+        }
+      } catch { /* notification failure must never block the review response */ }
     }
 
     AuditService.log({
@@ -276,7 +341,7 @@ router.get('/download/:itemId', requireAuth, async (req, res, next) => {
     if (!item.file_path) throw new NotFoundError('No file uploaded for this item');
 
     const matter = await one(`SELECT * FROM matters WHERE id = ?`, [item.matter_id]);
-    if (!isStaff(req.user) && matter.client_id !== req.user.id) throw new ForbiddenError();
+    if (!isStaff(req.user.role) && matter.client_id !== req.user.id) throw new ForbiddenError();
 
     if (!fs.existsSync(item.file_path)) throw new NotFoundError('File not found on disk');
 
@@ -295,6 +360,29 @@ router.get('/templates/:matterType', requireAuth, async (req, res, next) => {
       [req.params.matterType]
     );
     res.json(templates);
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/checklists/matter/:matterId/all-items ─────────────────────────
+// Attorney view: every checklist item that has a file, regardless of status
+// — review-queue above only surfaces status='submitted', so an already
+// accepted/corrected item's file becomes unreachable from there once
+// reviewed. This lets the attorney browse the full document history for a
+// matter, not just what's currently pending.
+router.get('/matter/:matterId/all-items', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
+  try {
+    const items = await all(
+      `SELECT ci.*,
+              m.case_number, m.matter_type,
+              u.first_name AS client_first, u.last_name AS client_last
+       FROM matter_checklist_items ci
+       JOIN matters m ON m.id = ci.matter_id
+       JOIN users   u ON u.id = m.client_id
+       WHERE ci.matter_id = ? AND ci.file_name IS NOT NULL
+       ORDER BY ci.updated_at DESC`,
+      [req.params.matterId]
+    );
+    res.json(items);
   } catch (err) { next(err); }
 });
 

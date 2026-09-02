@@ -27,6 +27,11 @@ const checklistApi = {
   clientOverview: () =>
     http.get('/checklists/client-overview'),
 
+  /** Attorney: every checklist item with a file for a matter, any status —
+   *  lets the attorney browse already-reviewed documents, not just pending ones */
+  getAllItems: (matterId) =>
+    http.get(`/checklists/matter/${matterId}/all-items`),
+
   /** Download / stream an uploaded file */
   downloadUrl: (itemId) => `/api/checklists/download/${itemId}`,
 };

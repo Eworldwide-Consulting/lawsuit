@@ -11,6 +11,13 @@ import Avatar     from '../components/ui/Avatar';
 
 const fmtType = t => t ? t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—';
 
+const DOC_STATUS_CFG = {
+  submitted:        { badge: 'warning', label: 'Pending Review' },
+  accepted:         { badge: 'success', label: 'Accepted' },
+  needs_correction: { badge: 'error',   label: 'Needs Correction' },
+  not_applicable:   { badge: 'default', label: 'N/A' },
+};
+
 function ReadinessBadge({ pct }) {
   if (pct >= 80) return <span className="flex items-center gap-1 text-xs font-semibold text-green-700"><CheckCircle size={12} />{pct}% Ready</span>;
   if (pct >= 50) return <span className="flex items-center gap-1 text-xs font-semibold text-yellow-700"><Clock size={12} />{pct}% In Progress</span>;
@@ -23,6 +30,7 @@ export default function ChecklistReview() {
   const [loading, setLoading]       = useState(true);
   const [reviewItem, setReviewItem] = useState(null);
   const [expanded, setExpanded]     = useState({});
+  const [allItemsByMatter, setAllItemsByMatter] = useState({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -39,6 +47,24 @@ export default function ChecklistReview() {
 
   function handleReviewed(updatedItem) {
     setQueue(q => q.filter(i => i.id !== updatedItem.id));
+    setAllItemsByMatter(m => {
+      const key = updatedItem.matter_id;
+      if (!m[key]) return m;
+      return { ...m, [key]: m[key].map(i => i.id === updatedItem.id ? { ...i, ...updatedItem } : i) };
+    });
+  }
+
+  function toggleClient(client) {
+    const willOpen = !expanded[client.user_id];
+    setExpanded(e => ({ ...e, [client.user_id]: willOpen }));
+    if (willOpen) {
+      client.matters.forEach(m => {
+        if (allItemsByMatter[m.matter_id]) return; // already loaded
+        checklistApi.getAllItems(m.matter_id)
+          .then(r => setAllItemsByMatter(prev => ({ ...prev, [m.matter_id]: r.data })))
+          .catch(() => {});
+      });
+    }
   }
 
   // Group overview rows by user_id
@@ -131,7 +157,7 @@ export default function ChecklistReview() {
               <div key={client.user_id} className="card overflow-hidden">
                 {/* Client header */}
                 <button
-                  onClick={() => setExpanded(e => ({ ...e, [client.user_id]: !isOpen }))}
+                  onClick={() => toggleClient(client)}
                   className="w-full flex items-center justify-between px-4 py-3 bg-[#0f2057]/5 border-b border-gray-200 hover:bg-[#0f2057]/10 transition-colors"
                 >
                   <div className="flex items-center gap-3">
@@ -191,42 +217,61 @@ export default function ChecklistReview() {
                   </div>
                 )}
 
-                {/* Expandable review queue for this client */}
-                {isOpen && pendingForClient.length > 0 && (
-                  <div className="border-t border-gray-200 bg-amber-50/40">
-                    <div className="px-4 py-2 text-xs font-semibold text-amber-700 uppercase tracking-wide">Submitted Items — Awaiting Review</div>
-                    <div className="divide-y divide-gray-100">
-                      {pendingForClient.map(item => (
-                        <button
-                          key={item.id}
-                          onClick={() => setReviewItem(item)}
-                          className="w-full flex items-center justify-between px-4 py-3 hover:bg-amber-50 transition-colors text-left group"
-                          aria-label={`Review: ${item.label}`}
-                        >
-                          <div className="flex items-start gap-3 min-w-0">
-                            <FileText size={15} className="text-[#0f2057] flex-shrink-0 mt-0.5" />
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-gray-800 group-hover:text-[#0f2057] truncate">{item.label}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs text-gray-500">{item.section}</span>
-                                {item.file_name && (
-                                  <><span className="text-gray-300">·</span><span className="text-xs text-gray-400 truncate max-w-[140px]">{item.file_name}</span></>
-                                )}
+                {/* Expandable document list for this client — every checklist
+                    item that has a file, any status, pending review first */}
+                {isOpen && (() => {
+                  const items = client.matters.flatMap(m => allItemsByMatter[m.matter_id] || []);
+                  const statusRank = { submitted: 0, needs_correction: 1, accepted: 2, not_applicable: 3 };
+                  const sorted = [...items].sort((a, b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9));
+                  if (!items.length) {
+                    return (
+                      <div className="px-4 py-3 text-xs text-gray-400 italic border-t border-gray-100">
+                        No documents uploaded yet.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="border-t border-gray-200">
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50">Documents</div>
+                      <div className="divide-y divide-gray-100">
+                        {sorted.map(item => {
+                          const badge = DOC_STATUS_CFG[item.status] || DOC_STATUS_CFG.submitted;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => setReviewItem(item)}
+                              className={`w-full flex items-center justify-between px-4 py-3 transition-colors text-left group ${
+                                item.status === 'submitted' ? 'bg-amber-50/40 hover:bg-amber-50' : 'hover:bg-gray-50'
+                              }`}
+                              aria-label={`View: ${item.label}`}
+                            >
+                              <div className="flex items-start gap-3 min-w-0">
+                                <FileText size={15} className="text-[#0f2057] flex-shrink-0 mt-0.5" />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 group-hover:text-[#0f2057] truncate">{item.label}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-xs text-gray-500">{item.section}</span>
+                                    {item.file_name && (
+                                      <><span className="text-gray-300">·</span><span className="text-xs text-gray-400 truncate max-w-[140px]">{item.file_name}</span></>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                            <span className="text-xs text-gray-400 flex items-center gap-1 whitespace-nowrap">
-                              <Clock size={11} />
-                              {item.updated_at ? formatDistanceToNow(new Date(item.updated_at), { addSuffix: true }) : '—'}
-                            </span>
-                            <span className="text-xs font-medium text-[#0f2057] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Review →</span>
-                          </div>
-                        </button>
-                      ))}
+                              <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                                <Badge variant={badge.badge} size="sm">{badge.label}</Badge>
+                                <span className="text-xs text-gray-400 flex items-center gap-1 whitespace-nowrap">
+                                  <Clock size={11} />
+                                  {item.updated_at ? formatDistanceToNow(new Date(item.updated_at), { addSuffix: true }) : '—'}
+                                </span>
+                                <span className="text-xs font-medium text-[#0f2057] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">View →</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

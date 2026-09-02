@@ -5,10 +5,13 @@ const { run, all, one } = require('../db');
 const ws     = require('../websocket');
 const logger = require('../logger');
 const { getQueue, QUEUE_NAMES } = require('../queue');
+const { normalizeStatus, USER_STATUS } = require('../domain/user');
 
 const TYPES = {
   NEW_MESSAGE:          'new_message',
   DOCUMENT_REVIEWED:    'document_reviewed',
+  DOCUMENT_UPLOADED:    'document_uploaded',
+  DOCUMENT_AVAILABLE:   'document_available',
   TASK_ASSIGNED:        'task_assigned',
   TASK_DUE_SOON:        'task_due_soon',
   APPOINTMENT_REMINDER: 'appointment_reminder',
@@ -19,8 +22,18 @@ const TYPES = {
 
 const JOB_NAME = 'deliver_notification';
 
-// Create a notification — persists to DB, then pushes via WebSocket
+// Create a notification — persists to DB, then pushes via WebSocket.
+// Suspended/deleted accounts are silently skipped — they can't act on a
+// notification (suspended can't log in; deleted no longer exists to the
+// rest of the app), so there's nothing to gain from writing one and it
+// avoids leaking activity into a closed account's row.
 async function create({ userId, type, title, body, entityType, entityId }) {
+  const recipient = await one('SELECT status FROM users WHERE id = ?', [userId]).catch(() => null);
+  const status = normalizeStatus(recipient?.status);
+  if (!recipient || status === USER_STATUS.SUSPENDED || status === USER_STATUS.DELETED) {
+    return null;
+  }
+
   let notifId;
   try {
     const result = await run(
@@ -66,6 +79,19 @@ const NotificationService = {
       type:       TYPES.DOCUMENT_REVIEWED,
       title:      `Document ${status}`,
       body:       note ? `${docName} — ${note}` : docName,
+      entityType: 'matter',
+      entityId:   matterId,
+    });
+  },
+
+  // A new document is available for the client to view — fired when an
+  // attorney/staff member uploads a document to a client's matter.
+  documentAvailable(toUserId, { docName, uploaderName, matterId }) {
+    return create({
+      userId:     toUserId,
+      type:       TYPES.DOCUMENT_AVAILABLE,
+      title:      'New document available',
+      body:       `${uploaderName} added "${docName}" to your case.`,
       entityType: 'matter',
       entityId:   matterId,
     });
