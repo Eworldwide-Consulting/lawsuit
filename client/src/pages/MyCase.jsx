@@ -46,7 +46,7 @@ function SetupModal({ onComplete, onClose }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
       onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}
     >
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+      <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden relative">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#0f2057] to-[#1a3476] px-6 py-5 text-white relative">
           {onClose && (
@@ -74,31 +74,31 @@ function SetupModal({ onComplete, onClose }) {
         <div className="p-6">
           {step === 1 && (
             <>
-              <h2 className="font-bold text-gray-900 mb-1">What type of legal matter do you need help with?</h2>
-              <p className="text-sm text-gray-500 mb-4">Select the option that best describes your situation.</p>
+              <h2 className="font-bold text-gray-900 dark:text-white mb-1">What type of legal matter do you need help with?</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Select the option that best describes your situation.</p>
               <div className="space-y-2.5">
                 {MATTER_TYPES.map(mt => (
                   <button key={mt.value} onClick={() => setMatterType(mt.value)}
                     className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                       matterType === mt.value
-                        ? 'border-[#0f2057] bg-[#0f2057]/5'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-[#0f2057] dark:border-blue-400 bg-[#0f2057]/5 dark:bg-blue-400/10'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                     }`}>
                     <div className="flex items-start gap-3">
                       <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
-                        matterType === mt.value ? 'border-[#0f2057] bg-[#0f2057]' : 'border-gray-300'
+                        matterType === mt.value ? 'border-[#0f2057] dark:border-blue-400 bg-[#0f2057] dark:bg-blue-400' : 'border-gray-300 dark:border-gray-600'
                       }`}>
                         {matterType === mt.value && <Check size={11} className="text-white" strokeWidth={3} />}
                       </div>
                       <div>
-                        <div className="font-semibold text-gray-800 text-sm">{mt.label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{mt.desc}</div>
+                        <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm">{mt.label}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{mt.desc}</div>
                       </div>
                     </div>
                   </button>
                 ))}
               </div>
-              {error && <p className="text-red-600 text-xs mt-3">{error}</p>}
+              {error && <p className="text-red-600 dark:text-red-400 text-xs mt-3">{error}</p>}
               <button
                 onClick={() => { if (!matterType) { setError('Please select a matter type.'); return; } setError(''); setStep(2); }}
                 className="mt-5 w-full bg-[#0f2057] hover:bg-[#1a3476] text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
@@ -110,14 +110,14 @@ function SetupModal({ onComplete, onClose }) {
 
           {step === 2 && (
             <>
-              <button onClick={() => setStep(1)} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4">
+              <button onClick={() => setStep(1)} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 mb-4">
                 ← Back
               </button>
-              <h2 className="font-bold text-gray-900 mb-1">Tell us about your situation</h2>
-              <p className="text-sm text-gray-500 mb-4">
+              <h2 className="font-bold text-gray-900 dark:text-white mb-1">Tell us about your situation</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Briefly describe your case in your own words. Your legal team will review this and reach out to help.
               </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-xs text-blue-800">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-4 text-xs text-blue-800 dark:text-blue-300">
                 <strong>Selected:</strong> {MATTER_TYPES.find(m => m.value === matterType)?.label}
               </div>
               <textarea
@@ -125,10 +125,10 @@ function SetupModal({ onComplete, onClose }) {
                 onChange={e => setDescription(e.target.value)}
                 rows={5}
                 placeholder="Describe your situation... (e.g. 'My mother has dementia and can no longer manage her finances. We need help establishing conservatorship.')"
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-[#0f2057]/30"
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-sm text-gray-800 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-[#0f2057]/30 dark:focus:ring-blue-400/40 placeholder-gray-400 dark:placeholder-gray-500"
               />
-              <p className="text-xs text-gray-400 mt-1">Optional — you can update this later.</p>
-              {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Optional — you can update this later.</p>
+              {error && <p className="text-red-600 dark:text-red-400 text-xs mt-2">{error}</p>}
               <button
                 onClick={submit}
                 disabled={saving}
@@ -226,11 +226,11 @@ export default function MyCase() {
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Briefcase size={20} className="text-[#0f2057]" />
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Briefcase size={20} className="text-[#0f2057] dark:text-blue-400" />
               My Case
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Your legal journey with TriVanta Legal.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Your legal journey with TriVanta Legal.</p>
           </div>
           {!matter && (
             <button
@@ -244,9 +244,9 @@ export default function MyCase() {
 
         {!matter && !showSetup && (
           <div className="card p-10 text-center">
-            <Briefcase size={40} className="mx-auto text-gray-300 mb-3" />
-            <div className="text-gray-600 font-semibold mb-1">No active case yet</div>
-            <div className="text-gray-400 text-sm mb-4">Set up your case to get started with your legal team.</div>
+            <Briefcase size={40} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+            <div className="text-gray-600 dark:text-gray-300 font-semibold mb-1">No active case yet</div>
+            <div className="text-gray-400 dark:text-gray-500 text-sm mb-4">Set up your case to get started with your legal team.</div>
             <button
               onClick={() => setShowSetup(true)}
               className="bg-[#0f2057] text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-[#1a3476]"
@@ -262,8 +262,8 @@ export default function MyCase() {
             <div className="card p-5">
               <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
                 <div>
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Reference Number</div>
-                  <div className="font-mono font-semibold text-[#0f2057]">#{matter.case_number || matter.id}</div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wide mb-0.5">Reference Number</div>
+                  <div className="font-mono font-semibold text-[#0f2057] dark:text-blue-400">#{matter.case_number || matter.id}</div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <span className="badge badge-blue capitalize">{matter.stage?.replace(/_/g, ' ')}</span>
@@ -275,34 +275,34 @@ export default function MyCase() {
 
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div className="flex items-start gap-2.5">
-                  <Briefcase size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                  <Briefcase size={15} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">Matter Type</div>
-                    <div className="font-medium text-gray-800">{matterLabel}</div>
+                    <div className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">Matter Type</div>
+                    <div className="font-medium text-gray-800 dark:text-gray-100">{matterLabel}</div>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5">
-                  <User size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                  <User size={15} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">Attorney</div>
+                    <div className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">Attorney</div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {matter.attorney_name && <div className="font-medium text-gray-800">{matter.attorney_name}</div>}
+                      {matter.attorney_name && <div className="font-medium text-gray-800 dark:text-gray-100">{matter.attorney_name}</div>}
                       <AttorneyStatusBadge hasAttorney={Boolean(matter.attorney_id)} caseAccepted={matter.case_accepted === 1 || matter.case_accepted === true} />
                     </div>
                     <button onClick={() => setShowAttyPicker(true)}
-                      className="mt-1 text-xs font-medium text-[#0f2057] hover:text-[#1a3476] flex items-center gap-1">
+                      className="mt-1 text-xs font-medium text-[#0f2057] dark:text-blue-400 hover:text-[#1a3476] dark:hover:text-blue-300 flex items-center gap-1">
                       {matter.attorney_id ? <><RefreshCw size={11} /> Change Attorney</> : 'Select an attorney →'}
                     </button>
                   </div>
                 </div>
                 {(matter.court || matter.county || matter.state) && (
                   <div className="flex items-start gap-2.5">
-                    <MapPin size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                    <MapPin size={15} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wide">
+                      <div className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">
                         {matter.court ? 'Court' : 'Case Location'}
                       </div>
-                      <div className="font-medium text-gray-800">
+                      <div className="font-medium text-gray-800 dark:text-gray-100">
                         {[matter.court, matter.county, matter.state].filter(Boolean).join(' · ')}
                       </div>
                     </div>
@@ -310,10 +310,10 @@ export default function MyCase() {
                 )}
                 {matter.important_date && (
                   <div className="flex items-start gap-2.5">
-                    <Calendar size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                    <Calendar size={15} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wide">Next Court Date</div>
-                      <div className="font-medium text-gray-800">
+                      <div className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">Next Court Date</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-100">
                         {new Date(matter.important_date).toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric' })}
                       </div>
                     </div>
@@ -321,9 +321,9 @@ export default function MyCase() {
                 )}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
+              <div className="grid md:grid-cols-2 gap-4 text-sm mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <div>
-                  <label className="text-xs text-gray-400 uppercase tracking-wide font-medium">Legal Case Number</label>
+                  <label className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">Legal Case Number</label>
                   <input
                     value={legalCaseNumber}
                     onChange={e => setLegalCaseNumber(e.target.value)}
@@ -332,7 +332,7 @@ export default function MyCase() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 uppercase tracking-wide font-medium">County</label>
+                  <label className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">County</label>
                   <select value={county} onChange={e => setCounty(e.target.value)} className="form-input mt-1 text-sm">
                     <option value="">— Select county —</option>
                     {GEORGIA_COUNTIES.map(c => (
@@ -355,18 +355,18 @@ export default function MyCase() {
 
             {/* Case Story */}
             <div className="card p-5">
-              <h2 className="font-bold text-gray-800 text-sm mb-1">Your Case Story</h2>
+              <h2 className="font-bold text-gray-800 dark:text-gray-100 text-sm mb-1">Your Case Story</h2>
               {matter.description && (
-                <p className="text-sm text-gray-600 mb-3 italic">"{matter.description}"</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 italic">"{matter.description}"</p>
               )}
-              <div className="bg-blue-50 border-l-4 border-[#0f2057] rounded-r-xl px-4 py-3 text-sm text-gray-700">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-[#0f2057] dark:border-blue-400 rounded-r-xl px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                 {stageStory}
               </div>
             </div>
 
             {/* Stage Timeline */}
             <div className="card p-5">
-              <h2 className="font-bold text-gray-800 text-sm mb-4">Case Progress</h2>
+              <h2 className="font-bold text-gray-800 dark:text-gray-100 text-sm mb-4">Case Progress</h2>
               <div className="overflow-x-auto">
                 <ol className="flex items-start min-w-max pb-2">
                   {STAGES.map((stage, i) => {
@@ -377,19 +377,19 @@ export default function MyCase() {
                       <li key={stage} className="flex items-start">
                         <div className="flex flex-col items-center">
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                            curr ? 'bg-[#0f2057] border-[#0f2057] text-white ring-2 ring-[#0f2057]/20 shadow-md' :
+                            curr ? 'bg-[#0f2057] dark:bg-blue-500 border-[#0f2057] dark:border-blue-500 text-white ring-2 ring-[#0f2057]/20 dark:ring-blue-400/30 shadow-md' :
                             done ? 'bg-green-500 border-green-500 text-white shadow-sm' :
-                                   'bg-white border-gray-300 text-gray-400'
+                                   'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500'
                           }`}>
                             {done && !curr ? <Check size={12} strokeWidth={3} /> : i + 1}
                           </div>
                           <div className={`text-[9px] mt-1 text-center w-14 leading-tight font-medium ${
-                            curr ? 'text-[#0f2057] font-semibold' : done ? 'text-green-600' : 'text-gray-400'
+                            curr ? 'text-[#0f2057] dark:text-blue-400 font-semibold' : done ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'
                           }`}>{stage}</div>
                         </div>
                         {!last && (
                           <div className={`w-8 h-0.5 mt-3.5 mx-0.5 flex-shrink-0 rounded-full transition-colors ${
-                            stageIdx >= 0 && i < stageIdx ? 'bg-green-500' : 'bg-gray-200'
+                            stageIdx >= 0 && i < stageIdx ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-600'
                           }`} />
                         )}
                       </li>
@@ -403,21 +403,21 @@ export default function MyCase() {
             {checklist && (
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                    <ClipboardList size={15} className="text-[#0f2057]" />
+                  <h2 className="font-bold text-gray-800 dark:text-gray-100 text-sm flex items-center gap-2">
+                    <ClipboardList size={15} className="text-[#0f2057] dark:text-blue-400" />
                     Document Checklist Summary
                   </h2>
-                  <button onClick={() => navigate('/checklist')} className="text-xs text-green-600 font-medium flex items-center gap-1 hover:text-green-700">
+                  <button onClick={() => navigate('/checklist')} className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1 hover:text-green-700 dark:hover:text-green-300">
                     View checklist <ChevronRight size={13} />
                   </button>
                 </div>
 
                 <div className="mb-3">
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
                     <span>{acceptedItems.length} of {neededNowItems.length} required documents accepted</span>
                     <span className="font-medium">{checklistProgress}%</span>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${checklistProgress >= 75 ? 'bg-green-500' : checklistProgress >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
                       style={{ width: `${checklistProgress}%` }}
@@ -426,17 +426,17 @@ export default function MyCase() {
                 </div>
 
                 {pendingItems.length > 0 && (
-                  <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
+                  <div className="flex items-start gap-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-sm">
                     <AlertCircle size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold text-amber-800">{pendingItems.length} item{pendingItems.length !== 1 ? 's' : ''} still needed.</span>
-                      <span className="text-amber-700"> Head to the Checklist page to upload them.</span>
+                      <span className="font-semibold text-amber-800 dark:text-amber-400">{pendingItems.length} item{pendingItems.length !== 1 ? 's' : ''} still needed.</span>
+                      <span className="text-amber-700 dark:text-amber-500"> Head to the Checklist page to upload them.</span>
                     </div>
                   </div>
                 )}
 
                 {pendingItems.length === 0 && neededNowItems.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">
+                  <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3">
                     <Check size={15} className="text-green-500" />
                     All required documents have been submitted. Your attorney is reviewing them.
                   </div>

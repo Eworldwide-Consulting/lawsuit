@@ -1,11 +1,22 @@
-﻿import { NavLink, useNavigate } from 'react-router-dom';
+﻿import { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { mattersApi } from '../../api';
 import Logo from '../ui/Logo';
 import {
   LayoutDashboard, FileText, Users, CreditCard,
   Calendar, BarChart2, MessageSquare, Settings, LogOut, FileCheck,
   Briefcase, CheckSquare, Folder, ClipboardList, ClipboardCheck, Scale,
 } from 'lucide-react';
+
+// Lowercase, mid-sentence phrasing for "We're here to support your ___ journey" —
+// deliberately not the formal Title Case labels used elsewhere (Checklist.jsx etc).
+const CASE_TYPE_PHRASE = {
+  guardianship:                 'guardianship',
+  conservatorship:              'conservatorship',
+  guardianship_conservatorship: 'guardianship & conservatorship',
+  estate_administration:        'estate administration',
+};
 
 const clientNav = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
@@ -61,6 +72,18 @@ export default function Sidebar({ unreadMessages = 0, onClose }) {
   const navigate = useNavigate();
   const navItems = navByRole[user?.role] || clientNav;
 
+  const [caseTypePhrase, setCaseTypePhrase] = useState('legal');
+  useEffect(() => {
+    if (user?.role !== 'client') return;
+    mattersApi.list()
+      .then(r => {
+        const list = r.data?.matters || r.data || [];
+        const phrase = CASE_TYPE_PHRASE[list[0]?.matter_type];
+        if (phrase) setCaseTypePhrase(phrase);
+      })
+      .catch(() => {});
+  }, [user?.role]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -89,7 +112,7 @@ export default function Sidebar({ unreadMessages = 0, onClose }) {
       <div className="p-3 border-t border-white/10">
         {user?.role === 'client' && (
           <div className="mb-3 p-3 bg-white/10 rounded-lg text-xs text-blue-100">
-            <div className="font-semibold text-white mb-1">We're here to support your guardianship journey.</div>
+            <div className="font-semibold text-white mb-1">We're here to support your {caseTypePhrase} journey.</div>
             <div className="text-blue-200">You're not alone. We're with you every step.</div>
           </div>
         )}

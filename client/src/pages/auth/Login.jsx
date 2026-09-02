@@ -59,6 +59,9 @@ export default function Login() {
   const [needsVerification, setNeedsVerification]   = useState('');
   const [resentVerification, setResentVerification] = useState(false);
   const [notRegistered, setNotRegistered]           = useState(false);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState('');
+  const [passwordSetupSent, setPasswordSetupSent]   = useState(false);
+  const [sendingPasswordSetup, setSendingPasswordSetup] = useState(false);
   const { login } = useAuth();
   const navigate   = useNavigate();
   const location   = useLocation();
@@ -83,6 +86,8 @@ export default function Login() {
     setNeedsVerification('');
     setResentVerification(false);
     setNotRegistered(false);
+    setNeedsPasswordSetup('');
+    setPasswordSetupSent(false);
   }
 
   async function handleSubmit(e) {
@@ -92,6 +97,8 @@ export default function Login() {
     setNotRegistered(false);
     setNeedsVerification('');
     setResentVerification(false);
+    setNeedsPasswordSetup('');
+    setPasswordSetupSent(false);
     try {
       const res = await authApi.login({ ...form, portal: activeRole });
       if (res.data.twoFaRequired) {
@@ -126,6 +133,9 @@ export default function Login() {
       if (d.requiresVerification && d.email) {
         setError(d.error || 'Please verify your email.');
         setNeedsVerification(d.email);
+      } else if (d.requiresPasswordSetup && d.email) {
+        setError(d.error || 'This account was created with Google Sign-In.');
+        setNeedsPasswordSetup(d.email);
       } else if (err.response?.status === 401) {
         setError(d.error || 'Invalid email or password. Please check your credentials and try again.');
       } else {
@@ -206,6 +216,32 @@ export default function Login() {
                   className="underline font-medium hover:text-red-900"
                 >
                   Resend verification email
+                </button>
+              )}
+            </div>
+          )}
+          {needsPasswordSetup && (
+            <div className="mt-2 space-y-1">
+              {passwordSetupSent ? (
+                <div>
+                  <span className="text-green-600 font-medium">Password setup email sent!</span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Click the link in that email to set a password, then come back and sign in with it.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={sendingPasswordSetup}
+                  onClick={async () => {
+                    setSendingPasswordSetup(true);
+                    await authApi.forgotPassword(needsPasswordSetup).catch(() => {});
+                    setSendingPasswordSetup(false);
+                    setPasswordSetupSent(true);
+                  }}
+                  className="underline font-medium hover:text-red-900 disabled:opacity-50"
+                >
+                  {sendingPasswordSetup ? 'Sending…' : 'Set a Password'}
                 </button>
               )}
             </div>

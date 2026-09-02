@@ -342,14 +342,14 @@ export default function ClientDashboard() {
                     <li key={stage} className="flex items-start">
                       <div className="flex flex-col items-center">
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                          curr ? 'bg-[#0f2057] border-[#0f2057] text-white ring-2 ring-[#0f2057]/20 shadow-md'
+                          curr ? 'bg-[#0f2057] dark:bg-blue-500 border-[#0f2057] dark:border-blue-500 text-white ring-2 ring-[#0f2057]/20 dark:ring-blue-400/30 shadow-md'
                                : done ? 'bg-green-500 border-green-500 text-white shadow-sm'
-                               : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-400'
+                               : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500'
                         }`}>
                           {done && !curr ? <Check size={12} strokeWidth={3} /> : i + 1}
                         </div>
                         <div className={`text-[9px] mt-1 text-center w-14 leading-tight font-medium ${
-                          curr ? 'text-[#0f2057] font-semibold' : done ? 'text-green-600' : 'text-gray-400'
+                          curr ? 'text-[#0f2057] dark:text-blue-400 font-semibold' : done ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'
                         }`}>{stage}</div>
                       </div>
                       {!last && (

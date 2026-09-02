@@ -160,10 +160,16 @@ const AuthService = {
     if (!user || !validPassword) {
       // Google-created accounts have no password until one is set via the
       // reset flow — tell the user how to proceed instead of a dead-end 401.
+      // requiresPasswordSetup lets the login screen render a direct "Set a
+      // Password" action instead of the user having to spot the separate
+      // Forgot Password link on their own.
       if (user && !user.password_hash && user.google_id)
-        throw new UnauthorizedError(
-          "This account was created with Google Sign-In. Use \"Continue with Google\", " +
-          "or set a password first via \"Forgot password?\" — then you can sign in with email too."
+        throw Object.assign(
+          new UnauthorizedError(
+            "This account was created with Google Sign-In. Use \"Continue with Google\", " +
+            "or set a password below — then you can sign in with email too."
+          ),
+          { requiresPasswordSetup: true, email: user.email }
         );
       throw new UnauthorizedError('Invalid credentials');
     }
