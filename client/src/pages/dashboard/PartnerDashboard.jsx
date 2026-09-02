@@ -99,8 +99,8 @@ function DonutGauge({ value, max = 100, color = '#16a34a', label }) {
           strokeDasharray={`${pct * circ} ${circ}`} strokeLinecap="round" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-xl font-bold text-gray-900">{value}</div>
-        {label && <div className="text-[9px] text-gray-400 text-center">{label}</div>}
+        <div className="text-xl font-bold text-gray-900 dark:text-white">{value}</div>
+        {label && <div className="text-[9px] text-gray-400 dark:text-gray-500 text-center">{label}</div>}
       </div>
     </div>
   );
@@ -166,11 +166,11 @@ export default function PartnerDashboard() {
 
       {/* Pending approval banner */}
       {user?.approval_status === 'pending' && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 flex items-start gap-3">
           <Clock size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
           <div>
-            <div className="text-sm font-semibold text-amber-700">Account Pending Approval</div>
-            <div className="text-xs text-amber-600 mt-0.5">
+            <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">Account Pending Approval</div>
+            <div className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
               Your credentials are under review. Full platform access will be enabled once approved (1–2 business days).
             </div>
           </div>
@@ -181,14 +181,14 @@ export default function PartnerDashboard() {
       {pendingCount > 0 && user?.approval_status !== 'pending' && (
         <button
           onClick={() => navigate('/matters')}
-          className="w-full rounded-xl bg-indigo-50 border border-indigo-200 p-3.5 flex items-center gap-3 hover:bg-indigo-100 transition-colors text-left"
+          className="w-full rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 p-3.5 flex items-center gap-3 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors text-left"
         >
-          <UserCheck size={18} className="text-indigo-600 flex-shrink-0" />
+          <UserCheck size={18} className="text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
           <div className="flex-1">
-            <div className="text-sm font-semibold text-indigo-800">
+            <div className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
               {pendingCount} account{pendingCount > 1 ? 's' : ''} pending your approval
             </div>
-            <div className="text-xs text-indigo-600 mt-0.5">
+            <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
               {pendingCount === 1 ? 'An attorney or partner needs' : 'Attorneys or partners need'} your review
             </div>
           </div>
@@ -199,10 +199,10 @@ export default function PartnerDashboard() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{greeting}, {user?.first_name}.</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Here's your partner-level practice and financial overview.</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{greeting}, {user?.first_name}.</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Here's your partner-level practice and financial overview.</p>
         </div>
-        <div className="text-xs text-gray-400 hidden lg:block">{new Date().toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
+        <div className="text-xs text-gray-400 dark:text-gray-500 hidden lg:block">{new Date().toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
       </div>
 
       {/* ── KPI stat bar (5 cards) ── */}
@@ -253,8 +253,8 @@ export default function PartnerDashboard() {
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 ${iconBg}`}>
               <Icon size={15} />
             </div>
-            <div className="text-xl font-bold text-gray-900">{value}</div>
-            <div className="text-xs font-medium text-gray-600">{label}</div>
+            <div className="text-xl font-bold text-gray-900 dark:text-white">{value}</div>
+            <div className="text-xs font-medium text-gray-600 dark:text-gray-400">{label}</div>
             <div className={`text-xs font-medium ${subColor}`}>{sub}</div>
           </div>
         ))}
@@ -269,15 +269,15 @@ export default function PartnerDashboard() {
           {/* Firm Matter & Financial Overview table */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
-              <div className="font-semibold text-gray-800 text-sm">Firm Matter & Financial Overview</div>
-              <button onClick={() => navigate('/matters')} className="text-xs text-green-600 font-medium hover:text-green-700">View all matters</button>
+              <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Firm Matter & Financial Overview</div>
+              <button onClick={() => navigate('/matters')} className="text-xs text-green-600 dark:text-green-400 font-medium hover:text-green-700 dark:hover:text-green-300">View all matters</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-gray-100">
+                  <tr className="border-b border-gray-100 dark:border-gray-700">
                     {['Matter', 'Client', 'Attorney', 'Stage', 'Billed', 'Collected', 'WIP', 'A/R', 'Status'].map(h => (
-                      <th key={h} className="text-left py-2 pr-3 text-gray-400 font-medium whitespace-nowrap">{h}</th>
+                      <th key={h} className="text-left py-2 pr-3 text-gray-400 dark:text-gray-500 font-medium whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -286,37 +286,37 @@ export default function PartnerDashboard() {
                     const isAtRisk = m.status === 'at_risk' || m.ar > 5000;
                     return (
                       <tr key={m.id}
-                        className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                        className="border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
                         onClick={() => navigate(`/matters/${m.id}`)}>
                         <td className="py-2.5 pr-3">
-                          <div className="font-semibold text-gray-800">{m.case_number}</div>
-                          <div className="text-[10px] text-gray-400 truncate max-w-[100px]">{m.description}</div>
+                          <div className="font-semibold text-gray-800 dark:text-gray-100">{m.case_number}</div>
+                          <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[100px]">{m.description}</div>
                         </td>
                         <td className="pr-3">
                           <div className="flex items-center gap-1.5">
                             <div className="w-6 h-6 rounded-full bg-navy-900 text-white text-[9px] flex items-center justify-center font-bold flex-shrink-0">
                               {m.client_initials || '?'}
                             </div>
-                            <span className="truncate max-w-[70px] text-gray-700">{(m.client_name || '').split(' ')[0]}</span>
+                            <span className="truncate max-w-[70px] text-gray-700 dark:text-gray-300">{(m.client_name || '').split(' ')[0]}</span>
                           </div>
                         </td>
-                        <td className="pr-3 text-gray-600 truncate max-w-[80px]">
+                        <td className="pr-3 text-gray-600 dark:text-gray-400 truncate max-w-[80px]">
                           {(m.attorney_name || 'Unassigned').split(' ')[1] || m.attorney_name || '—'}
                         </td>
                         <td className="pr-3 whitespace-nowrap">
                           <span className="badge badge-blue text-[10px]">{stageLabel(m.stage)}</span>
                         </td>
-                        <td className="pr-3 font-medium text-gray-700">{fmtShort(m.billed)}</td>
-                        <td className="pr-3 text-green-600 font-medium">{fmtShort(m.collected)}</td>
-                        <td className="pr-3 text-amber-600">{fmtShort(m.wip)}</td>
-                        <td className="pr-3 text-red-500">{fmtShort(m.ar)}</td>
+                        <td className="pr-3 font-medium text-gray-700 dark:text-gray-300">{fmtShort(m.billed)}</td>
+                        <td className="pr-3 text-green-600 dark:text-green-400 font-medium">{fmtShort(m.collected)}</td>
+                        <td className="pr-3 text-amber-600 dark:text-amber-400">{fmtShort(m.wip)}</td>
+                        <td className="pr-3 text-red-500 dark:text-red-400">{fmtShort(m.ar)}</td>
                         <td>
                           <div className="flex items-center gap-1.5">
-                            <div className="h-1.5 w-12 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 w-12 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                               <div className={`h-full rounded-full ${isAtRisk ? 'bg-red-400' : 'bg-green-500'}`}
                                 style={{ width: `${m.readiness_pct ?? 20}%` }} />
                             </div>
-                            <span className={`text-[10px] font-medium ${isAtRisk ? 'text-red-500' : 'text-green-600'}`}>
+                            <span className={`text-[10px] font-medium ${isAtRisk ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                               {isAtRisk ? 'At Risk' : 'On Track'}
                             </span>
                           </div>
@@ -325,7 +325,7 @@ export default function PartnerDashboard() {
                     );
                   })}
                   {(!data?.matters || data.matters.length === 0) && (
-                    <tr><td colSpan={9} className="py-6 text-center text-gray-400 text-xs">No active matters</td></tr>
+                    <tr><td colSpan={9} className="py-6 text-center text-gray-400 dark:text-gray-500 text-xs">No active matters</td></tr>
                   )}
                 </tbody>
               </table>
@@ -335,16 +335,16 @@ export default function PartnerDashboard() {
           {/* Revenue & Collections Performance chart */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-1">
-              <div className="font-semibold text-gray-800 text-sm">Revenue & Collections Performance</div>
-              <div className="flex items-center gap-3 text-[10px] text-gray-500">
+              <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Revenue & Collections Performance</div>
+              <div className="flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-green-600 inline-block" /> Revenue</span>
                 <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-blue-500 inline-block border-t-2 border-dashed border-blue-500" style={{borderStyle:'dashed'}} /> Collected</span>
               </div>
             </div>
-            <div className="text-xs text-gray-400 mb-3">YTD — Monthly performance</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500 mb-3">YTD — Monthly performance</div>
             {monthlyData.length > 0
               ? <RevenueChart data={monthlyData} />
-              : <div className="h-32 flex items-center justify-center text-xs text-gray-400">No revenue data yet</div>
+              : <div className="h-32 flex items-center justify-center text-xs text-gray-400 dark:text-gray-500">No revenue data yet</div>
             }
           </div>
 
@@ -353,7 +353,7 @@ export default function PartnerDashboard() {
 
             {/* Billing & A/R Aging */}
             <div className="card p-5">
-              <div className="font-semibold text-gray-800 text-sm mb-3">Billing & A/R Aging</div>
+              <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3">Billing & A/R Aging</div>
               <div className="space-y-2.5">
                 {[
                   { label: 'Current',    value: arAging.current,   pct: Math.round((arAging.current   / arTotal) * 100), color: 'bg-green-500' },
@@ -363,40 +363,40 @@ export default function PartnerDashboard() {
                 ].map(({ label, value, pct, color }) => (
                   <div key={label}>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-600">{label}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{label}</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-800">{fmtShort(value)}</span>
-                        <span className="text-gray-400 w-7 text-right">{pct}%</span>
+                        <span className="font-semibold text-gray-800 dark:text-gray-100">{fmtShort(value)}</span>
+                        <span className="text-gray-400 dark:text-gray-500 w-7 text-right">{pct}%</span>
                       </div>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between text-xs">
-                <span className="font-medium text-gray-700">Total A/R</span>
-                <span className="font-bold text-red-500">{fmtShort(ar)}</span>
+              <div className="border-t border-gray-100 dark:border-gray-700 mt-3 pt-3 flex justify-between text-xs">
+                <span className="font-medium text-gray-700 dark:text-gray-300">Total A/R</span>
+                <span className="font-bold text-red-500 dark:text-red-400">{fmtShort(ar)}</span>
               </div>
             </div>
 
             {/* Practice Group Performance */}
             <div className="card p-5">
-              <div className="font-semibold text-gray-800 text-sm mb-3">Practice Group Performance</div>
+              <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3">Practice Group Performance</div>
               {practiceGroups.length > 0 ? (
                 <div className="space-y-3">
                   {practiceGroups.map(g => (
                     <div key={g.type} className="flex items-center justify-between">
                       <div className="min-w-0 flex-1 mr-3">
-                        <div className="text-xs font-medium text-gray-700 truncate">
+                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
                           {PRACTICE_NAMES[g.type] || stageLabel(g.type)}
                         </div>
-                        <div className="text-[10px] text-gray-400">{g.count} matter{g.count !== 1 ? 's' : ''}</div>
+                        <div className="text-[10px] text-gray-400 dark:text-gray-500">{g.count} matter{g.count !== 1 ? 's' : ''}</div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-xs font-bold text-gray-900">{fmtShort(g.revenue)}</div>
-                        <div className={`text-[10px] font-medium ${g.margin >= 25 ? 'text-green-600' : 'text-amber-600'}`}>
+                        <div className="text-xs font-bold text-gray-900 dark:text-white">{fmtShort(g.revenue)}</div>
+                        <div className={`text-[10px] font-medium ${g.margin >= 25 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                           {g.margin}% margin
                         </div>
                       </div>
@@ -404,7 +404,7 @@ export default function PartnerDashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="text-xs text-gray-400 text-center py-4">No practice group data yet</div>
+                <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No practice group data yet</div>
               )}
             </div>
           </div>
@@ -412,48 +412,48 @@ export default function PartnerDashboard() {
           {/* Top Clients by Revenue */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
-              <div className="font-semibold text-gray-800 text-sm">Top Clients by Revenue</div>
-              <button onClick={() => navigate('/clients')} className="text-xs text-green-600 font-medium hover:text-green-700">View all</button>
+              <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Top Clients by Revenue</div>
+              <button onClick={() => navigate('/clients')} className="text-xs text-green-600 dark:text-green-400 font-medium hover:text-green-700 dark:hover:text-green-300">View all</button>
             </div>
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-100">
+                <tr className="border-b border-gray-100 dark:border-gray-700">
                   {['#', 'Client', 'Billed (YTD)', 'Collected (YTD)', '% Collected'].map(h => (
-                    <th key={h} className="text-left py-2 pr-3 text-gray-400 font-medium">{h}</th>
+                    <th key={h} className="text-left py-2 pr-3 text-gray-400 dark:text-gray-500 font-medium">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {topClients.length > 0 ? topClients.map((c, i) => (
-                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2 pr-3 text-gray-400 font-medium">{i + 1}</td>
+                  <tr key={i} className="border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td className="py-2 pr-3 text-gray-400 dark:text-gray-500 font-medium">{i + 1}</td>
                     <td className="pr-3">
                       <button
                         onClick={() => c.id && setProfileUserId(c.id)}
                         disabled={!c.id}
-                        className="flex items-center gap-1.5 hover:text-blue-600 disabled:cursor-default"
+                        className="flex items-center gap-1.5 hover:text-blue-600 dark:hover:text-blue-400 disabled:cursor-default"
                         title={c.id ? 'View full profile' : undefined}
                       >
                         <div className="w-6 h-6 rounded-full bg-navy-900 text-white text-[9px] flex items-center justify-center font-bold flex-shrink-0">
                           {c.initials}
                         </div>
-                        <span className="text-gray-700 font-medium hover:underline">{c.name}</span>
+                        <span className="text-gray-700 dark:text-gray-300 font-medium hover:underline">{c.name}</span>
                       </button>
                     </td>
-                    <td className="pr-3 font-semibold text-gray-800">{fmtShort(c.billed)}</td>
-                    <td className="pr-3 text-green-600 font-semibold">{fmtShort(c.collected)}</td>
+                    <td className="pr-3 font-semibold text-gray-800 dark:text-gray-100">{fmtShort(c.billed)}</td>
+                    <td className="pr-3 text-green-600 dark:text-green-400 font-semibold">{fmtShort(c.collected)}</td>
                     <td>
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-16 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full ${c.pct >= 80 ? 'bg-green-500' : c.pct >= 60 ? 'bg-amber-400' : 'bg-red-400'}`}
                             style={{ width: `${c.pct}%` }} />
                         </div>
-                        <span className="font-medium text-gray-700">{c.pct}%</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{c.pct}%</span>
                       </div>
                     </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={5} className="py-4 text-center text-gray-400">No client billing data yet</td></tr>
+                  <tr><td colSpan={5} className="py-4 text-center text-gray-400 dark:text-gray-500">No client billing data yet</td></tr>
                 )}
               </tbody>
             </table>
@@ -465,7 +465,7 @@ export default function PartnerDashboard() {
 
           {/* Key Financial Alerts */}
           <div className="card p-4">
-            <div className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+            <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3 flex items-center gap-2">
               <AlertTriangle size={15} className="text-amber-500" /> Key Financial Alerts
             </div>
             <div className="space-y-2">
@@ -478,7 +478,7 @@ export default function PartnerDashboard() {
                   <ChevronRight size={12} className="flex-shrink-0 mt-0.5 opacity-60" />
                 </div>
               )) : (
-                <div className="text-xs text-green-600 text-center py-3 font-medium">
+                <div className="text-xs text-green-600 dark:text-green-400 text-center py-3 font-medium">
                   No financial alerts — firm on track
                 </div>
               )}
@@ -487,58 +487,58 @@ export default function PartnerDashboard() {
 
           {/* Upcoming Partner Appointments */}
           <div className="card p-4">
-            <div className="font-semibold text-gray-800 text-sm mb-3 flex items-center justify-between">
+            <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3 flex items-center justify-between">
               <span className="flex items-center gap-2"><Calendar size={14} className="text-blue-500" /> Upcoming Appointments</span>
-              <button onClick={() => navigate('/appointments')} className="text-xs text-green-600 font-medium hover:text-green-700">View calendar</button>
+              <button onClick={() => navigate('/appointments')} className="text-xs text-green-600 dark:text-green-400 font-medium hover:text-green-700 dark:hover:text-green-300">View calendar</button>
             </div>
             <div className="space-y-2.5">
               {(data?.upcomingAppts || []).slice(0, 4).map(appt => {
                 const dt = new Date(appt.start_time);
                 return (
-                  <div key={appt.id} className="flex items-center gap-2.5 py-1.5 border-b border-gray-50 last:border-0">
-                    <div className="bg-blue-50 text-navy-900 w-11 h-11 rounded-lg flex flex-col items-center justify-center flex-shrink-0">
-                      <div className="text-[8px] font-bold uppercase text-blue-600">
+                  <div key={appt.id} className="flex items-center gap-2.5 py-1.5 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 text-navy-900 dark:text-blue-300 w-11 h-11 rounded-lg flex flex-col items-center justify-center flex-shrink-0">
+                      <div className="text-[8px] font-bold uppercase text-blue-600 dark:text-blue-400">
                         {dt.toLocaleDateString('en', { month: 'short' })}
                       </div>
-                      <div className="text-base font-bold text-navy-900 leading-tight">{dt.getDate()}</div>
+                      <div className="text-base font-bold text-navy-900 dark:text-blue-300 leading-tight">{dt.getDate()}</div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-gray-700 truncate">{appt.title}</div>
-                      <div className="text-[10px] text-gray-400 truncate">
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate">{appt.title}</div>
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
                         {dt.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })}
                         {appt.location ? ` · ${appt.location}` : ''}
                       </div>
                     </div>
-                    <button className="text-[10px] border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 font-medium text-gray-600 flex-shrink-0">
+                    <button className="text-[10px] border border-gray-200 dark:border-gray-600 px-2.5 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium text-gray-600 dark:text-gray-300 flex-shrink-0">
                       View
                     </button>
                   </div>
                 );
               })}
               {(!data?.upcomingAppts || !data.upcomingAppts.length) && (
-                <div className="text-xs text-gray-400 text-center py-3">No upcoming appointments</div>
+                <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-3">No upcoming appointments</div>
               )}
             </div>
           </div>
 
           {/* Partner Financial Snapshot */}
           <div className="card p-4">
-            <div className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+            <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3 flex items-center gap-2">
               <TrendingUp size={14} className="text-green-600" /> Partner Financial Snapshot
             </div>
             <div className="flex items-start gap-4">
               <DonutGauge value={finScore} color="#16a34a" label="/ 100" />
               <div className="flex-1 space-y-1.5">
-                <div className="text-[10px] font-semibold text-gray-500 mb-1">Financial Health Score</div>
+                <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1">Financial Health Score</div>
                 {[
-                  { label: 'Revenue growth',      value: `${Math.max(0, Math.round((colEff - 80) / 2))}%`,   color: 'text-green-600' },
-                  { label: 'Collection efficiency',value: `${colEff}%`,                                        color: colEff >= 80 ? 'text-green-600' : 'text-amber-600' },
-                  { label: 'Matter margin',        value: `${profitability}%`,                                 color: 'text-green-600' },
-                  { label: 'Partner realization',  value: `${Math.min(100, Math.round(colEff * 0.9))}%`,       color: 'text-green-600' },
-                  { label: 'Client retention',     value: `${data?.activeMatters > 0 ? 92 : 0}%`,             color: 'text-green-600' },
+                  { label: 'Revenue growth',      value: `${Math.max(0, Math.round((colEff - 80) / 2))}%`,   color: 'text-green-600 dark:text-green-400' },
+                  { label: 'Collection efficiency',value: `${colEff}%`,                                        color: colEff >= 80 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400' },
+                  { label: 'Matter margin',        value: `${profitability}%`,                                 color: 'text-green-600 dark:text-green-400' },
+                  { label: 'Partner realization',  value: `${Math.min(100, Math.round(colEff * 0.9))}%`,       color: 'text-green-600 dark:text-green-400' },
+                  { label: 'Client retention',     value: `${data?.activeMatters > 0 ? 92 : 0}%`,             color: 'text-green-600 dark:text-green-400' },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="flex justify-between items-center text-[10px]">
-                    <div className="flex items-center gap-1.5 text-gray-600">
+                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
                       <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
                       {label}
                     </div>
@@ -548,7 +548,7 @@ export default function PartnerDashboard() {
               </div>
             </div>
             {(data?.overdueTasks ?? 0) > 0 && (
-              <div className="mt-3 text-[10px] text-amber-600 font-medium border-t border-gray-100 pt-2">
+              <div className="mt-3 text-[10px] text-amber-600 dark:text-amber-400 font-medium border-t border-gray-100 dark:border-gray-700 pt-2">
                 {data.overdueTasks} overdue task{data.overdueTasks > 1 ? 's' : ''} affecting score
               </div>
             )}
@@ -556,36 +556,36 @@ export default function PartnerDashboard() {
 
           {/* Partner Messages */}
           <div className="card p-4">
-            <div className="font-semibold text-gray-800 text-sm mb-3 flex items-center justify-between">
+            <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3 flex items-center justify-between">
               <span className="flex items-center gap-2"><MessageSquare size={14} className="text-green-600" /> Partner Messages</span>
-              <button onClick={() => navigate('/messages')} className="text-xs text-green-600 font-medium hover:text-green-700">View all</button>
+              <button onClick={() => navigate('/messages')} className="text-xs text-green-600 dark:text-green-400 font-medium hover:text-green-700 dark:hover:text-green-300">View all</button>
             </div>
             <div className="space-y-2">
               {(data?.recentMessages || []).slice(0, 4).map(msg => (
-                <div key={msg.id} className="flex items-start gap-2.5 py-1.5 border-b border-gray-50 last:border-0">
+                <div key={msg.id} className="flex items-start gap-2.5 py-1.5 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
                   <div className="w-7 h-7 rounded-full bg-navy-900 text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">
                     {msg.from_initials || '?'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className={`text-xs font-medium ${!msg.read_at ? 'text-gray-900' : 'text-gray-700'}`}>
+                      <span className={`text-xs font-medium ${!msg.read_at ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
                         {msg.from_name || 'Unknown'}
                       </span>
-                      <span className="text-[9px] text-gray-400 flex-shrink-0 ml-1">
+                      <span className="text-[9px] text-gray-400 dark:text-gray-500 flex-shrink-0 ml-1">
                         {new Date(msg.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
-                    <div className="text-[10px] text-gray-500 truncate">{msg.subject || msg.body}</div>
+                    <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{msg.subject || msg.body}</div>
                   </div>
                   {!msg.read_at && <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-1.5" />}
                 </div>
               ))}
               {(!data?.recentMessages || data.recentMessages.length === 0) && (
-                <div className="text-xs text-gray-400 text-center py-3">No recent messages</div>
+                <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-3">No recent messages</div>
               )}
               <button
                 onClick={() => navigate('/messages')}
-                className="w-full mt-1 text-xs text-green-600 font-medium hover:text-green-700 text-center py-1.5 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
+                className="w-full mt-1 text-xs text-green-600 dark:text-green-400 font-medium hover:text-green-700 dark:hover:text-green-300 text-center py-1.5 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
               >
                 + Compose New Message
               </button>

@@ -21,8 +21,11 @@ const ACTION_CFG = {
 };
 
 const statusColor = s => s === 'overdue' ? 'text-orange-500' : s === 'pending' ? 'text-amber-600' : 'text-gray-500';
-const docStatusBadge = s => s === 'accepted' ? 'badge-green' : s === 'rejected' ? 'badge-red' : 'badge-yellow';
-const docStatusLabel = s => s === 'accepted' ? 'Approved' : s === 'rejected' ? 'Needs Revision' : 'Under Review';
+// documents.status values are 'pending' | 'uploaded' | 'approved' | 'rejected'
+// (server/src/domain/document.js) — distinct from matter_checklist_items'
+// 'accepted'/'needs_correction' vocabulary, which this used to check by mistake.
+const docStatusBadge = s => s === 'approved' ? 'badge-green' : s === 'rejected' ? 'badge-red' : 'badge-yellow';
+const docStatusLabel = s => s === 'approved' ? 'Approved' : s === 'rejected' ? 'Needs Revision' : 'Under Review';
 const shortCat = c => c.replace(/^\d+\.\s*/, '');
 
 // ── Readiness gauge ──────────────────────────────────────────────────────────
@@ -111,7 +114,10 @@ function ReviewedDocsPanel({ matterId }) {
   useEffect(() => {
     if (!matterId) { setLoading(false); return; }
     documentsApi.list({ matterId })
-      .then(r => setDocs((r.data.documents || r.data || []).filter(d => d.status && d.status !== 'pending')))
+      // Only docs the attorney has actually acted on — 'uploaded' (not yet
+      // submitted) and 'pending' (submitted, awaiting review) don't belong
+      // in an "Attorney-Reviewed Documents" list.
+      .then(r => setDocs((r.data.documents || r.data || []).filter(d => ['approved', 'rejected'].includes(d.status))))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [matterId]);

@@ -313,9 +313,13 @@ router.put('/items/:itemId/review', requireAuth, requireRole('attorney', 'partne
 
 // ── GET /api/checklists/review-queue ───────────────────────────────────────
 // Attorney view: all submitted items across matters they manage, with
-// matter context for the review panel.
+// matter context for the review panel. Partners/itsupport (law firm heads)
+// see submitted items firm-wide. Was previously unscoped for attorneys too
+// despite the doc comment's original intent — every attorney saw every
+// other attorney's clients' submitted documents.
 router.get('/review-queue', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
   try {
+    const scoped = req.user.role === 'attorney';
     const items = await all(
       `SELECT ci.*,
               m.case_number, m.matter_type, m.title AS matter_title,
@@ -323,10 +327,10 @@ router.get('/review-queue', requireAuth, requireRole('attorney', 'partner'), asy
        FROM matter_checklist_items ci
        JOIN matters m ON m.id = ci.matter_id
        JOIN users   u ON u.id = m.client_id
-       WHERE ci.status = 'submitted'
+       WHERE ci.status = 'submitted' ${scoped ? 'AND m.attorney_id = ?' : ''}
        ORDER BY ci.updated_at DESC
        LIMIT 200`,
-      []
+      scoped ? [req.user.id] : []
     );
     res.json(items);
   } catch (err) { next(err); }
@@ -371,6 +375,10 @@ router.get('/templates/:matterType', requireAuth, async (req, res, next) => {
 // matter, not just what's currently pending.
 router.get('/matter/:matterId/all-items', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
   try {
+    if (req.user.role === 'attorney') {
+      const matter = await one('SELECT attorney_id FROM matters WHERE id = ?', [req.params.matterId]);
+      if (!matter || matter.attorney_id !== req.user.id) throw new ForbiddenError();
+    }
     const items = await all(
       `SELECT ci.*,
               m.case_number, m.matter_type,
@@ -387,9 +395,13 @@ router.get('/matter/:matterId/all-items', requireAuth, requireRole('attorney', '
 });
 
 // ── GET /api/checklists/client-overview ───────────────────────────────────
-// Attorney view: all clients with their matter and checklist readiness stats
+// Attorney view: only clients whose matter they're the responsible attorney
+// on. Partners/itsupport (law firm heads) see every client firm-wide. Was
+// previously unscoped for attorneys too — every attorney saw every client
+// in the firm here regardless of who they were actually assigned to.
 router.get('/client-overview', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
   try {
+    const scoped = req.user.role === 'attorney';
     const rows = await all(
       `SELECT
          u.id         AS user_id,
@@ -403,10 +415,10 @@ router.get('/client-overview', requireAuth, requireRole('attorney', 'partner'), 
        FROM users u
        LEFT JOIN matters m ON m.client_id = u.id
        LEFT JOIN matter_checklist_items ci ON ci.matter_id = m.id
-       WHERE u.role = 'client'
+       WHERE u.role = 'client' ${scoped ? 'AND m.attorney_id = ?' : ''}
        GROUP BY u.id, m.id
        ORDER BY u.last_name ASC, u.first_name ASC`,
-      []
+      scoped ? [req.user.id] : []
     );
     res.json(rows);
   } catch (err) { next(err); }

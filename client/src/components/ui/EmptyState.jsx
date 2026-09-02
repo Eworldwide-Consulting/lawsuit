@@ -34,17 +34,17 @@ export default function EmptyState({
       aria-label={title || 'No data'}
     >
       {Icon && (
-        <div className="mb-4 p-4 bg-gray-50 rounded-full inline-flex">
-          <Icon size={s.icon} className="text-gray-300" aria-hidden="true" />
+        <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700/40 rounded-full inline-flex">
+          <Icon size={s.icon} className="text-gray-300 dark:text-gray-500" aria-hidden="true" />
         </div>
       )}
 
       {title && (
-        <p className={`font-semibold text-gray-700 ${s.title}`}>{title}</p>
+        <p className={`font-semibold text-gray-700 dark:text-gray-200 ${s.title}`}>{title}</p>
       )}
 
       {description && (
-        <p className={`text-gray-400 mt-1.5 max-w-xs ${s.desc}`}>{description}</p>
+        <p className={`text-gray-400 dark:text-gray-500 mt-1.5 max-w-xs ${s.desc}`}>{description}</p>
       )}
 
       {action && (

@@ -55,6 +55,12 @@ router.get('/', requireAuth, async (req, res, next) => {
         const matter = await MatterRepo.findById(matterId);
         if (!matter || matter.client_id !== req.user.id) throw new ForbiddenError();
       }
+      // An attorney could previously view any matter's documents by passing
+      // any matterId — only their own assigned matters now.
+      if (req.user.role === 'attorney') {
+        const matter = await MatterRepo.findById(matterId);
+        if (!matter || matter.attorney_id !== req.user.id) throw new ForbiddenError();
+      }
       return res.json(await DocumentRepo.findByMatter(matterId, pagination));
     }
 
@@ -67,7 +73,10 @@ router.get('/', requireAuth, async (req, res, next) => {
       );
     }
 
-    res.json(await DocumentRepo.findAll(pagination));
+    // Attorneys see only documents on their own matters; partners/itsupport
+    // (law firm heads) see every document firm-wide.
+    const attorneyId = req.user.role === 'attorney' ? req.user.id : null;
+    res.json(await DocumentRepo.findAll(pagination, attorneyId));
   } catch (err) { next(err); }
 });
 

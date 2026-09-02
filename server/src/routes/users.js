@@ -4,7 +4,10 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const EmailService  = require('../services/email.service');
 const config        = require('../config');
 
-router.get('/', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
+// Full user directory across every role — law firm heads / platform admins
+// only. Not attorney-accessible: a regular attorney has no legitimate need
+// to enumerate every account in the firm, including other attorneys'.
+router.get('/', requireAuth, requireRole('partner', 'itsupport'), async (req, res, next) => {
   try {
     res.json(await all(
       'SELECT id,first_name,last_name,email,role,phone,avatar_initials,created_at FROM users ORDER BY created_at DESC'
@@ -36,8 +39,22 @@ router.get('/available-attorneys', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Attorneys see only clients whose matter they're the responsible attorney
+// on; partners/itsupport (law firm heads) see every client firm-wide.
+// Previously unscoped for attorneys too — e.g. leaked the full client list
+// into the invoice-creation dropdown on Payments.jsx.
 router.get('/clients', requireAuth, requireRole('attorney', 'partner'), async (req, res, next) => {
   try {
+    if (req.user.role === 'attorney') {
+      return res.json(await all(
+        `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.phone, u.avatar_initials, u.created_at
+         FROM users u
+         JOIN matters m ON m.client_id = u.id
+         WHERE u.role = 'client' AND m.attorney_id = ?
+         ORDER BY u.last_name ASC`,
+        [req.user.id]
+      ));
+    }
     res.json(await all(
       "SELECT id,first_name,last_name,email,phone,avatar_initials,created_at FROM users WHERE role='client' ORDER BY last_name ASC"
     ));

@@ -20,17 +20,38 @@ const AppointmentRepository = {
     );
   },
 
-  findAllAfter(after, limit = 10) {
+  // attorneyId omitted → firm-wide (partner/itsupport). Provided → only
+  // appointments on that attorney's own matters (appointments has no
+  // attorney_id column of its own, so this joins through matters).
+  findAllAfter(after, limit = 10, attorneyId = null) {
+    if (!attorneyId) {
+      return all(
+        'SELECT * FROM appointments WHERE start_time >= ? ORDER BY start_time ASC LIMIT ?',
+        [after, limit]
+      );
+    }
     return all(
-      'SELECT * FROM appointments WHERE start_time >= ? ORDER BY start_time ASC LIMIT ?',
-      [after, limit]
+      `SELECT a.* FROM appointments a
+       JOIN matters m ON a.matter_id = m.id
+       WHERE a.start_time >= ? AND m.attorney_id = ?
+       ORDER BY a.start_time ASC LIMIT ?`,
+      [after, attorneyId, limit]
     );
   },
 
-  findAll({ limit, offset } = {}) {
+  findAll({ limit, offset } = {}, attorneyId = null) {
+    if (!attorneyId) {
+      return all(
+        'SELECT * FROM appointments ORDER BY start_time ASC LIMIT ? OFFSET ?',
+        [limit, offset]
+      );
+    }
     return all(
-      'SELECT * FROM appointments ORDER BY start_time ASC LIMIT ? OFFSET ?',
-      [limit, offset]
+      `SELECT a.* FROM appointments a
+       JOIN matters m ON a.matter_id = m.id
+       WHERE m.attorney_id = ?
+       ORDER BY a.start_time ASC LIMIT ? OFFSET ?`,
+      [attorneyId, limit, offset]
     );
   },
 
@@ -38,14 +59,19 @@ const AppointmentRepository = {
     return one('SELECT * FROM appointments WHERE id = ?', [id]);
   },
 
-  findForAttorneyDashboard(after, limit = 5) {
+  // attorneyId omitted → firm-wide (partner dashboard). Provided → that
+  // attorney's own matters' appointments only (attorney dashboard) — was
+  // previously unscoped, leaking every attorney's calendar to every other.
+  findForAttorneyDashboard(after, limit = 5, attorneyId = null) {
+    const where = attorneyId ? 'WHERE a.start_time >= ? AND m.attorney_id = ?' : 'WHERE a.start_time >= ?';
+    const args  = attorneyId ? [after, attorneyId, limit] : [after, limit];
     return all(
       `SELECT a.*, m.description AS matter_description, m.case_number
        FROM appointments a
        LEFT JOIN matters m ON a.matter_id = m.id
-       WHERE a.start_time >= ?
+       ${where}
        ORDER BY a.start_time ASC LIMIT ?`,
-      [after, limit]
+      args
     );
   },
 

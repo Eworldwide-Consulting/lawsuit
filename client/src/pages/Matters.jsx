@@ -51,8 +51,8 @@ export default function Matters() {
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Matters</h1>
-          <p className="text-gray-500 text-sm">{matters.length} total matters</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Matters</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{matters.length} total matters</p>
         </div>
         <button onClick={() => navigate('/intake')} className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
           <Plus size={16} /> New Matter
@@ -80,56 +80,56 @@ export default function Matters() {
         <div className="flex justify-center py-16"><Spinner size={8} /></div>
       ) : filtered.length === 0 && caseLookup ? (
         <div className="card p-5">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Found via case lookup</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Found via case lookup</div>
           <div
-            className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-green-300 hover:bg-gray-50 cursor-pointer transition-colors"
+            className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-green-300 dark:hover:border-green-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer transition-colors"
             onClick={() => navigate(`/matters/${caseLookup.matter.id}`)}
           >
             <div>
-              <div className="font-mono text-sm font-semibold text-navy-900">{caseLookup.matter.case_number}</div>
-              <div className="text-sm text-gray-700">{caseLookup.matter.client_name || '—'} · {caseLookup.matter.description || caseLookup.matter.matter_type?.replace(/_/g, ' ')}</div>
-              <div className="text-xs text-gray-400 mt-0.5">
+              <div className="font-mono text-sm font-semibold text-navy-900 dark:text-blue-400">{caseLookup.matter.case_number}</div>
+              <div className="text-sm text-gray-700 dark:text-gray-300">{caseLookup.matter.client_name || '—'} · {caseLookup.matter.description || caseLookup.matter.matter_type?.replace(/_/g, ' ')}</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                 Checklist: {caseLookup.checklist.accepted}/{caseLookup.checklist.neededNow} accepted
                 {caseLookup.intakeForm.status ? ` · Intake form: ${caseLookup.intakeForm.status}` : ' · No intake form yet'}
               </div>
             </div>
-            <ExternalLink size={16} className="text-gray-400 flex-shrink-0" />
+            <ExternalLink size={16} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
           </div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="text-4xl mb-3">📁</div>
-          <div className="text-gray-600 font-medium">{lookingUp ? 'Searching…' : 'No matters found'}</div>
-          <div className="text-gray-400 text-sm mt-1">Try adjusting your search or filters</div>
+          <div className="text-gray-600 dark:text-gray-300 font-medium">{lookingUp ? 'Searching…' : 'No matters found'}</div>
+          <div className="text-gray-400 dark:text-gray-500 text-sm mt-1">Try adjusting your search or filters</div>
         </div>
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-200 dark:border-gray-700">
                 <tr>
                   {['Case #', 'Description', 'Client', 'Attorney', 'Type', 'Stage', 'Status', ''].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {filtered.map(m => (
-                  <tr key={m.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/matters/${m.id}`)}>
-                    <td className="px-4 py-3 font-mono font-medium text-navy-900 text-xs">{m.case_number}</td>
+                  <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors" onClick={() => navigate(`/matters/${m.id}`)}>
+                    <td className="px-4 py-3 font-mono font-medium text-navy-900 dark:text-blue-400 text-xs">{m.case_number}</td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-800 truncate max-w-[200px]">{m.description || '—'}</div>
-                      <div className="text-xs text-gray-400">{m.court || ''}</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-100 truncate max-w-[200px]">{m.description || '—'}</div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500">{m.court || ''}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-navy-900 text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
                           {m.client_initials || m.client_name?.[0] || '?'}
                         </div>
-                        <span className="text-gray-700 truncate max-w-[100px]">{m.client_name || '—'}</span>
+                        <span className="text-gray-700 dark:text-gray-300 truncate max-w-[100px]">{m.client_name || '—'}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{m.attorney_name || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{m.attorney_name || '—'}</td>
                     <td className="px-4 py-3">
                       <span className="badge badge-blue capitalize">{m.matter_type?.replace(/_/g,' ') || '—'}</span>
                     </td>
@@ -142,7 +142,7 @@ export default function Matters() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <button className="text-xs text-green-600 hover:text-green-700 font-medium whitespace-nowrap">View →</button>
+                      <button className="text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium whitespace-nowrap">View →</button>
                     </td>
                   </tr>
                 ))}

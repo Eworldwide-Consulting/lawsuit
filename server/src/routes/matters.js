@@ -20,7 +20,7 @@ router.get('/', requireAuth, async (req, res, next) => {
 
 router.get('/stats/overview', requireAuth, requireRole('attorney', 'partner', 'itsupport'), async (req, res, next) => {
   try {
-    res.json(await MatterRepo.stats());
+    res.json(await MatterRepo.stats(req.user.role === 'attorney' ? req.user.id : null));
   } catch (err) { next(err); }
 });
 

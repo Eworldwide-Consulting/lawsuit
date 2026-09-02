@@ -41,12 +41,26 @@ const DocumentRepository = {
     );
   },
 
-  findAll({ limit, offset } = {}) {
+  // attorneyId omitted → firm-wide (partner/itsupport). Provided → only
+  // documents on that attorney's own matters (documents has no attorney_id
+  // column itself, so this joins through matters).
+  findAll({ limit, offset } = {}, attorneyId = null) {
+    if (!attorneyId) {
+      return all(
+        `SELECT d.*, u.first_name AS uploader_first, u.last_name AS uploader_last
+         FROM documents d LEFT JOIN users u ON u.id = d.user_id
+         ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
+        [limit, offset]
+      );
+    }
     return all(
       `SELECT d.*, u.first_name AS uploader_first, u.last_name AS uploader_last
-       FROM documents d LEFT JOIN users u ON u.id = d.user_id
+       FROM documents d
+       LEFT JOIN users u ON u.id = d.user_id
+       JOIN matters m ON m.id = d.matter_id
+       WHERE m.attorney_id = ?
        ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
-      [limit, offset]
+      [attorneyId, limit, offset]
     );
   },
 

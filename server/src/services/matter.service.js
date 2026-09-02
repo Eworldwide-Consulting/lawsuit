@@ -5,9 +5,15 @@ const { NotFoundError, ForbiddenError, ValidationError } = require('../lib/error
 const { isClient } = require('../domain/user');
 
 const MatterService = {
+  // Clients see only their own matters. Attorneys see only matters they're
+  // the responsible attorney on. Partners/itsupport (law firm heads) see
+  // every matter firm-wide — findAll()'s attorneyId param is omitted for them.
   async list(user, pagination) {
     if (isClient(user.role)) {
       return MatterRepo.findByClientId(user.id, pagination);
+    }
+    if (user.role === 'attorney') {
+      return MatterRepo.findAll(pagination, user.id);
     }
     return MatterRepo.findAll(pagination);
   },
@@ -16,6 +22,11 @@ const MatterService = {
     const matter = await MatterRepo.findById(id);
     if (!matter) throw new NotFoundError('Matter');
     if (isClient(user.role) && matter.client_id !== user.id)
+      throw new ForbiddenError();
+    // An attorney could previously view any matter by guessing/typing its id
+    // in the URL — only their own assigned matters (partners/itsupport still
+    // see everything).
+    if (user.role === 'attorney' && matter.attorney_id !== user.id)
       throw new ForbiddenError();
     return matter;
   },

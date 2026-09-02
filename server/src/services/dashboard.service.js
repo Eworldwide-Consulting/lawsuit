@@ -119,10 +119,12 @@ const DashboardService = {
     const today = todayIso();
     const now   = nowIso();
 
+    // Scoped to this attorney's own matters — previously these three calls
+    // were firm-wide, so every attorney saw every other attorney's clients.
     const [statsRow, matters, appts, missingR, overdueR, msgs, revenueRow] = await Promise.all([
-      MatterRepo.stats(),
-      MatterRepo.findForAttorneyDashboard(),
-      AppointmentRepo.findForAttorneyDashboard(now, 5),
+      MatterRepo.stats(userId),
+      MatterRepo.findForAttorneyDashboard(userId),
+      AppointmentRepo.findForAttorneyDashboard(now, 5, userId),
       require('../db').one("SELECT COUNT(*) c FROM documents WHERE status = 'pending' AND required = 1"),
       require('../db').one("SELECT COUNT(*) c FROM tasks WHERE status != 'completed' AND due_date < ?", [today]),
       MessageRepo.findRecentForUser(userId, 5),

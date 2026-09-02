@@ -33,7 +33,11 @@ const MatterRepository = {
     );
   },
 
-  findAll({ limit, offset } = {}) {
+  // attorneyId omitted → firm-wide (partner/itsupport). Provided → that
+  // attorney's own matters only — see MatterService.list().
+  findAll({ limit, offset } = {}, attorneyId = null) {
+    const where = attorneyId ? 'WHERE m.attorney_id = ?' : '';
+    const args  = attorneyId ? [attorneyId, limit, offset] : [limit, offset];
     return all(
       `SELECT m.*,
               a.first_name || ' ' || a.last_name AS attorney_name,
@@ -42,9 +46,10 @@ const MatterRepository = {
        FROM matters m
        LEFT JOIN users a ON m.attorney_id = a.id
        LEFT JOIN users c ON m.client_id   = c.id
+       ${where}
        ORDER BY m.updated_at DESC
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      args
     );
   },
 
@@ -53,7 +58,11 @@ const MatterRepository = {
     return all('SELECT id FROM matters WHERE client_id = ?', [clientId]);
   },
 
-  async stats() {
+  // attorneyId omitted → firm-wide stats (partner/itsupport). Provided →
+  // that attorney's own matters only.
+  async stats(attorneyId = null) {
+    const where = attorneyId ? 'WHERE attorney_id = ?' : '';
+    const args  = attorneyId ? [attorneyId] : [];
     const row = await one(`
       SELECT
         COUNT(*)                                              AS total,
@@ -61,7 +70,8 @@ const MatterRepository = {
         SUM(CASE WHEN status = 'at_risk'  THEN 1 ELSE 0 END) AS at_risk,
         SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS complete
       FROM matters
-    `);
+      ${where}
+    `, args);
     return {
       total:    Number(row.total),
       active:   Number(row.active),
@@ -84,7 +94,12 @@ const MatterRepository = {
     );
   },
 
-  findForAttorneyDashboard() {
+  // attorneyId omitted → firm-wide (partner dashboard). Provided → that
+  // attorney's own matters only (attorney dashboard) — was previously
+  // unscoped, leaking every attorney's matters to every other attorney.
+  findForAttorneyDashboard(attorneyId = null) {
+    const where = attorneyId ? 'WHERE m.attorney_id = ?' : '';
+    const args  = attorneyId ? [attorneyId] : [];
     return all(
       `SELECT m.*,
               c.first_name || ' ' || c.last_name AS client_name,
@@ -93,8 +108,10 @@ const MatterRepository = {
        FROM matters m
        LEFT JOIN users c ON m.client_id   = c.id
        LEFT JOIN users a ON m.attorney_id = a.id
+       ${where}
        ORDER BY m.updated_at DESC
-       LIMIT 10`
+       LIMIT 10`,
+      args
     );
   },
 

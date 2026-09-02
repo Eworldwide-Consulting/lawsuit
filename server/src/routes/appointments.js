@@ -15,7 +15,9 @@ router.get('/', requireAuth, async (req, res, next) => {
       if (!matterRows.length) return res.json([]);
       return res.json(await AppointmentRepo.findByMatters(matterRows.map(m => m.id), pagination));
     }
-    res.json(await AppointmentRepo.findAll(pagination));
+    // Attorneys see only their own matters' appointments; partners/itsupport (law firm heads) see all.
+    const attorneyId = req.user.role === 'attorney' ? req.user.id : null;
+    res.json(await AppointmentRepo.findAll(pagination, attorneyId));
   } catch (err) { next(err); }
 });
 
@@ -27,7 +29,8 @@ router.get('/upcoming', requireAuth, async (req, res, next) => {
       if (!matterRows.length) return res.json([]);
       return res.json(await AppointmentRepo.findByMattersAfter(matterRows.map(m => m.id), now, 5));
     }
-    res.json(await AppointmentRepo.findAllAfter(now, 10));
+    const attorneyId = req.user.role === 'attorney' ? req.user.id : null;
+    res.json(await AppointmentRepo.findAllAfter(now, 10, attorneyId));
   } catch (err) { next(err); }
 });
 
