@@ -1,4 +1,5 @@
 const MatterRepo = require('../repositories/matter.repository');
+const UserRepo   = require('../repositories/user.repository');
 const { MATTER_STAGES, buildCaseNumber } = require('../domain/matter');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../lib/errors');
 const { isClient } = require('../domain/user');
@@ -32,7 +33,10 @@ const MatterService = {
       additionalNotes, status: matterStatus,
     });
 
-    await MatterRepo.setCaseNumber(r.insertId, buildCaseNumber(r.insertId));
+    const client = await UserRepo.findById(userId);
+    await MatterRepo.setCaseNumber(r.insertId, buildCaseNumber({
+      id: r.insertId, firstName: client?.first_name, lastName: client?.last_name, createdAt: client?.created_at,
+    }));
     return MatterRepo.findById(r.insertId);
   },
 

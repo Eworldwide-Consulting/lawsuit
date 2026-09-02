@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardApi, documentsApi } from '../../api';
+import { dashboardApi, documentsApi, checklistApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import {
   Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare,
@@ -18,13 +18,6 @@ const ACTION_CFG = {
   Review:  { Icon: Eye,         cls: 'bg-blue-600  hover:bg-blue-700'  },
   Sign:    { Icon: PenLine,     cls: 'bg-violet-600 hover:bg-violet-700' },
   Confirm: { Icon: CheckCircle, cls: 'bg-green-600  hover:bg-green-700' },
-};
-
-const MATTER_TYPE_DOCS = {
-  guardianship:                  ['Petition for Guardianship', 'Medical Records', 'Financial Disclosure', 'Background Check', 'Letters of Guardianship', 'Annual Guardian Report'],
-  conservatorship:               ['Petition for Conservatorship', 'Financial Inventory', 'Bank Statements (3 months)', 'Tax Returns', 'Bond Insurance', 'Annual Accounting'],
-  guardianship_conservatorship:  ['Petition for Guardian & Conservator', 'Medical Records', 'Financial Inventory', 'Background Check', 'Bond Insurance', 'Annual Report'],
-  estate_administration:         ['Death Certificate', 'Will (if any)', 'Asset Inventory', 'Creditor Notification', 'Tax Returns', 'Final Accounting'],
 };
 
 const statusColor = s => s === 'overdue' ? 'text-orange-500' : s === 'pending' ? 'text-amber-600' : 'text-gray-500';
@@ -52,10 +45,29 @@ const ReadinessGauge = memo(function ReadinessGauge({ value }) {
 });
 
 // ── Required Documents panel ─────────────────────────────────────────────────
-function RequiredDocsPanel({ matterType, uploadedDocs }) {
-  const docs = MATTER_TYPE_DOCS[matterType] || [];
-  if (!docs.length) return null;
-  const uploadedNames = (uploadedDocs || []).flatMap(d => [d.category, d.name]).map(n => (n || '').toLowerCase());
+// Real checklist data — not a static per-type list. Checklist items don't
+// exist until the attorney accepts the case (server auto-initialises them
+// from the matter-type template in POST /matters/:id/accept), so a brand new
+// client with no attorney yet has nothing to fetch and this panel stays
+// hidden rather than showing a generic/inaccurate placeholder list.
+function RequiredDocsPanel({ matterId, matterType, caseAccepted }) {
+  const [items, setItems]     = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!matterId || !caseAccepted) { setLoading(false); return; }
+    checklistApi.getByMatter(matterId)
+      .then(r => {
+        const needed = (r.data?.sections || [])
+          .flatMap(s => s.items)
+          .filter(i => i.default_status === 'needed_now');
+        setItems(needed);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [matterId, caseAccepted]);
+
+  if (!caseAccepted || loading || !items.length) return null;
 
   return (
     <div className="card p-5">
@@ -67,10 +79,10 @@ function RequiredDocsPanel({ matterType, uploadedDocs }) {
         <span className="text-xs text-gray-400 capitalize">{matterType?.replace(/_/g, ' ')}</span>
       </div>
       <div className="space-y-1.5">
-        {docs.map((doc, i) => {
-          const uploaded = uploadedNames.some(n => n.includes(doc.toLowerCase().split(' ')[0]));
+        {items.map(item => {
+          const uploaded = ['submitted', 'accepted'].includes(item.status);
           return (
-            <div key={i} className={`flex items-center gap-3 py-1.5 px-3 rounded-lg ${
+            <div key={item.id} className={`flex items-center gap-3 py-1.5 px-3 rounded-lg ${
               uploaded ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-700/40'
             }`}>
               {uploaded
@@ -78,7 +90,7 @@ function RequiredDocsPanel({ matterType, uploadedDocs }) {
                 : <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300 dark:border-gray-500 flex-shrink-0" />}
               <span className={`flex-1 text-xs ${uploaded
                 ? 'text-green-700 dark:text-green-400 line-through'
-                : 'text-gray-700 dark:text-gray-300'}`}>{doc}</span>
+                : 'text-gray-700 dark:text-gray-300'}`}>{item.label}</span>
               {!uploaded && <span className="text-xs text-amber-600 font-medium">Needed</span>}
             </div>
           );
@@ -172,6 +184,34 @@ export default function ClientDashboard() {
   const caseAccepted  = matter?.case_accepted === 1 || matter?.case_accepted === true;
   const pendingAccept = hasAttorney && !caseAccepted;
 
+  // Concrete next actions behind the readiness score, ordered by what
+  // actually unblocks progress first (attorney → uploads → review → tasks).
+  const readinessSteps = [];
+  if (matter) {
+    if (!hasAttorney) {
+      readinessSteps.push('Select an attorney to begin working your case.');
+    } else if (!caseAccepted) {
+      readinessSteps.push("Waiting on your attorney to accept the case — send a message if it's been a while.");
+    }
+    if (docsUploaded < docsTotal) {
+      const remaining = docsTotal - docsUploaded;
+      readinessSteps.push(`Upload the ${remaining} remaining required document${remaining !== 1 ? 's' : ''}.`);
+    }
+    const docsAwaitingReview = docsUploaded - (data?.checklistAccepted ?? 0);
+    if (docsAwaitingReview > 0) {
+      readinessSteps.push(`${docsAwaitingReview} uploaded document${docsAwaitingReview !== 1 ? 's' : ''} still awaiting attorney review.`);
+    }
+    const openTasksCount = Math.max(0, (data?.totalTasks ?? 0) - (data?.completedTasks ?? 0));
+    if (openTasksCount > 0) {
+      const overdueCount = data?.overdueTasks ?? 0;
+      readinessSteps.push(
+        overdueCount > 0
+          ? `Complete ${openTasksCount} open task${openTasksCount !== 1 ? 's' : ''} — ${overdueCount} ${overdueCount !== 1 ? 'are' : 'is'} overdue.`
+          : `Complete ${openTasksCount} remaining task${openTasksCount !== 1 ? 's' : ''}.`
+      );
+    }
+  }
+
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto">
 
@@ -238,7 +278,7 @@ export default function ClientDashboard() {
           { label: 'Required Documents', value: data?.requiredDocsPending ?? 0,
             sub: `${docsUploaded} of ${docsTotal} uploaded${daysToCount !== null ? ` · ${daysToCount < 0 ? 'Past due' : `${daysToCount}d left`}` : ''}`,
             icon: FileText, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' },
-          { label: 'Guardian Readiness', value: `${readiness}%`,
+          { label: 'Matter Readiness', value: `${readiness}%`,
             sub: readiness >= 75 ? 'On track' : readiness >= 50 ? 'Needs attention' : 'At risk',
             icon: Shield, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
@@ -360,9 +400,9 @@ export default function ClientDashboard() {
             )}
           </div>
 
-          {/* Required docs */}
-          {matter?.matter_type && (
-            <RequiredDocsPanel matterType={matter.matter_type} uploadedDocs={data?.uploadedDocs} />
+          {/* Required docs — real checklist, only once an attorney has accepted */}
+          {matter?.id && (
+            <RequiredDocsPanel matterId={matter.id} matterType={matter.matter_type} caseAccepted={caseAccepted} />
           )}
 
           {/* Attorney-reviewed docs */}
@@ -452,9 +492,9 @@ export default function ClientDashboard() {
         {/* ── Right column ── */}
         <div className="space-y-4">
 
-          {/* Guardian Readiness */}
+          {/* Matter Readiness */}
           <div className="card p-4 text-center">
-            <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3">Guardian Readiness</div>
+            <div className="font-semibold text-gray-800 dark:text-gray-100 text-sm mb-3">Matter Readiness</div>
             <ReadinessGauge value={readiness} />
             <div className="mt-3 grid grid-cols-3 gap-1 text-center text-xs">
               <div>
@@ -472,9 +512,25 @@ export default function ClientDashboard() {
                 <div className="text-gray-400">Overdue</div>
               </div>
             </div>
-            {docsUploaded > 0 && (data?.checklistAccepted ?? 0) < docsUploaded && (
-              <div className="mt-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-2 py-1.5">
-                {docsUploaded - (data?.checklistAccepted ?? 0)} doc{docsUploaded - (data?.checklistAccepted ?? 0) !== 1 ? 's' : ''} pending review
+            {readinessSteps.length > 0 && (
+              <div className={`mt-3 text-left rounded-xl p-3 border ${
+                readiness < 50
+                  ? 'bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-800'
+                  : 'bg-amber-50 dark:bg-amber-900/15 border-amber-200 dark:border-amber-800'
+              }`}>
+                <div className={`text-xs font-semibold mb-2 ${readiness < 50 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                  {readiness < 50 ? 'At risk — here\'s what to do next' : 'Steps to complete your readiness'}
+                </div>
+                <ul className="space-y-1.5">
+                  {readinessSteps.map((step, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300">
+                      <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[10px] mt-0.5 ${
+                        readiness < 50 ? 'bg-red-100 dark:bg-red-900/40 text-red-600' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-600'
+                      }`}>{i + 1}</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

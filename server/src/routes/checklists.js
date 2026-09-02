@@ -101,12 +101,15 @@ router.get('/matter/:matterId', requireAuth, async (req, res, next) => {
     }
     const sections = Object.values(sectionMap).sort((a, b) => a.order - b.order);
 
-    // Progress: accepted needed_now items / total needed_now items
+    // Progress: uploaded (submitted or accepted) needed_now items / total needed_now
+    // items — matches the "completedDocs" definition the client dashboard's
+    // Matter Readiness score uses, so the two numbers agree for the same matter.
+    // Nothing required at all reads as fully ready, not 0%.
     const neededNow = items.filter(i => i.default_status === 'needed_now');
-    const accepted  = neededNow.filter(i => i.status === 'accepted');
+    const uploaded  = neededNow.filter(i => ['submitted', 'accepted'].includes(i.status));
     const progress  = neededNow.length > 0
-      ? Math.round((accepted.length / neededNow.length) * 100)
-      : 0;
+      ? Math.round((uploaded.length / neededNow.length) * 100)
+      : 100;
 
     res.json({ matterType: matter.matter_type, sections, progress, totalItems: items.length });
   } catch (err) { next(err); }

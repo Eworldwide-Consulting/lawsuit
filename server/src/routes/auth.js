@@ -531,7 +531,15 @@ router.put('/complete-profile', requireAuth, async (req, res, next) => {
           [req.user.id, matterType, 'intake', 'active', workedBefore === 'yes' ? 1 : 0,
            caseState || null, caseCounty || null, caseDescription?.trim() || null]
         );
-        await dbRun('UPDATE matters SET case_number = ? WHERE id = ?', [buildCaseNumber(mr.insertId), mr.insertId]);
+        // req.user (from requireAuth) doesn't carry created_at — look it up directly.
+        const accountRow = await dbOne('SELECT created_at FROM users WHERE id = ?', [req.user.id]);
+        await dbRun('UPDATE matters SET case_number = ? WHERE id = ?', [
+          buildCaseNumber({
+            id: mr.insertId, firstName: req.user.first_name, lastName: req.user.last_name,
+            createdAt: accountRow?.created_at,
+          }),
+          mr.insertId,
+        ]);
       } else if (caseState || caseCounty) {
         // Popup re-submitted (or matter created earlier without location) —
         // fill in the case location without overwriting values already set.

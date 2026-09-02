@@ -88,7 +88,9 @@ const AuthService = {
          VALUES (?,?,?,?,?)`,
         [result.insertId, matterType, 'intake', 'active', existingMatter === 'yes' ? 1 : 0]
       );
-      await run('UPDATE matters SET case_number = ? WHERE id = ?', [buildCaseNumber(mr.insertId), mr.insertId]);
+      await run('UPDATE matters SET case_number = ? WHERE id = ?', [
+        buildCaseNumber({ id: mr.insertId, firstName, lastName, createdAt: new Date() }), mr.insertId,
+      ]);
     }
 
     sendVerificationEmail(email.toLowerCase(), verToken);

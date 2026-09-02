@@ -39,6 +39,7 @@ const ws            = require('./websocket');
 const { initDatabase }  = require('./database');
 const { runMigrations } = require('./migrations/runner');
 const { startWorkers }  = require('./queue/workers');
+const { startDocumentReminderSweep } = require('./jobs/documentReminders');
 const { queueStats }    = require('./queue');
 const { breakers }      = require('./lib/circuit-breaker');
 console.log('[BOOT] app modules loaded');
@@ -272,6 +273,7 @@ async function start() {
 
   await ws.init(server);
   startWorkers();
+  startDocumentReminderSweep();
 
   // SMTP health check — must happen after startWorkers() so the transport is warm
   const EmailService = require('./services/email.service');

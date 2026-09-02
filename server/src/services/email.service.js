@@ -22,6 +22,7 @@ const JOB = {
   ATTORNEY_DECISION:     'attorney_decision',
   PAYMENT_CONFIRMED:     'payment_confirmed',
   DOCUMENT_UPLOADED:     'document_uploaded',
+  DOCUMENT_REMINDER:     'document_reminder',
 };
 
 // ── Transport ─────────────────────────────────────────────────────────────────
@@ -211,6 +212,13 @@ const EmailService = {
     return queue(JOB.DOCUMENT_UPLOADED, { to, attorneyName, clientName, caseNumber, docNames, reviewUrl });
   },
 
+  // Sent to the client — required documents still pending, hurting their
+  // matter readiness score. Triggered by the daily sweep in
+  // server/src/jobs/documentReminders.js, throttled per-matter there.
+  sendDocumentUploadReminder(to, { firstName, caseNumber, missingCount, missingLabels }) {
+    return queue(JOB.DOCUMENT_REMINDER, { to, firstName, caseNumber, missingCount, missingLabels });
+  },
+
   sendContactSales({ name, email, company, phone, plan, message }) {
     const salesTo = config.smtp.user || 'legal@trivanta.com';
     return send({
@@ -317,6 +325,13 @@ const EmailService = {
           to: data.to,
           subject: `Action Required: New document uploaded — ${esc(data.caseNumber || 'your case')}`,
           html: tmplDocumentUploaded(data),
+        };
+        break;
+      case JOB.DOCUMENT_REMINDER:
+        mail = {
+          to: data.to,
+          subject: `${data.missingCount} document${data.missingCount !== 1 ? 's' : ''} still needed for your case`,
+          html: tmplDocumentReminder(data),
         };
         break;
       default:
@@ -661,5 +676,19 @@ function tmplDocumentUploaded({ attorneyName, clientName, caseNumber, docNames, 
     </div>
     ${btn(reviewUrl || `${config.client.url}/documents`, 'Review Documents Now')}
     <p style="color:#9ca3af;font-size:13px">You can accept, reject, or request changes from your TriVanta document dashboard. Your client will be notified of your decision.</p>
+  `);
+}
+
+function tmplDocumentReminder({ firstName, caseNumber, missingCount, missingLabels }) {
+  const shown = (missingLabels || []).slice(0, 6);
+  const extra = (missingLabels || []).length - shown.length;
+  const list  = shown.map(l => `<li style="color:#374151;font-size:14px;padding:3px 0">${esc(l)}</li>`).join('')
+    + (extra > 0 ? `<li style="color:#6b7280;font-size:13px;padding:3px 0">+ ${extra} more</li>` : '');
+  return wrap(`
+    ${h2('A few documents are still needed')}
+    ${p(`Hi ${esc(firstName) || 'there'}, your case${caseNumber ? ` <strong>${esc(caseNumber)}</strong>` : ''} still needs <strong>${missingCount} required document${missingCount !== 1 ? 's' : ''}</strong> to keep moving forward:`)}
+    <ul style="margin:12px 0 20px;padding-left:20px">${list}</ul>
+    ${p("Uploading these now keeps your case on track and speeds up your attorney's review.")}
+    ${btn(`${config.client.url}/checklist`, 'Upload Documents')}
   `);
 }
