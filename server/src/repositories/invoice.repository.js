@@ -104,13 +104,17 @@ const InvoiceRepository = {
     );
   },
 
-  findForExport({ clientId, status, from, to } = {}) {
+  // attorneyId scopes the export to invoices on that attorney's own matters —
+  // an attorney could previously export EVERY client's billing history and
+  // email address firm-wide with no ownership check at all.
+  findForExport({ clientId, status, from, to, attorneyId } = {}) {
     const conds = ['1=1'];
     const vals  = [];
-    if (clientId) { conds.push('i.client_id = ?'); vals.push(clientId); }
-    if (status)   { conds.push('i.status = ?');    vals.push(status); }
-    if (from)     { conds.push('i.created_at >= ?'); vals.push(from); }
-    if (to)       { conds.push('i.created_at <= ?'); vals.push(to + ' 23:59:59'); }
+    if (clientId)   { conds.push('i.client_id = ?'); vals.push(clientId); }
+    if (status)     { conds.push('i.status = ?');    vals.push(status); }
+    if (from)       { conds.push('i.created_at >= ?'); vals.push(from); }
+    if (to)         { conds.push('i.created_at <= ?'); vals.push(to + ' 23:59:59'); }
+    if (attorneyId) { conds.push('m.attorney_id = ?'); vals.push(attorneyId); }
     return require('../db').all(
       `SELECT i.id, i.status, i.amount, i.description, i.service_type, i.due_date,
               i.created_at, i.paid_at, i.refunded_at,

@@ -17,6 +17,17 @@ const SmsService          = require('../services/sms.service');
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../../../uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// Shared ownership check for any route that reads or mutates a single document
+// (view, download, rename, delete, review status). An attorney could previously
+// act on ANY document firm-wide just by guessing/incrementing the id — isStaff()
+// alone doesn't check they're actually the assigned attorney. Partners/itsupport
+// still see/manage everything; a client keeps access to their own uploads.
+function canAccessDoc(doc, user) {
+  if (doc.user_id === user.id || doc.client_id === user.id) return true;
+  if (user.role === 'attorney') return doc.matter_attorney_id === user.id;
+  return isStaff(user.role);
+}
+
 // H4: whitelist both extension AND declared MIME type.
 // Extension-only checks can be bypassed by renaming files (e.g. payload.php → payload.pdf).
 const ALLOWED_MIME = new Set([
@@ -236,10 +247,9 @@ router.get('/pending-review', requireAuth, requireRole('attorney', 'partner', 'i
 
 router.patch('/:id', requireAuth, async (req, res, next) => {
   try {
-    const doc = await DocumentRepo.findById(req.params.id);
+    const doc = await DocumentRepo.findByIdWithMatter(req.params.id);
     if (!doc) throw new NotFoundError('Document');
-    if (doc.user_id !== req.user.id && !isStaff(req.user.role))
-      throw new ForbiddenError();
+    if (!canAccessDoc(doc, req.user)) throw new ForbiddenError();
     const { name, category } = req.body;
     if (!name?.trim()) throw new ValidationError('name required');
     await DocumentRepo.update(req.params.id, { name: name.trim(), category: category || null });
@@ -259,8 +269,11 @@ router.put('/:id/status', requireAuth, requireRole('attorney', 'partner', 'itsup
     if (status === 'rejected' && !note)
       throw new ValidationError('A rejection reason is required so the client knows what to correct.');
 
-    const doc = await DocumentRepo.findById(req.params.id);
+    const doc = await DocumentRepo.findByIdWithMatter(req.params.id);
     if (!doc) throw new NotFoundError('Document');
+    // An attorney could previously approve/reject any document firm-wide —
+    // requireRole alone doesn't check they're the assigned attorney.
+    if (!canAccessDoc(doc, req.user)) throw new ForbiddenError();
 
     await DocumentRepo.setReviewStatus(req.params.id, {
       status,
@@ -387,10 +400,9 @@ router.post('/:id/reupload', requireAuth, upload.single('file'), async (req, res
 
 router.delete('/:id', requireAuth, async (req, res, next) => {
   try {
-    const doc = await DocumentRepo.findById(req.params.id);
+    const doc = await DocumentRepo.findByIdWithMatter(req.params.id);
     if (!doc) throw new NotFoundError('Document');
-    if (doc.user_id !== req.user.id && !isStaff(req.user.role))
-      throw new ForbiddenError();
+    if (!canAccessDoc(doc, req.user)) throw new ForbiddenError();
 
     if (doc.file_path) {
       const fp = path.join(UPLOAD_DIR, path.basename(doc.file_path));
@@ -414,9 +426,7 @@ router.get('/view/:id', requireAuth, async (req, res, next) => {
   try {
     const doc = await DocumentRepo.findByIdWithMatter(req.params.id);
     if (!doc?.file_path) throw new NotFoundError('File');
-
-    const isOwner = doc.user_id === req.user.id || doc.client_id === req.user.id;
-    if (!isOwner && !isStaff(req.user.role)) throw new ForbiddenError();
+    if (!canAccessDoc(doc, req.user)) throw new ForbiddenError();
 
     const filePath = path.join(UPLOAD_DIR, path.basename(doc.file_path));
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.name)}"`);
@@ -428,9 +438,7 @@ router.get('/download/:id', requireAuth, async (req, res, next) => {
   try {
     const doc = await DocumentRepo.findByIdWithMatter(req.params.id);
     if (!doc?.file_path) throw new NotFoundError('File');
-
-    const isOwner = doc.user_id === req.user.id || doc.client_id === req.user.id;
-    if (!isOwner && !isStaff(req.user.role)) throw new ForbiddenError();
+    if (!canAccessDoc(doc, req.user)) throw new ForbiddenError();
 
     res.download(path.join(UPLOAD_DIR, path.basename(doc.file_path)), doc.name);
   } catch (err) { next(err); }

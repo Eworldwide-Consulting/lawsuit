@@ -10,15 +10,30 @@ const TaskRepository = {
     );
   },
 
-  findAll({ limit, offset } = {}) {
+  // attorneyId omitted → firm-wide (partner/itsupport). Provided → only tasks
+  // on that attorney's own matters, plus their own matterless personal tasks.
+  findAll({ limit, offset } = {}, attorneyId = null) {
+    if (!attorneyId) {
+      return all(
+        'SELECT * FROM tasks ORDER BY due_date ASC LIMIT ? OFFSET ?',
+        [limit, offset]
+      );
+    }
     return all(
-      'SELECT * FROM tasks ORDER BY due_date ASC LIMIT ? OFFSET ?',
-      [limit, offset]
+      `SELECT t.* FROM tasks t LEFT JOIN matters m ON m.id = t.matter_id
+       WHERE m.attorney_id = ? OR (t.matter_id IS NULL AND t.assigned_to = ?)
+       ORDER BY t.due_date ASC LIMIT ? OFFSET ?`,
+      [attorneyId, attorneyId, limit, offset]
     );
   },
 
   findById(id) {
-    return one('SELECT id, assigned_to, matter_id FROM tasks WHERE id = ?', [id]);
+    return one(
+      `SELECT t.id, t.assigned_to, t.matter_id, m.attorney_id AS matter_attorney_id
+       FROM tasks t LEFT JOIN matters m ON m.id = t.matter_id
+       WHERE t.id = ?`,
+      [id]
+    );
   },
 
   // Single aggregation: replaces 4 separate COUNT queries in the client dashboard.

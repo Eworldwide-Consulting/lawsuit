@@ -11,6 +11,12 @@ const documentsApi = {
   pendingReview: ()          => http.get('/documents/pending-review'),
   viewUrl:       id          => `/api/documents/view/${id}`,
   downloadUrl:   id          => `/api/documents/download/${id}`,
+  // Plain <a href> navigation never carries the Bearer token (it's attached
+  // by an axios interceptor, not a cookie), so viewUrl/downloadUrl above hit
+  // a 401 instead of the real file. These fetch the file through the
+  // authenticated axios instance instead.
+  viewBlob:      id          => http.get(`/documents/view/${id}`, { responseType: 'blob' }),
+  downloadBlob:  id          => http.get(`/documents/download/${id}`, { responseType: 'blob' }),
 };
 
 export default documentsApi;

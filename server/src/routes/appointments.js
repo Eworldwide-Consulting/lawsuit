@@ -55,18 +55,29 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
     if (!isStaff(req.user.role)) throw new ForbiddenError();
     const appt = await AppointmentRepo.findById(req.params.id);
     if (!appt) throw new NotFoundError('Appointment');
+    // An attorney could previously delete ANY firm-wide appointment — isStaff()
+    // alone doesn't check they're the assigned attorney (partners/itsupport unrestricted).
+    if (req.user.role === 'attorney') {
+      const matter = appt.matter_id ? await MatterRepo.findById(appt.matter_id) : null;
+      if (!matter || matter.attorney_id !== req.user.id) throw new ForbiddenError();
+    }
     await AppointmentRepo.delete(req.params.id);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
 
 // ── Helper: verify the current user can act on the given appointment ────────
+// An attorney could previously act on ANY firm-wide appointment — isStaff()
+// alone doesn't check they're the assigned attorney (partners/itsupport unrestricted).
 async function assertApptAccess(apptId, user) {
   const appt = await AppointmentRepo.findById(apptId);
   if (!appt) throw new NotFoundError('Appointment');
-  if (!isStaff(user.role)) {
-    const matter = appt.matter_id ? await MatterRepo.findById(appt.matter_id) : null;
-    if (!matter || matter.client_id !== user.id) throw new ForbiddenError();
+  if (user.role === 'partner' || user.role === 'itsupport') return appt;
+  const matter = appt.matter_id ? await MatterRepo.findById(appt.matter_id) : null;
+  if (user.role === 'attorney') {
+    if (!matter || matter.attorney_id !== user.id) throw new ForbiddenError();
+  } else if (!matter || matter.client_id !== user.id) {
+    throw new ForbiddenError();
   }
   return appt;
 }

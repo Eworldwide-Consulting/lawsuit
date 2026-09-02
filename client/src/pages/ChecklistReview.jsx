@@ -31,15 +31,22 @@ export default function ChecklistReview() {
   const [reviewItem, setReviewItem] = useState(null);
   const [expanded, setExpanded]     = useState({});
   const [allItemsByMatter, setAllItemsByMatter] = useState({});
+  const [error, setError]           = useState(null);
 
+  // allSettled (not all) — a failure in one of these must not silently wipe
+  // out data the other one loaded successfully, and must be visible instead
+  // of failing dead silent (a broken review-queue query once did exactly that).
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([checklistApi.clientOverview(), checklistApi.getReviewQueue()])
+    setError(null);
+    Promise.allSettled([checklistApi.clientOverview(), checklistApi.getReviewQueue()])
       .then(([ovRes, qRes]) => {
-        setOverview(ovRes.data);
-        setQueue(qRes.data);
+        if (ovRes.status === 'fulfilled') setOverview(ovRes.value.data);
+        if (qRes.status === 'fulfilled') setQueue(qRes.value.data);
+        if (ovRes.status === 'rejected' || qRes.status === 'rejected') {
+          setError('Some data could not be loaded. Please refresh or try again.');
+        }
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -128,6 +135,13 @@ export default function ChecklistReview() {
           Refresh
         </Button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          {error}
+          <button onClick={load} className="ml-2 underline font-medium">Retry</button>
+        </div>
+      )}
 
       {loading && (
         <div className="space-y-3">

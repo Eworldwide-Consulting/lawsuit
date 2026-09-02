@@ -2,6 +2,8 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi, documentsApi, checklistApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { viewFileInPopup } from '../../lib/fileActions';
 import {
   Calendar, FileText, CheckSquare, Upload, Eye, PenLine, Phone, MessageSquare,
   Shield, Check, CheckCircle, Briefcase, ArrowRight, Clock, UserCheck,
@@ -108,8 +110,17 @@ function RequiredDocsPanel({ matterId, matterType, caseAccepted }) {
 
 // ── Attorney-reviewed documents ───────────────────────────────────────────────
 function ReviewedDocsPanel({ matterId }) {
+  const toast = useToast();
   const [docs, setDocs]       = useState([]);
   const [loading, setLoading] = useState(true);
+
+  async function handleView(doc) {
+    try {
+      await viewFileInPopup(documentsApi.viewBlob(doc.id));
+    } catch (err) {
+      toast.error(err.code === 'POPUP_BLOCKED' ? err.message : 'Could not open document. Please try again.');
+    }
+  }
 
   useEffect(() => {
     if (!matterId) { setLoading(false); return; }
@@ -138,10 +149,10 @@ function ReviewedDocsPanel({ matterId }) {
               <div className="text-xs text-gray-400">{doc.category || 'General'}</div>
             </div>
             <span className={`badge ${docStatusBadge(doc.status)}`}>{docStatusLabel(doc.status)}</span>
-            <a href={documentsApi.viewUrl(doc.id)} target="_blank" rel="noreferrer"
+            <button onClick={() => handleView(doc)} aria-label={`View ${doc.name}`}
               className="text-gray-400 hover:text-[#0f2057] dark:hover:text-blue-400 transition-colors flex-shrink-0">
               <ExternalLink size={13} />
-            </a>
+            </button>
           </div>
         ))}
       </div>

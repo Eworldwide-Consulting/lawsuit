@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardApi, mattersApi, documentsApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { viewFileInPopup, downloadFile } from '../../lib/fileActions';
 import {
   ChevronRight, Clock, Users, Phone, Mail, CheckCircle, XCircle, MessageSquare,
   FileText, Eye, AlertCircle, ChevronDown, UserCheck, RefreshCw, ThumbsUp, ThumbsDown,
@@ -109,12 +111,29 @@ function DeclineModal({ request, onConfirm, onCancel }) {
 
 // ── Document Review Panel ─────────────────────────────────────────────────────
 function DocumentReviewPanel({ onRefresh }) {
+  const toast = useToast();
   const [docs, setDocs]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [busy, setBusy]         = useState({});
   const [expanded, setExpanded] = useState(null);
   const [denyId, setDenyId]     = useState(null);
   const [denyNote, setDenyNote] = useState('');
+
+  async function handleView(doc) {
+    try {
+      await viewFileInPopup(documentsApi.viewBlob(doc.id));
+    } catch (err) {
+      toast.error(err.code === 'POPUP_BLOCKED' ? err.message : 'Could not open document. Please try again.');
+    }
+  }
+
+  async function handleDownload(doc) {
+    try {
+      await downloadFile(documentsApi.downloadBlob(doc.id), doc.name);
+    } catch {
+      toast.error('Download failed. Please try again.');
+    }
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -208,14 +227,14 @@ function DocumentReviewPanel({ onRefresh }) {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <a href={documentsApi.viewUrl(doc.id)} target="_blank" rel="noreferrer"
+                  <button onClick={() => handleView(doc)}
                     className="flex items-center gap-1.5 text-xs border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium">
                     <Eye size={12} /> Preview
-                  </a>
-                  <a href={documentsApi.downloadUrl(doc.id)} download
+                  </button>
+                  <button onClick={() => handleDownload(doc)}
                     className="flex items-center gap-1.5 text-xs border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium">
                     <Download size={12} /> Download
-                  </a>
+                  </button>
                 </div>
               </div>
             )}

@@ -6,6 +6,7 @@ import Spinner from '../components/ui/Spinner';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { viewFileInPopup } from '../lib/fileActions';
 
 const DOC_STATUS_CFG = {
   approved: { variant: 'success', label: 'Approved' },
@@ -68,6 +69,14 @@ export default function MatterDetail() {
 
   const stageLabel = s => s?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—';
   const canEditStage = ['attorney', 'partner'].includes(user?.role);
+
+  async function handleViewDoc(doc) {
+    try {
+      await viewFileInPopup(documentsApi.viewBlob(doc.id));
+    } catch (err) {
+      toast.error(err.code === 'POPUP_BLOCKED' ? err.message : 'Could not open document. Please try again.');
+    }
+  }
 
   async function handleStageChange(newStage) {
     if (newStage === matter.stage) return;
@@ -176,10 +185,10 @@ export default function MatterDetail() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Badge variant={cfg.variant} size="sm">{cfg.label}</Badge>
-                    <a href={documentsApi.viewUrl(doc.id)} target="_blank" rel="noreferrer"
+                    <button onClick={() => handleViewDoc(doc)}
                       className="text-gray-400 hover:text-[#0f2057] dark:hover:text-blue-400 transition-colors" aria-label={`View ${doc.name}`}>
                       <ExternalLink size={13} />
-                    </a>
+                    </button>
                   </div>
                 </div>
               );

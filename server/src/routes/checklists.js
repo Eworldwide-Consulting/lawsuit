@@ -40,10 +40,15 @@ const upload = multer({
 });
 
 // ── Helper: verify the current user can access the given matter ─────────────
+// An attorney could previously view/init the checklist for ANY firm-wide
+// matter — isStaff() alone doesn't check they're the assigned attorney.
 async function assertMatterAccess(matterId, user) {
   const matter = await one(`SELECT id, client_id, attorney_id, matter_type FROM matters WHERE id = ?`, [matterId]);
   if (!matter) throw new NotFoundError('Matter not found');
-  if (!isStaff(user.role) && matter.client_id !== user.id) throw new ForbiddenError();
+  const canAccess = matter.client_id === user.id
+    || user.role === 'partner' || user.role === 'itsupport'
+    || (user.role === 'attorney' && matter.attorney_id === user.id);
+  if (!canAccess) throw new ForbiddenError();
   return matter;
 }
 
@@ -127,8 +132,13 @@ router.post('/items/:itemId/upload', requireAuth, upload.single('file'), async (
     const matter = await one(`SELECT * FROM matters WHERE id = ?`, [item.matter_id]);
     if (!matter) throw new NotFoundError('Matter not found');
 
-    // Clients can only upload for their own matter; staff can upload for any
-    if (!isStaff(req.user.role) && matter.client_id !== req.user.id) throw new ForbiddenError();
+    // Clients can only upload for their own matter. Attorneys only for
+    // matters they're actually assigned to (previously any attorney could
+    // upload to any other attorney's client). Partners/itsupport unrestricted.
+    const canUpload = matter.client_id === req.user.id
+      || req.user.role === 'partner' || req.user.role === 'itsupport'
+      || (req.user.role === 'attorney' && matter.attorney_id === req.user.id);
+    if (!canUpload) throw new ForbiddenError();
 
     // Reject if already accepted
     if (item.status === 'accepted') {
@@ -215,6 +225,12 @@ router.put('/items/:itemId/review', requireAuth, requireRole('attorney', 'partne
 
     const matter = await one(`SELECT * FROM matters WHERE id = ?`, [item.matter_id]);
     if (!matter) throw new NotFoundError('Matter not found');
+
+    // An attorney could previously review any other attorney's client's
+    // checklist item — must actually be the assigned attorney (partners unrestricted).
+    if (req.user.role === 'attorney' && matter.attorney_id !== req.user.id) {
+      throw new ForbiddenError();
+    }
 
     // Must have a file to accept or request correction
     if (action !== 'not_applicable' && !item.file_path) {
@@ -322,7 +338,7 @@ router.get('/review-queue', requireAuth, requireRole('attorney', 'partner'), asy
     const scoped = req.user.role === 'attorney';
     const items = await all(
       `SELECT ci.*,
-              m.case_number, m.matter_type, m.title AS matter_title,
+              m.case_number, m.matter_type,
               u.first_name AS client_first, u.last_name AS client_last
        FROM matter_checklist_items ci
        JOIN matters m ON m.id = ci.matter_id
@@ -345,7 +361,12 @@ router.get('/download/:itemId', requireAuth, async (req, res, next) => {
     if (!item.file_path) throw new NotFoundError('No file uploaded for this item');
 
     const matter = await one(`SELECT * FROM matters WHERE id = ?`, [item.matter_id]);
-    if (!isStaff(req.user.role) && matter.client_id !== req.user.id) throw new ForbiddenError();
+    // isStaff() alone let any attorney open any client's file firm-wide —
+    // must actually be the assigned attorney (partners/itsupport unrestricted).
+    const canAccess = matter.client_id === req.user.id
+      || req.user.role === 'partner' || req.user.role === 'itsupport'
+      || (req.user.role === 'attorney' && matter.attorney_id === req.user.id);
+    if (!canAccess) throw new ForbiddenError();
 
     if (!fs.existsSync(item.file_path)) throw new NotFoundError('File not found on disk');
 

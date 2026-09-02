@@ -161,7 +161,7 @@ const MatterRepository = {
   },
 
   findStageAndClient(id) {
-    return one('SELECT stage, client_id FROM matters WHERE id = ?', [id]);
+    return one('SELECT stage, client_id, attorney_id FROM matters WHERE id = ?', [id]);
   },
 };
 

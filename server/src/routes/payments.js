@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { requireAuth, requireRole } = require('../middleware/auth');
 const InvoiceRepo         = require('../repositories/invoice.repository');
+const MatterRepo          = require('../repositories/matter.repository');
 const UserRepo            = require('../repositories/user.repository');
 const { parsePagination } = require('../lib/pagination');
 const config              = require('../config');
@@ -174,6 +175,13 @@ router.post('/refund', requireAuth, requireRole('attorney', 'partner', 'itsuppor
 
     const inv = await InvoiceRepo.findById(invoiceId);
     if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+    // An attorney could previously refund ANY invoice firm-wide — must
+    // actually be the assigned attorney on the invoice's matter (partners/
+    // itsupport unrestricted).
+    if (req.user.role === 'attorney') {
+      const matter = inv.matter_id ? await MatterRepo.findById(inv.matter_id) : null;
+      if (!matter || matter.attorney_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    }
     if (inv.status !== 'paid') return res.status(400).json({ error: 'Invoice is not paid' });
     if (inv.status === 'refunded') return res.status(400).json({ error: 'Already refunded' });
     if (!inv.stripe_payment_intent_id)
@@ -360,6 +368,7 @@ router.get('/export', requireAuth, requireRole('attorney', 'partner', 'itsupport
       from:   from   || null,
       to:     to     || null,
       clientId: clientId ? Number(clientId) : null,
+      attorneyId: req.user.role === 'attorney' ? req.user.id : null,
     });
 
     const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;

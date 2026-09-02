@@ -64,10 +64,10 @@ const DocumentRepository = {
     );
   },
 
-  // Returns doc joined with its matter's client_id — needed for ownership checks.
+  // Returns doc joined with its matter's client_id/attorney_id — needed for ownership checks.
   findByIdWithMatter(id) {
     return one(
-      `SELECT d.*, m.client_id
+      `SELECT d.*, m.client_id, m.attorney_id AS matter_attorney_id
        FROM documents d
        LEFT JOIN matters m ON d.matter_id = m.id
        WHERE d.id = ?`,

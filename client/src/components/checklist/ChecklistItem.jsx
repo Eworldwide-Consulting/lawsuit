@@ -4,6 +4,7 @@ import {
   Download, XCircle, MinusCircle, Info, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import checklistApi from '../../api/checklist.api';
+import { downloadFile } from '../../lib/fileActions';
 import { useToast } from '../../context/ToastContext';
 import Spinner from '../ui/Spinner';
 
@@ -91,6 +92,14 @@ export default function ChecklistItem({ item, onUpdated }) {
   const isCorrection = item.status === 'needs_correction';
   const isChecked    = ['submitted', 'accepted', 'not_applicable'].includes(item.status);
 
+  async function handleDownloadFile() {
+    try {
+      await downloadFile(checklistApi.fileBlob(item.id), item.file_name);
+    } catch {
+      toast.error('Download failed. Please try again.');
+    }
+  }
+
   async function handleFile(file) {
     if (!file) return;
     setUploading(true);
@@ -176,16 +185,13 @@ export default function ChecklistItem({ item, onUpdated }) {
                     : `${Math.round(item.file_size / 1024)} KB`})
                 </span>
               )}
-              <a
-                href={checklistApi.downloadUrl(item.id)}
-                target="_blank"
-                rel="noreferrer"
+              <button
                 aria-label={`Download ${item.file_name}`}
                 className="ml-1 text-[#0f2057] hover:text-blue-700"
-                onClick={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); handleDownloadFile(); }}
               >
                 <Download size={12} />
-              </a>
+              </button>
             </div>
           )}
 

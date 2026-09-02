@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, CheckCircle, XCircle, MinusCircle, FileText, ExternalLink, User, Briefcase } from 'lucide-react';
 import checklistApi from '../../api/checklist.api';
+import { viewFileInPopup } from '../../lib/fileActions';
 import { useToast } from '../../context/ToastContext';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
@@ -30,6 +31,14 @@ export default function AttorneyReviewPanel({ item, onClose, onReviewed }) {
   if (!item) return null;
 
   const cfg = STATUS_CFG[item.status] || STATUS_CFG.submitted;
+
+  async function handleViewFile() {
+    try {
+      await viewFileInPopup(checklistApi.fileBlob(item.id));
+    } catch (err) {
+      toast.error(err.code === 'POPUP_BLOCKED' ? err.message : 'Could not open file. Please try again.');
+    }
+  }
 
   async function handleSubmit() {
     if (!action) return;
@@ -142,16 +151,14 @@ export default function AttorneyReviewPanel({ item, onClose, onReviewed }) {
                 )}
               </div>
             </div>
-            <a
-              href={checklistApi.downloadUrl(item.id)}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Open file in new tab"
+            <button
+              onClick={handleViewFile}
+              aria-label="Open file in a new window"
               className="flex items-center gap-1 text-xs text-[#0f2057] hover:underline font-medium"
             >
               <ExternalLink size={13} />
               View file
-            </a>
+            </button>
           </div>
         ) : (
           <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">

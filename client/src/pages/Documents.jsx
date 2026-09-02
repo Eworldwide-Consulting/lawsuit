@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { documentsApi, mattersApi } from '../api';
+import { viewFileInPopup, downloadFile } from '../lib/fileActions';
 import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X, Send, CheckCircle, XCircle, RotateCcw, User } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
@@ -152,6 +153,22 @@ export default function Documents() {
   function startReupload(doc) {
     setReuploadTarget(doc);
     reuploadRef.current?.click();
+  }
+
+  async function handleView(doc) {
+    try {
+      await viewFileInPopup(documentsApi.viewBlob(doc.id));
+    } catch (err) {
+      toast.error(err.code === 'POPUP_BLOCKED' ? err.message : 'Could not open document. Please try again.');
+    }
+  }
+
+  async function handleDownload(doc) {
+    try {
+      await downloadFile(documentsApi.downloadBlob(doc.id), doc.name);
+    } catch {
+      toast.error('Download failed. Please try again.');
+    }
   }
 
   async function handleReupload(file) {
@@ -461,27 +478,24 @@ export default function Documents() {
                           </button>
                         )}
                         {doc.file_path && (
-                          <a
-                            href={documentsApi.viewUrl(doc.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={() => handleView(doc)}
                             aria-label={`View ${doc.name}`}
                             title="View document"
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                           >
                             <Eye size={14} />
-                          </a>
+                          </button>
                         )}
                         {doc.file_path && (
-                          <a
-                            href={documentsApi.downloadUrl(doc.id)}
-                            download
+                          <button
+                            onClick={() => handleDownload(doc)}
                             aria-label={`Download ${doc.name}`}
                             title="Download"
                             className="p-1.5 text-gray-400 hover:text-[#0f2057] hover:bg-gray-100 rounded transition-colors"
                           >
                             <Download size={14} />
-                          </a>
+                          </button>
                         )}
                         <button
                           onClick={() => openEdit(doc)}

@@ -34,6 +34,10 @@ const checklistApi = {
 
   /** Download / stream an uploaded file */
   downloadUrl: (itemId) => `/api/checklists/download/${itemId}`,
+  // downloadUrl above is unusable as a raw <a href> — the route requires
+  // auth and the Bearer token is only ever attached by the axios interceptor,
+  // never sent on plain navigation. Fetch it through axios instead.
+  fileBlob: (itemId) => http.get(`/checklists/download/${itemId}`, { responseType: 'blob' }),
 };
 
 export default checklistApi;

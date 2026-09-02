@@ -62,6 +62,11 @@ router.get('/by-case-number/:caseNumber', requireAuth, requireRole('attorney', '
       [req.params.caseNumber]
     );
     if (!matter) throw new NotFoundError('No case found with that case number');
+    // An attorney could previously pull up ANY firm-wide case (client PII,
+    // intake form, checklist) just by knowing/guessing its case number —
+    // requireRole alone doesn't check they're the assigned attorney.
+    if (req.user.role === 'attorney' && matter.attorney_id !== req.user.id)
+      throw new ForbiddenError();
 
     const { getSchema, normalizeMatterType } = require('../domain/intakeFormSchema');
     const formRow = await one('SELECT * FROM intake_forms WHERE matter_id = ?', [matter.id]);
@@ -138,6 +143,12 @@ router.put('/:id', requireAuth, requireRole('attorney', 'partner'), async (req, 
   try {
     // Snapshot stage before update to detect stage changes
     const before = await MatterRepo.findById(req.params.id);
+    if (!before) throw new NotFoundError('Matter');
+    // An attorney could previously update (or even reassign) any matter
+    // firm-wide — requireRole alone doesn't check they're the assigned
+    // attorney. Partners/itsupport remain unrestricted.
+    if (req.user.role === 'attorney' && before.attorney_id !== req.user.id)
+      throw new ForbiddenError();
     await MatterService.update(req.params.id, req.body);
 
     const stageChanged = req.body.stage && before?.stage !== req.body.stage;

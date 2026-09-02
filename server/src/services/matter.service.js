@@ -87,6 +87,8 @@ const MatterService = {
     if (!m) throw new NotFoundError('Matter');
     if (isClient(user.role) && m.client_id !== user.id)
       throw new ForbiddenError();
+    if (user.role === 'attorney' && m.attorney_id !== user.id)
+      throw new ForbiddenError();
 
     const cur = MATTER_STAGES.indexOf(m.stage);
     return MATTER_STAGES.map((stage, i) => ({

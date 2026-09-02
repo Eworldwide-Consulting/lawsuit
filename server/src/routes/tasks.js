@@ -3,7 +3,6 @@ const { requireAuth }  = require('../middleware/auth');
 const TaskRepo         = require('../repositories/task.repository');
 const MatterRepo       = require('../repositories/matter.repository');
 const { parsePagination } = require('../lib/pagination');
-const { isStaff }      = require('../domain/user');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../lib/errors');
 const NotificationService = require('../services/notification.service');
 const AuditService        = require('../services/audit.service');
@@ -18,7 +17,10 @@ router.get('/', requireAuth, async (req, res, next) => {
       if (!matterRows.length) return res.json([]);
       return res.json(await TaskRepo.findByMatters(matterRows.map(m => m.id), pagination));
     }
-    res.json(await TaskRepo.findAll(pagination));
+    // An attorney could previously list every firm-wide task — only their
+    // own matters' tasks now (partners/itsupport still see everything).
+    const attorneyId = req.user.role === 'attorney' ? req.user.id : null;
+    res.json(await TaskRepo.findAll(pagination, attorneyId));
   } catch (err) { next(err); }
 });
 
@@ -52,8 +54,12 @@ router.put('/:id', requireAuth, async (req, res, next) => {
   try {
     const task = await TaskRepo.findById(req.params.id);
     if (!task) throw new NotFoundError('Task');
-    if (task.assigned_to !== req.user.id && !isStaff(req.user.role))
-      throw new ForbiddenError();
+    // An attorney could previously update ANY firm-wide task — isStaff() alone
+    // doesn't check they're actually assigned to it or its matter.
+    const canAccess = task.assigned_to === req.user.id
+      || (req.user.role === 'attorney' && task.matter_attorney_id === req.user.id)
+      || ['partner', 'itsupport'].includes(req.user.role);
+    if (!canAccess) throw new ForbiddenError();
     if (!VALID_STATUSES.includes(req.body.status))
       throw new ValidationError(`status must be one of: ${VALID_STATUSES.join(', ')}`);
     await TaskRepo.updateStatus(req.params.id, req.body.status);
