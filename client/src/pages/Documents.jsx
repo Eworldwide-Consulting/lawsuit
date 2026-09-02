@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { documentsApi } from '../api';
-import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X, Send, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { documentsApi, mattersApi } from '../api';
+import { Upload, Download, Trash2, Search, FileText, File, Eye, Edit2, X, Send, CheckCircle, XCircle, RotateCcw, User } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import Badge, { statusVariant } from '../components/ui/Badge';
@@ -52,6 +52,12 @@ export default function Documents() {
   const [reuploadTarget, setReuploadTarget] = useState(null);
   const [reuploading, setReuploading]       = useState({});
 
+  // Which matter/client an upload gets attached to. Staff must explicitly
+  // choose one (a firm can have many clients); a client only ever has their
+  // own matter(s), so theirs is auto-selected — no prompt needed.
+  const [matters, setMatters]               = useState([]);
+  const [selectedMatterId, setSelectedMatterId] = useState('');
+
   const fileRef     = useRef();
   const reuploadRef = useRef();
 
@@ -60,19 +66,40 @@ export default function Documents() {
   const load = () =>
     documentsApi.list().then(r => setDocs(r.data)).finally(() => setLoading(false));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    mattersApi.list({ limit: 200 }).then(r => {
+      const list = r.data?.matters || r.data || [];
+      setMatters(list);
+      // Client: silently attach their own (most recent) matter to every
+      // upload. Staff: leave unselected — they must pick a client below.
+      if (!isStaff && list.length) setSelectedMatterId(String(list[0].id));
+    }).catch(() => {});
+  }, []);
+
+  const selectedMatter = matters.find(m => String(m.id) === String(selectedMatterId));
 
   async function handleUpload(files) {
     if (!files?.length) return;
+    if (isStaff && !selectedMatterId) {
+      toast.error('Select which client this document is for before uploading.');
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData();
       Array.from(files).forEach(f => fd.append('files', f));
+      if (selectedMatterId) fd.append('matterId', selectedMatterId);
       const res = await documentsApi.upload(fd);
       const newDocs = Array.isArray(res.data) ? res.data : [];
       if (newDocs.length) setDocs(prev => [...newDocs, ...prev]);
       load();
-      toast.success(`${files.length} file${files.length !== 1 ? 's' : ''} uploaded`);
+      const count = files.length;
+      toast.success(
+        isStaff && selectedMatter
+          ? `${count} file${count !== 1 ? 's' : ''} uploaded for ${selectedMatter.client_name} — they've been notified`
+          : `${count} file${count !== 1 ? 's' : ''} uploaded`
+      );
     } catch {
       toast.error('Upload failed. Please try again.');
     } finally {
@@ -203,9 +230,10 @@ export default function Documents() {
         </div>
         <button
           onClick={() => fileRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || (isStaff && !selectedMatterId)}
           className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
           aria-label="Upload files"
+          title={isStaff && !selectedMatterId ? 'Select a client first' : undefined}
         >
           {uploading ? <Spinner size={4} color="text-white" /> : <Upload size={16} aria-hidden="true" />}
           Upload Files
@@ -229,19 +257,61 @@ export default function Documents() {
         />
       </div>
 
+      {/* Staff: choose which client this upload is for — required before
+          anything can be uploaded, so a document is never accidentally
+          orphaned from a matter (which would make it invisible to the
+          client and skip their notification). */}
+      {isStaff && (
+        <div className="card p-4 mb-5">
+          <label className="form-label flex items-center gap-1.5">
+            <User size={13} /> Uploading for which client? <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={selectedMatterId}
+            onChange={e => setSelectedMatterId(e.target.value)}
+            className="form-input text-sm"
+            aria-label="Select client for upload"
+          >
+            <option value="">— Select a client / case —</option>
+            {matters.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.client_name || 'Unknown client'} — {m.case_number || `Matter #${m.id}`}
+              </option>
+            ))}
+          </select>
+          {matters.length === 0 && (
+            <p className="text-xs text-amber-600 mt-1.5">You have no clients assigned yet.</p>
+          )}
+          {selectedMatter && (
+            <p className="text-xs text-gray-500 mt-1.5">
+              Uploaded files will be sent to <strong>{selectedMatter.client_name}</strong> and they'll be notified immediately.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Drop zone */}
       <div
         role="button"
         tabIndex={0}
-        aria-label="Drop zone — drag and drop files here or press Enter to browse"
-        onDrop={handleDrop}
+        aria-disabled={isStaff && !selectedMatterId}
+        aria-label={
+          isStaff && !selectedMatterId
+            ? 'Select a client above before uploading'
+            : 'Drop zone — drag and drop files here or press Enter to browse'
+        }
+        onDrop={e => { if (!(isStaff && !selectedMatterId)) handleDrop(e); else e.preventDefault(); }}
         onDragOver={e => e.preventDefault()}
-        onClick={() => fileRef.current?.click()}
-        onKeyDown={e => e.key === 'Enter' && fileRef.current?.click()}
-        className="drop-zone mb-5"
+        onClick={() => { if (!(isStaff && !selectedMatterId)) fileRef.current?.click(); }}
+        onKeyDown={e => { if (e.key === 'Enter' && !(isStaff && !selectedMatterId)) fileRef.current?.click(); }}
+        className={`drop-zone mb-5 ${isStaff && !selectedMatterId ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <Upload size={24} className="mx-auto text-gray-400 mb-2" aria-hidden="true" />
-        <div className="text-sm font-medium text-gray-600">Drag & drop files here or click to browse</div>
+        <div className="text-sm font-medium text-gray-600">
+          {isStaff && !selectedMatterId
+            ? 'Select a client above to enable upload'
+            : 'Drag & drop files here or click to browse'}
+        </div>
         <div className="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, JPG, PNG · Max 20 MB each</div>
       </div>
 

@@ -1,7 +1,7 @@
 import http from './http';
 
 const mattersApi = {
-  list:            ()              => http.get('/matters'),
+  list:            (params)        => http.get('/matters', { params }),
   get:             id              => http.get(`/matters/${id}`),
   create:          d               => http.post('/matters', d),
   update:          (id, d)         => http.put(`/matters/${id}`, d),
