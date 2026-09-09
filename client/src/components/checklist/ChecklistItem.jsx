@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import {
-  Check, Clock, AlertCircle, Upload, FileText,
+  Check, Clock, FileText,
   Download, XCircle, MinusCircle, Info, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import checklistApi from '../../api/checklist.api';
@@ -206,21 +206,6 @@ export default function ChecklistItem({ item, onUpdated }) {
             </div>
           )}
 
-          {/* Upload button (secondary) for items that can be uploaded */}
-          {canUpload && !uploading && (
-            <button
-              onClick={() => fileRef.current?.click()}
-              className={`mt-2 flex items-center gap-1.5 text-xs font-medium transition-colors ${
-                isCorrection
-                  ? 'text-red-600 hover:text-red-800'
-                  : 'text-[#0f2057] hover:text-blue-700'
-              }`}
-              aria-label={`Upload file for ${item.label}`}
-            >
-              <Upload size={12} />
-              {item.file_name ? 'Replace file' : isCorrection ? 'Fix & Re-upload' : 'Upload file'}
-            </button>
-          )}
         </div>
       </div>
 

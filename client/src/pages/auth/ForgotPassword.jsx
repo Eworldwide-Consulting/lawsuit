@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Phone, ArrowLeft, Shield, Check } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
 import Spinner from '../../components/ui/Spinner';
+import PasswordRequirements from '../../components/ui/PasswordRequirements';
+import { passwordMeetsRules, PASSWORD_REQUIREMENTS_MESSAGE } from '../../lib/passwordPolicy';
 import { authApi } from '../../api';
 
 function EmailReset() {
@@ -159,8 +161,8 @@ function PhoneReset() {
       setError('Passwords do not match.');
       return;
     }
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+    if (!passwordMeetsRules(newPassword)) {
+      setError(PASSWORD_REQUIREMENTS_MESSAGE);
       return;
     }
     setLoading(true);
@@ -273,11 +275,13 @@ function PhoneReset() {
             value={newPassword}
             onChange={e => setNewPassword(e.target.value)}
             required
-            placeholder="At least 8 characters"
+            minLength={8}
+            placeholder="8+ characters, incl. uppercase, number & symbol"
             className="form-input"
             autoComplete="new-password"
             disabled={loading}
           />
+          <PasswordRequirements password={newPassword} />
         </div>
         <div>
           <label className="form-label" htmlFor="fp-confirm-pw">Confirm new password</label>

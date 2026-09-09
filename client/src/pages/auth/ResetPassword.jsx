@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
 import Spinner from '../../components/ui/Spinner';
+import PasswordRequirements from '../../components/ui/PasswordRequirements';
+import { passwordMeetsRules, PASSWORD_REQUIREMENTS_MESSAGE } from '../../lib/passwordPolicy';
 import { authApi } from '../../api';
 
 export default function ResetPassword() {
@@ -23,14 +25,13 @@ export default function ResetPassword() {
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
-  // Password strength: at least 8 chars, 1 number or symbol
-  const isStrong = form.newPassword.length >= 8;
+  const isStrong = passwordMeetsRules(form.newPassword);
   const matches  = form.newPassword === form.confirm;
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!matches)   return setError('Passwords do not match.');
-    if (!isStrong)  return setError('Password must be at least 8 characters.');
+    if (!isStrong)  return setError(PASSWORD_REQUIREMENTS_MESSAGE);
     if (!token)     return setError('Invalid or missing reset token.');
 
     setLoading(true);
@@ -104,7 +105,7 @@ export default function ResetPassword() {
                   onChange={set('newPassword')}
                   required
                   minLength={8}
-                  placeholder="Min. 8 characters"
+                  placeholder="8+ characters, incl. uppercase, number & symbol"
                   className="form-input pl-10 pr-10"
                   autoComplete="new-password"
                   disabled={loading || !token}
@@ -118,12 +119,7 @@ export default function ResetPassword() {
                   {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              {form.newPassword && (
-                <div className={`mt-1.5 text-xs flex items-center gap-1 ${isStrong ? 'text-green-600' : 'text-amber-600'}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${isStrong ? 'bg-green-500' : 'bg-amber-400'}`} />
-                  {isStrong ? 'Strong password' : 'At least 8 characters required'}
-                </div>
-              )}
+              <PasswordRequirements password={form.newPassword} />
             </div>
 
             <div>

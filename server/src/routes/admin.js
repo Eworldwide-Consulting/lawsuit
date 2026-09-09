@@ -10,6 +10,7 @@ const { in24Hours }   = require('../lib/dates');
 const { parsePagination } = require('../lib/pagination');
 const config          = require('../config');
 const AuditService    = require('../services/audit.service');
+const { isStrongPassword, PASSWORD_REQUIREMENTS_MESSAGE } = require('../lib/passwordPolicy');
 
 const guard = [requireAuth, requireRole('itsupport', 'partner')];
 
@@ -309,8 +310,8 @@ router.post('/users/:id/resend-verification', ...guard, async (req, res, next) =
 router.put('/users/:id/reset-password', ...guard, async (req, res, next) => {
   try {
     const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 8)
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (!isStrongPassword(newPassword))
+      return res.status(400).json({ error: PASSWORD_REQUIREMENTS_MESSAGE });
 
     const user = await one('SELECT id, email, first_name FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });

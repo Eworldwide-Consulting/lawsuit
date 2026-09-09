@@ -183,7 +183,7 @@ router.post('/forgot-password', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/reset-password', async (req, res, next) => {
+router.post('/reset-password', validate(schemas.resetPassword), async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
     const result = await AuthService.resetPassword({ token, newPassword });
@@ -226,7 +226,7 @@ router.post('/forgot-password/phone', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/reset-password/phone', async (req, res, next) => {
+router.post('/reset-password/phone', validate(schemas.resetPasswordByPhone), async (req, res, next) => {
   try {
     const { phone, code, newPassword } = req.body;
     const result = await AuthService.resetPasswordByPhone({ phone, code, newPassword });
@@ -426,13 +426,9 @@ router.put('/profile', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/change-password', requireAuth, async (req, res, next) => {
+router.put('/change-password', requireAuth, validate(schemas.changePassword), async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword)
-      return res.status(400).json({ error: 'Both passwords required' });
-    if (newPassword.length < 8)
-      return res.status(400).json({ error: 'Min 8 characters' });
     await AuthService.changePassword(req.user.id, { currentPassword, newPassword });
     await invalidateUserCache(req.user.id);
     AuditService.log({

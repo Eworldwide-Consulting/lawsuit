@@ -4,6 +4,8 @@ import { authApi } from '../api';
 import { User, Lock, Bell, Shield, Check, ShieldCheck, ShieldOff, Link2, Unlink } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
 import TwoFASetupModal from '../components/ui/TwoFASetupModal';
+import PasswordRequirements from '../components/ui/PasswordRequirements';
+import { passwordMeetsRules, PASSWORD_REQUIREMENTS_MESSAGE } from '../lib/passwordPolicy';
 
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
@@ -46,7 +48,7 @@ export default function Settings() {
   async function changePassword(e) {
     e.preventDefault();
     if (pwd.newPassword !== pwd.confirm) return setError('Passwords do not match');
-    if (pwd.newPassword.length < 8) return setError('Password must be at least 8 characters');
+    if (!passwordMeetsRules(pwd.newPassword)) return setError(PASSWORD_REQUIREMENTS_MESSAGE);
     setSaving(true); setError(''); setSaved('');
     try {
       await authApi.changePassword({ currentPassword: pwd.currentPassword, newPassword: pwd.newPassword });
@@ -143,7 +145,16 @@ export default function Settings() {
             </div>
             <div>
               <label className="form-label">New password</label>
-              <input type="password" value={pwd.newPassword} onChange={e => setPwd(p => ({ ...p, newPassword: e.target.value }))} required minLength={8} className="form-input" />
+              <input
+                type="password"
+                value={pwd.newPassword}
+                onChange={e => setPwd(p => ({ ...p, newPassword: e.target.value }))}
+                required
+                minLength={8}
+                placeholder="8+ characters, incl. uppercase, number & symbol"
+                className="form-input"
+              />
+              <PasswordRequirements password={pwd.newPassword} />
             </div>
             <div>
               <label className="form-label">Confirm new password</label>

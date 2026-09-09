@@ -11,6 +11,7 @@ const { sanitizeUser, isSuspended }  = require('../domain/user');
 const { buildCaseNumber } = require('../domain/matter');
 const { in24Hours }     = require('../lib/dates');
 const { AppError, ConflictError, UnauthorizedError, ValidationError, ForbiddenError } = require('../lib/errors');
+const { isStrongPassword, PASSWORD_REQUIREMENTS_MESSAGE } = require('../lib/passwordPolicy');
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -114,7 +115,7 @@ const AuthService = {
   async registerAdmin({ firstName, lastName, email, password }) {
     if (!firstName || !lastName) throw new ValidationError('First and last name are required');
     if (!email) throw new ValidationError('Email is required');
-    if (!password || password.length < 8) throw new ValidationError('Password must be at least 8 characters');
+    if (!isStrongPassword(password)) throw new ValidationError(PASSWORD_REQUIREMENTS_MESSAGE);
 
     const existing = await UserRepo.findByEmail(email);
     if (existing) throw new ConflictError('Email already registered');
@@ -384,11 +385,10 @@ const AuthService = {
     return { sent: true, _email: user.email, _token: token };
   },
 
+  // Presence/strength of token and newPassword is already enforced by
+  // validate(schemas.resetPassword) at the route — same trust convention
+  // register() uses for validate(schemas.register).
   async resetPassword({ token, newPassword }) {
-    if (!token)       throw new ValidationError('Token required');
-    if (!newPassword) throw new ValidationError('New password required');
-    if (newPassword.length < 8) throw new ValidationError('Password must be at least 8 characters');
-
     const user = await UserRepo.findByPasswordResetToken(token);
     if (!user) throw new ValidationError('Invalid or expired reset link');
     if (new Date(user.password_reset_expires) < new Date())
@@ -416,11 +416,9 @@ const AuthService = {
     return { sent: true, _phone: user.phone, _code: code };
   },
 
+  // Presence/strength of phone, code and newPassword is already enforced by
+  // validate(schemas.resetPasswordByPhone) at the route.
   async resetPasswordByPhone({ phone, code, newPassword }) {
-    if (!phone)  throw new ValidationError('Phone number required');
-    if (!code)   throw new ValidationError('Code required');
-    if (!newPassword || newPassword.length < 8) throw new ValidationError('Password must be at least 8 characters');
-
     const user = await UserRepo.findByPhone(phone);
     if (!user?.phone_reset_otp) throw new UnauthorizedError('Invalid or expired code');
 

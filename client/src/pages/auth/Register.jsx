@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { authApi } from '../../api';
 import Logo from '../../components/ui/Logo';
+import PasswordRequirements from '../../components/ui/PasswordRequirements';
+import { passwordMeetsRules } from '../../lib/passwordPolicy';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -18,34 +20,6 @@ function isPublicEmail(email) {
 
 const MAX_DOB = new Date().toISOString().slice(0, 10); // today — DOB cannot be in the future
 const MIN_DOB = '1900-01-01';
-
-function pwStrength(pw) {
-  if (!pw) return 0;
-  let s = 0;
-  if (pw.length >= 8)  s++;
-  if (pw.length >= 12) s++;
-  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
-  if (/\d/.test(pw)) s++;
-  if (/[^A-Za-z0-9]/.test(pw)) s++;
-  return s;
-}
-
-function PasswordStrength({ password }) {
-  const s = pwStrength(password);
-  const level = s <= 1 ? 'Weak' : s <= 3 ? 'Fair' : 'Strong';
-  const color = s <= 1 ? 'bg-red-500' : s <= 3 ? 'bg-yellow-500' : 'bg-green-500';
-  const textColor = s <= 1 ? 'text-red-600' : s <= 3 ? 'text-yellow-600' : 'text-green-600';
-  const width = `${Math.min(100, (s / 5) * 100)}%`;
-  if (!password) return null;
-  return (
-    <div className="mt-1.5 space-y-1">
-      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width }} />
-      </div>
-      <p className={`text-xs font-medium ${textColor}`}>Password strength: {level}</p>
-    </div>
-  );
-}
 
 function FieldError({ msg }) {
   if (!msg) return null;
@@ -204,7 +178,8 @@ export default function Register() {
       else if ((role === 'attorney' || role === 'partner') && isPublicEmail(form.email.trim()))
         errs.email = 'Attorneys and partners must register with a professional firm email address';
       if (!form.password)         errs.password  = 'Password is required';
-      else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters';
+      else if (!passwordMeetsRules(form.password))
+        errs.password = 'Password must be at least 8 characters and include one uppercase letter, one number, and one special character (e.g. $ or %)';
     }
     if (s === 1 && role === 'client') {
       if (form.dob) {
@@ -444,7 +419,7 @@ export default function Register() {
                         type={showPw ? 'text' : 'password'}
                         value={form.password}
                         onChange={ev => set('password', ev.target.value)}
-                        placeholder="Minimum 8 characters"
+                        placeholder="8+ characters, incl. uppercase, number & symbol"
                         className={`pr-10 ${e('password') ? 'border-red-400' : ''}`}
                       />
                       <button
@@ -455,7 +430,7 @@ export default function Register() {
                         {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
                       </button>
                     </div>
-                    <PasswordStrength password={form.password} />
+                    <PasswordRequirements password={form.password} />
                   </Field>
                 </div>
               )}

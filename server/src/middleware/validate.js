@@ -1,4 +1,17 @@
 const { z } = require('zod');
+const { SPECIAL_CHAR_RE } = require('../lib/passwordPolicy');
+
+// Kept in sync with the frontend rule in client/src/lib/passwordPolicy.js
+// (PASSWORD_RULES / SPECIAL_CHAR_RE) — same character class both sides, so a
+// password the client-side checklist marks as satisfying every rule can never
+// be rejected here, and vice versa. Reused for every password-setting route:
+// /register, /reset-password, /reset-password/phone, /change-password.
+const passwordSchema = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128)
+  .refine(v => /[A-Z]/.test(v), 'Password must include at least one uppercase letter')
+  .refine(v => /\d/.test(v), 'Password must include at least one number')
+  .refine(v => SPECIAL_CHAR_RE.test(v), 'Password must include at least one special character (e.g. $ or %)');
 
 function validate(schema) {
   return (req, res, next) => {
@@ -32,7 +45,7 @@ const schemas = {
       firstName:  z.string().min(1).max(100),
       lastName:   z.string().min(1).max(100),
       email:      z.string().email().max(255),
-      password:   z.string().min(8).max(128),
+      password:   passwordSchema,
       role:       z.enum(['client', 'attorney', 'partner', 'itsupport']).default('client'),
       phone:      z.string().max(20).optional(),
     }),
@@ -42,6 +55,28 @@ const schemas = {
     body: z.object({
       email:    z.string().email(),
       password: z.string().min(1),
+    }),
+  }),
+
+  resetPassword: z.object({
+    body: z.object({
+      token:       z.string().min(1, 'Token required'),
+      newPassword: passwordSchema,
+    }),
+  }),
+
+  resetPasswordByPhone: z.object({
+    body: z.object({
+      phone:       z.string().min(1, 'Phone number required'),
+      code:        z.string().min(1, 'Code required'),
+      newPassword: passwordSchema,
+    }),
+  }),
+
+  changePassword: z.object({
+    body: z.object({
+      currentPassword: z.string().min(1, 'Current password required'),
+      newPassword:     passwordSchema,
     }),
   }),
 
