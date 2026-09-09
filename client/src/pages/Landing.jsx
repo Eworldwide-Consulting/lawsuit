@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import ContactSalesModal from '../components/ui/ContactSalesModal';
@@ -8,8 +8,20 @@ import {
   Users, Bell, Menu, X, Globe, Award,
   Database, Eye, Fingerprint, Check, Phone,
   Mail, BarChart2, Key, ChevronDown, Zap,
-  TrendingUp, Clock, Scale, Sparkles,
+  TrendingUp, Clock, Scale, MapPin,
 } from 'lucide-react';
+
+// All 50 states + DC — used by the nationwide-coverage marquee below the hero.
+const US_STATES = [
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
+  'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa',
+  'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan',
+  'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire',
+  'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
+  'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia',
+  'Wisconsin', 'Wyoming', 'District of Columbia',
+];
 
 export default function Landing() {
   const navigate  = useNavigate();
@@ -19,7 +31,6 @@ export default function Landing() {
   const [salesModal,    setSalesModal]    = useState(false);
   const [salesPlan,     setSalesPlan]     = useState('Enterprise');
   const [statsVisible,  setStatsVisible]  = useState(false);
-  const [counts,        setCounts]        = useState([0, 0, 0, 0]);
   const heroRef     = useRef(null);
   const servicesRef = useRef(null);
   const statsRef    = useRef(null);
@@ -48,73 +59,10 @@ export default function Landing() {
     return () => io.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!statsVisible) return;
-    const targets = [12400, 58000, 640, 99.97];
-    const duration = 2400;
-    const start = performance.now();
-    let rafId;
-    const animate = (now) => {
-      const t = Math.min((now - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      setCounts(targets.map(v => v * ease));
-      if (t < 1) { rafId = requestAnimationFrame(animate); }
-      else { setCounts(targets); }
-    };
-    rafId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafId);
-  }, [statsVisible]);
-
-  // ── 3D Trust Arc (stats) ──────────────────────────────
+  // ── Nationwide coverage marquee ───────────────────────
   const [reducedMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
-  const orbitStageRef  = useRef(null);
-  const orbitAngleRef  = useRef(0);
-  const orbitTiltRef   = useRef(0);
-  const orbitDragRef   = useRef({ dragging: false, startX: 0, startAngle: 0 });
-
-  const orbitParticles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    top: 40 + Math.random() * 55,
-    size: 2 + Math.random() * 3,
-    duration: 9 + Math.random() * 9,
-    delay: -(Math.random() * 16),
-    drift: `${Math.round((Math.random() - 0.5) * 90)}px`,
-  })), []);
-
-  useEffect(() => {
-    if (!statsVisible || reducedMotion) return;
-    let rafId;
-    const tick = (now) => {
-      const sway = Math.sin(now / 2500) * 6;
-      const stage = orbitStageRef.current;
-      if (stage) {
-        stage.style.transform = `rotateX(${orbitTiltRef.current}deg) rotateY(${orbitAngleRef.current + sway}deg)`;
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [statsVisible, reducedMotion]);
-
-  const onOrbitTilt = (e) => {
-    const r  = e.currentTarget.getBoundingClientRect();
-    const py = (e.clientY - r.top) / r.height - 0.5;
-    orbitTiltRef.current = Math.max(-12, Math.min(12, -py * 16));
-  };
-  const onOrbitTiltReset = () => { orbitTiltRef.current = 0; };
-  const onOrbitPointerDown = (e) => {
-    orbitDragRef.current = { dragging: true, startX: e.clientX, startAngle: orbitAngleRef.current };
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-  };
-  const onOrbitPointerMove = (e) => {
-    if (!orbitDragRef.current.dragging) return;
-    const dx = e.clientX - orbitDragRef.current.startX;
-    orbitAngleRef.current = Math.max(-40, Math.min(40, orbitDragRef.current.startAngle + dx * 0.4));
-  };
-  const onOrbitPointerUp = () => { orbitDragRef.current.dragging = false; };
 
   // ── Why TriVanta reveal (numbered list + reach panel) ─
   const impactRef = useRef(null);
@@ -159,18 +107,6 @@ export default function Landing() {
     ['Services',  'services'],
     ['Pricing',   'pricing'],
   ];
-
-  const stats = [
-    { target: 12400, label: 'Clients Served',    icon: Users,      color: '#3b82f6', accent: 'rgba(59,130,246,.14)'  },
-    { target: 58000, label: 'Documents Secured', icon: Shield,     color: '#d4af37', accent: 'rgba(212,175,55,.14)'  },
-    { target: 640,   label: 'Verified Attorneys',icon: Scale,      color: '#10b981', accent: 'rgba(16,185,129,.14)'  },
-    { target: 99.97, label: 'Platform Uptime',   icon: TrendingUp, color: '#a78bfa', accent: 'rgba(167,139,250,.14)' },
-  ];
-
-  const fmtCount = (v, i) => {
-    if (i === 3) return v.toFixed(2) + '%';
-    return Math.floor(v).toLocaleString() + '+';
-  };
 
   const faqs = [
     {
@@ -378,143 +314,66 @@ export default function Landing() {
           .srv-dot { animation: none; }
         }
 
-        /* ── Stats Section ── */
-        @keyframes statReveal {
-          from { opacity: 0; transform: translateY(40px) scale(.94); }
-          to   { opacity: 1; transform: translateY(0)    scale(1);   }
-        }
-        @keyframes borderPulse {
-          0%,100% { opacity: .55; }
-          50%     { opacity: 1;   }
-        }
-        .stat-card-pro {
-          transition: transform .36s cubic-bezier(.22,1,.36,1), box-shadow .36s ease;
-        }
-        .stat-card-pro:hover {
-          transform: translateY(-10px) scale(1.02);
-          box-shadow: 0 28px 80px rgba(0,0,0,.4);
-        }
-        .stats-visible .stat-card-pro {
-          animation: statReveal .78s cubic-bezier(.22,1,.36,1) both;
-        }
-        .stat-icon-wrap {
-          transition: transform .32s cubic-bezier(.34,1.56,.64,1);
-        }
-        .stat-card-pro:hover .stat-icon-wrap {
-          transform: scale(1.15) rotate(4deg);
+        /* ── Nationwide Coverage marquee ── */
+        @keyframes statesMarquee {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
         }
 
-        /* ── 3D Trust Arc ── */
-        @keyframes orbitRingSpin    { to { transform: rotateZ(360deg);  } }
-        @keyframes orbitRingSpinRev { to { transform: rotateZ(-360deg); } }
-        @keyframes orbitCoreGlow {
-          0%,100% { box-shadow: 0 0 30px 6px rgba(212,175,55,.32), 0 0 70px 20px rgba(59,130,246,.12); }
-          50%     { box-shadow: 0 0 48px 13px rgba(212,175,55,.58), 0 0 100px 28px rgba(59,130,246,.22); }
-        }
-        @keyframes orbitCardBob {
-          0%,100% { transform: translateY(0); }
-          50%     { transform: translateY(-9px); }
-        }
-        @keyframes orbitParticleFloat {
-          0%   { transform: translate3d(0,0,0); opacity: 0; }
-          12%  { opacity: .85; }
-          88%  { opacity: .5; }
-          100% { transform: translate3d(var(--drift,0px), -150px, 0); opacity: 0; }
-        }
-
-        .stat-orbit-wrap {
-          position: relative;
-          perspective: 1700px;
-          padding: 36px 0 6px;
-        }
-        .stat-orbit-particles {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          overflow: hidden;
-        }
-        .orbit-particle {
-          position: absolute;
-          border-radius: 9999px;
-          background: radial-gradient(circle, rgba(212,175,55,.9), rgba(212,175,55,0) 72%);
-          animation-name: orbitParticleFloat;
-          animation-timing-function: ease-in;
-          animation-iteration-count: infinite;
-        }
-        .stat-orbit-stage {
-          position: relative;
-          width: 100%;
-          max-width: 900px;
-          height: 380px;
-          margin: 0 auto;
-          transform-style: preserve-3d;
-          touch-action: pan-y;
-          cursor: grab;
-        }
-        .stat-orbit-stage:active { cursor: grabbing; }
-
-        .stat-orbit-core {
-          position: absolute;
-          top: 50%; left: 50%;
-          width: 96px; height: 96px;
-          transform: translate(-50%,-50%) translateZ(30px);
-          transform-style: preserve-3d;
-          border-radius: 9999px;
-          background: radial-gradient(circle at 35% 30%, rgba(212,175,55,.4), rgba(4,9,30,.92) 72%);
-          display: flex; align-items: center; justify-content: center;
-          animation: orbitCoreGlow 3.2s ease-in-out infinite;
-        }
-        .orbit-ring {
-          position: absolute;
-          inset: -20px;
-          border-radius: 9999px;
-          border: 1px dashed rgba(212,175,55,.35);
-        }
-        .orbit-ring-a { animation: orbitRingSpin 13s linear infinite; }
-        .orbit-ring-b { inset: -42px; border-color: rgba(59,130,246,.28); animation: orbitRingSpinRev 19s linear infinite; }
-        .orbit-ring-c { inset: -64px; border-color: rgba(255,255,255,.12); animation: orbitRingSpin 30s linear infinite; }
-
-        .stat-orbit-card {
-          position: absolute;
-          top: 50%; left: 50%;
-          width: 230px;
+        .us-states-wrap {
           opacity: 0;
           transition: opacity .8s ease;
-          transition-delay: calc(var(--i,0) * .12s);
         }
-        .stat-orbit-in .stat-orbit-card { opacity: 1; }
-        .stat-orbit-card-inner {
-          border-radius: 20px;
-          padding: 24px 20px;
-          background: linear-gradient(135deg,rgba(255,255,255,.075) 0%,rgba(255,255,255,.015) 100%);
-          border: 1px solid rgba(255,255,255,.1);
-          backdrop-filter: blur(14px);
-          animation: orbitCardBob 5.5s ease-in-out infinite;
-          animation-delay: calc(var(--i,0) * .35s);
-          transition: box-shadow .3s ease, border-color .3s ease, filter .3s ease;
+        .us-states-in { opacity: 1; }
+
+        .us-states-viewport {
+          position: relative;
+          overflow: hidden;
+          -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
         }
-        .stat-orbit-card-inner:hover {
-          border-color: rgba(212,175,55,.42);
-          filter: brightness(1.1);
-          box-shadow: 0 20px 50px rgba(0,0,0,.35);
+        .us-states-track {
+          display: flex;
+          width: max-content;
+          gap: 14px;
+          padding: 6px 0;
+          animation: statesMarquee 55s linear infinite;
         }
-        .stat-orbit-hint {
-          text-align: center;
-          font-size: .72rem;
-          letter-spacing: .04em;
-          color: rgba(147,197,253,.4);
-          margin-top: 6px;
-          user-select: none;
+        .us-states-viewport:hover .us-states-track {
+          animation-play-state: paused;
         }
 
-        @media (max-width: 767px) {
-          .stat-orbit-stage { height: 300px; }
-          .stat-orbit-card  { width: 168px; }
-          .stat-orbit-card-inner { padding: 18px 14px; }
+        .us-state-pill {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 10px 18px;
+          border-radius: 9999px;
+          background: linear-gradient(135deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.015) 100%);
+          border: 1px solid rgba(255,255,255,.1);
+          color: rgba(219,234,254,.85);
+          font-size: .82rem;
+          font-weight: 500;
+          white-space: nowrap;
+          transition: border-color .25s ease, background .25s ease;
+        }
+        .us-state-pill:hover {
+          border-color: rgba(212,175,55,.4);
+          background: linear-gradient(135deg,rgba(212,175,55,.1) 0%,rgba(255,255,255,.02) 100%);
+        }
+
+        .us-states-static {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 10px;
+          max-width: 900px;
+          margin: 0 auto;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .orbit-ring, .stat-orbit-core, .stat-orbit-card-inner, .orbit-particle { animation: none; }
+          .us-states-track { animation: none; }
         }
 
         /* ── Why TriVanta — numbered dossier list ── */
@@ -856,7 +715,7 @@ export default function Landing() {
         ════════════════════════ */}
         <section
           ref={statsRef}
-          className={`relative py-24 overflow-hidden${statsVisible ? ' stats-visible' : ''}`}
+          className="relative py-24 overflow-hidden"
           style={{ background: 'linear-gradient(180deg,#030816 0%,#050c1f 55%,#030816 100%)' }}
         >
           {/* Subtle grid */}
@@ -874,139 +733,40 @@ export default function Landing() {
             <div className="text-center mb-14">
               <div className="inline-flex items-center gap-2 border border-gold-500/22 bg-gold-500/8 rounded-full px-4 py-1.5 mb-5">
                 <span className="w-1.5 h-1.5 rounded-full bg-gold-400 inline-block srv-dot" />
-                <span className="text-gold-400/90 section-label">Platform Statistics</span>
+                <span className="text-gold-400/90 section-label">Nationwide Coverage</span>
               </div>
               <h2 className="font-display text-3xl md:text-4xl font-bold text-white tracking-tight">
-                The Platform That <span className="gold-shimmer">Supports Your In-House Team</span> — Every Single Day
+                The Platform That <span className="gold-shimmer">Supports Your In-House Team</span> Every Single Day
               </h2>
+              <p className="text-blue-300/70 text-sm mt-4 max-w-xl mx-auto">
+                Your Licensed attorneys and compliant workflows across all 50 states and Washington, D.C.
+              </p>
             </div>
 
-            {/* 3D Trust Arc */}
-            {reducedMotion ? (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-                {stats.map(({ label, icon: Icon, color, accent }, i) => (
-                  <div
-                    key={label}
-                    className="stat-card-pro group relative rounded-2xl p-6 cursor-default overflow-hidden"
-                    style={{ animationDelay: `${i * .15}s` }}
-                  >
-                    <div
-                      className="absolute inset-0 rounded-2xl border border-white/8"
-                      style={{ background: 'linear-gradient(135deg,rgba(255,255,255,.045) 0%,rgba(255,255,255,.01) 100%)' }}
-                    />
-                    <div
-                      className="absolute top-0 inset-x-0 h-[2px] rounded-t-2xl"
-                      style={{ background: `linear-gradient(90deg,transparent,${color},transparent)`, animation: `borderPulse 3s ease-in-out infinite ${i * .45}s` }}
-                    />
-                    <div className="relative z-10">
-                      <div
-                        className="stat-icon-wrap w-11 h-11 rounded-xl flex items-center justify-center mb-5"
-                        style={{ background: accent, border: `1px solid ${color}35` }}
-                      >
-                        <Icon size={20} style={{ color }} />
-                      </div>
-                      <div className="font-display text-4xl md:text-5xl font-bold mb-2 leading-none tabular-nums" style={{ color }}>
-                        {statsVisible ? fmtCount(counts[i], i) : (i === 3 ? '0.00%' : '0+')}
-                      </div>
-                      <div className="text-blue-300/75 text-sm font-medium mb-4">{label}</div>
-                      <div style={{ height: 3, borderRadius: 9999, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
-                        <div
-                          style={{
-                            height: '100%', borderRadius: 9999,
-                            background: `linear-gradient(90deg,${color}70,${color})`,
-                            width: statsVisible ? '100%' : '0%',
-                            transition: `width 2.4s cubic-bezier(.22,1,.36,1) ${i * .15}s`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div
-                className="stat-orbit-wrap"
-                onMouseMove={onOrbitTilt}
-                onMouseLeave={onOrbitTiltReset}
-              >
-                <div className="stat-orbit-particles">
-                  {orbitParticles.map(p => (
-                    <span
-                      key={p.id}
-                      className="orbit-particle"
-                      style={{
-                        left: `${p.left}%`,
-                        top: `${p.top}%`,
-                        width: p.size,
-                        height: p.size,
-                        animationDuration: `${p.duration}s`,
-                        animationDelay: `${p.delay}s`,
-                        '--drift': p.drift,
-                      }}
-                    />
+            {/* USA states — flowing right-to-left coverage marquee */}
+            <div className={`us-states-wrap${statsVisible ? ' us-states-in' : ''}`}>
+              {reducedMotion ? (
+                <div className="us-states-static">
+                  {US_STATES.map(state => (
+                    <span key={state} className="us-state-pill">
+                      <MapPin size={11} className="text-gold-400/80" />
+                      {state}
+                    </span>
                   ))}
                 </div>
-
-                <div
-                  className={`stat-orbit-stage${statsVisible ? ' stat-orbit-in' : ''}`}
-                  ref={orbitStageRef}
-                  onPointerDown={onOrbitPointerDown}
-                  onPointerMove={onOrbitPointerMove}
-                  onPointerUp={onOrbitPointerUp}
-                  onPointerLeave={onOrbitPointerUp}
-                >
-                  <div className="stat-orbit-core">
-                    <div className="orbit-ring orbit-ring-a" />
-                    <div className="orbit-ring orbit-ring-b" />
-                    <div className="orbit-ring orbit-ring-c" />
-                    <Sparkles size={22} className="text-gold-300 relative z-10" />
+              ) : (
+                <div className="us-states-viewport">
+                  <div className="us-states-track">
+                    {[...US_STATES, ...US_STATES].map((state, i) => (
+                      <span key={i} className="us-state-pill">
+                        <MapPin size={11} className="text-gold-400/80" />
+                        {state}
+                      </span>
+                    ))}
                   </div>
-
-                  {stats.map(({ label, icon: Icon, color, accent }, i) => {
-                    const angle = -33 + i * 22;
-                    const rad   = (angle * Math.PI) / 180;
-                    const R     = 330;
-                    const x     = Math.sin(rad) * R;
-                    const z     = (Math.cos(rad) - 1) * R;
-                    return (
-                      <div
-                        key={label}
-                        className="stat-orbit-card"
-                        style={{
-                          '--i': i,
-                          transform: `translate(-50%,-50%) translate3d(${x}px,0,${z}px) rotateY(${angle}deg)`,
-                        }}
-                      >
-                        <div className="stat-orbit-card-inner">
-                          <div
-                            className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
-                            style={{ background: accent, border: `1px solid ${color}35` }}
-                          >
-                            <Icon size={20} style={{ color }} />
-                          </div>
-                          <div className="font-display text-3xl md:text-4xl font-bold mb-1.5 leading-none tabular-nums" style={{ color }}>
-                            {statsVisible ? fmtCount(counts[i], i) : (i === 3 ? '0.00%' : '0+')}
-                          </div>
-                          <div className="text-blue-300/75 text-sm font-medium mb-3">{label}</div>
-                          <div style={{ height: 3, borderRadius: 9999, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
-                            <div
-                              style={{
-                                height: '100%', borderRadius: 9999,
-                                background: `linear-gradient(90deg,${color}70,${color})`,
-                                width: statsVisible ? '100%' : '0%',
-                                transition: `width 2.2s cubic-bezier(.22,1,.36,1) ${i * .15}s`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
-
-                <div className="stat-orbit-hint">DRAG TO ROTATE · HOVER TO EXPLORE</div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </section>
 
